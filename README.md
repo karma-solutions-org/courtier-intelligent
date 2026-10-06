@@ -1,6 +1,6 @@
-# Courtier Smart
+# Courtier Intelligent
 
-SaaS back-office pour courtiers en assurance + extension Chrome **Courtier Smart AutoFill** qui remplit les extranets des assureurs.
+SaaS back-office pour courtiers en assurance + extension Chrome **Courtier Intelligent – Remplissage auto** qui remplit les extranets des assureurs.
 
 ## Structure
 

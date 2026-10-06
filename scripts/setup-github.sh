@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Configure le backlog GitHub de Courtier Smart : labels, milestones (sprints), epics et stories.
+# Configure le backlog GitHub de Courtier Intelligent : labels, milestones (sprints), epics et stories.
 # Usage (Git Bash, depuis la racine du repo) : bash scripts/setup-github.sh
 set -euo pipefail
 
-REPO="dhiamockchahasg-coder/courtier-smart"
+REPO="dhiamockchahasg-coder/courtier-intelligent"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "== Labels"
