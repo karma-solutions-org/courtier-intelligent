@@ -2,7 +2,7 @@
 
 > À lire avant d'écrire du code. Ces règles priment sur les habitudes par défaut. Demander avant de s'en écarter.
 >
-> Structure reprise de `aibs-partenaire-web-and-desktop` (`core/` + `main/<zone>/<feature>-module/`, container / presentation, `*.structure.ts`, providers `ngx-sg`), avec **NgRx SignalStore à la place de NgRx classique** et **sans Electron**.
+> Structure reprise de `aibs-partenaire-web-and-desktop` (`core/` + `main/<zone>/<feature>-module/`, container / presentation, `*.structure.ts`, providers), avec **NgRx SignalStore à la place de NgRx classique** et **sans Electron**.
 
 ## 1. Stack
 
@@ -12,7 +12,7 @@
 | État | **NgRx SignalStore** (`@ngrx/signals`, `@ngrx/signals/entities`, `@ngrx/signals/rxjs-interop`) |
 | Async | `rxMethod()` pour les flux Firestore temps réel et les écritures ; `resource()` pour une lecture ponctuelle |
 | UI | **Angular Material** + SCSS |
-| Backend | **Firebase** (Auth, Firestore, Functions, Storage) via `@angular/fire`, **derrière les providers `ngx-sg`** |
+| Backend | **Firebase** (Auth, Firestore, Functions, Storage) via le **SDK `firebase`**, **derrière nos providers** (`core/providers/`, même rôle que `ngx-sg`) |
 | Locale | `fr-FR` |
 
 **Interdit dans le code :**
@@ -22,20 +22,20 @@
 - `@Input` / `@Output` / `@ViewChild` ;
 - l'injection par constructeur ;
 - `subscribe()` manuel dans un composant ;
-- un import direct de `@angular/fire` ou de `firebase/*` en dehors de `app.config.ts` et des services.
+- un import de `firebase/*` en dehors de `core/providers/` ; `@angular/fire` et `ngx-sg` (incompatibles avec Angular 22).
 
 ## 2. Couches et règle de dépendance
 
 ```
-container (page) → store → service → provider ngx-sg (DatabaseProvider, AuthenticationProvider…) → Firebase
+container (page) → store → service → provider (DatabaseProvider, AuthenticationProvider…) → Firebase
        ↓
 presentation (dumb)
 ```
 
 - Un **presentation component** ne reçoit que des `input()` et émet des `output()`. Il n'injecte rien.
 - Un **container component** injecte des stores, jamais un service ni un provider.
-- Un **store** injecte des services, jamais un provider `ngx-sg` directement.
-- Un **service** est le seul à parler aux providers `ngx-sg` (`DatabaseProvider`, `StorageProvider`, `BackendProvider`, `AuthenticationProvider`).
+- Un **store** injecte des services, jamais un provider directement.
+- Un **service** est le seul à parler aux providers (`DatabaseProvider`, `StorageProvider`, `BackendProvider`, `AuthenticationProvider`).
 - `core/` ne dépend jamais de `main/`, sauf `core/routing`, qui charge les composants en lazy.
 
 ## 3. Structure des dossiers
@@ -92,7 +92,7 @@ dossiers-module/
 │       └── new-dossier-presentation/
 ├── models/                                  # *.model.ts, *.enum.ts
 ├── services/
-│   └── dossiers.service.ts                  # seul accès aux providers ngx-sg
+│   └── dossiers.service.ts                  # seul accès aux providers
 ├── store/
 │   └── dossiers.store.ts                    # UN fichier SignalStore (remplace actions/reducer/effects/selectors)
 └── util/
@@ -181,27 +181,28 @@ export const DossiersStore = signalStore(
 
 ## 7. Services et providers
 
-Configurés une seule fois dans `app.config.ts`, comme dans `aibs-partenaire` :
+Les providers vivent dans `core/providers/`. Chaque port est une classe abstraite, liée à son implémentation Firebase dans `provideInfrastructure()` :
+
+| Port (abstrait) | Implémentation |
+|---|---|
+| `AuthenticationProvider` | `FireauthProvider` (expose `user$` avec les claims `tenantId` et `role`) |
+| `DatabaseProvider` | `FirestoreProvider` (`watchDocument`, `watchCollection`, `add`, `set`, `update`, `delete`) |
+| `BackendProvider` | `FirebaseFunctionsProvider` (`call(name, data)`) |
+| `StorageProvider` | `FirestorageProvider` (`upload`, `getUrl`, `delete`) |
 
 ```ts
-provideFirebaseApp(() => initializeApp(environment.firebaseConfig)),
-provideAuth(() => getAuth()),
-provideFirestore(() => initializeFirestore(getApp(), { ignoreUndefinedProperties: true })),
-provideFunctions(() => getFunctions()),
-provideStorage(() => getStorage()),
-{ provide: AuthenticationProvider, useClass: FireauthProvider },
-{ provide: DatabaseProvider,       useClass: FirestoreProvider },
-{ provide: BackendProvider,        useClass: FirebaseFunctionsProvider },
-{ provide: StorageProvider,        useClass: FirestorageProvider },
-provideZonelessChangeDetection(),
+// app.config.ts
+provideBrowserGlobalErrorListeners(),
 provideRouter(ROUTES, withComponentInputBinding()),
-provideAnimationsAsync(),
-{ provide: LOCALE_ID, useValue: 'fr-FR' },
+provideInfrastructure(),
+{ provide: LOCALE_ID, useValue: "fr-FR" },
 ```
+
+Le SDK est initialisé une seule fois dans `core/providers/firebase.ts`. `environment.useEmulators` bascule vers les emulators locaux.
 
 Aucun `provideStore`, `provideState` ni `provideEffects`.
 
-- Un service par module (`xxx.service.ts`, `providedIn: 'root'`). Il construit ses requêtes avec `QueryModelBuilder` et ne retourne que des `Observable` typés.
+- Un service par module (`xxx.service.ts`, `providedIn: 'root'`). Il construit ses requêtes avec un `QueryModel` (filtres, tri, limite) et ne retourne que des `Observable` typés.
 - Les chemins Firestore sont **toujours** préfixés par `tenants/{tenantId}/…`, sauf pour le catalogue global.
 - Les appels aux Cloud Functions passent par `BackendProvider`.
 
