@@ -19,6 +19,7 @@
     "@angular/material": "^22.2.1",
     "@angular/platform-browser": "^22.2.0",
     "@angular/router": "^22.2.0",
+    "@ngrx/operators": "^22.0.1",
     "@ngrx/signals": "^22.0.1",
     "firebase": "^12.19.0",
     "rxjs": "~7.8.0",
