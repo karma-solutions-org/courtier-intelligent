@@ -15,8 +15,8 @@ SaaS back-office pour courtiers en assurance + extension Chrome **Courtier Intel
 
 - `main` : production
 - `develop` : intégration
-- `feature/<ID>-<description>` : une story = une branche = une PR vers `develop`
+- `feature/<Epic>-<description> (ex. feature/E0-fondations)` : un Epic = une branche = une PR vers `develop`
 
 ## Commits
 
-`feat(E4-2): …`, `fix(E7-6): …`, `chore: …`, `docs: …`
+`feat(E4): …`, `fix(E7): …`, `chore: …`, `docs: …`

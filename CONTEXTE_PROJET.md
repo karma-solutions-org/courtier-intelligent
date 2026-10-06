@@ -170,7 +170,7 @@ Une première version existe dans `C:\Users\AIBS\extension\chrome-extension` («
 On **réutilise ses idées** : analyse DOM, synonymes, score de confiance, repli IA, mémoire structurelle des formulaires, modèle canonique fermé, étape « champs manquants », OCR de documents, règle « ne jamais inventer ».
 On **change** : communication via Firestore (et non plus par messages), mémoire **partagée** dans Firestore (et non plus locale), IA via proxy (plus de clé dans l'extension), et **ajout de la capture du tarif** (absente de la v1).
 
-## 13. Backlog (16 Epics, 85 stories)
+## 13. Backlog (16 Epics, pas de stories)
 
 | Epic | Contenu | Sprint |
 |---|---|---|
@@ -193,19 +193,19 @@ On **change** : communication via Firestore (et non plus par messages), mémoire
 
 **Sprints de 2 semaines (S1 → S11). MVP à la fin de S10.** Un **spike extension** de 3 jours est prévu en S2 sur l'extranet de l'assureur A, pour valider la faisabilité tôt.
 
-Le détail ligne par ligne (titre, labels, sprint, points, critère d'acceptation) est dans `scripts/backlog.tsv`.
+**Unité de travail = l'Epic.** Pas de découpage en stories : chaque Epic est une issue GitHub, développée sur une branche et livrée par une PR.
 
 **Estimation** : développeur junior aidé d'agents IA → **environ 6 à 7 mois** pour le MVP (5 en optimiste, 8–9 en pessimiste).
 
 ## 14. GitHub
 
 - Repo : **`dhiamockchahasg-coder/courtier-intelligent`** (privé).
-- Branches : `main` (production, protégée) · `develop` (intégration, protégée) · `feature/<ID>-<description>`.
-- Règle : **une story = une branche = une PR vers `develop`** ; fin de sprint = PR `develop → main` + release `v0.X`.
-- Commits : `feat(E4-2): …`, `fix(E7-6): …`, `chore: …`, `docs: …`.
-- Labels : `epic`, `story`, `spike`, `bug`, `P1`/`P2`/`P3`, `app`, `extension`, `functions`, `firestore`, `E0`…`E15`.
+- Branches : `main` (production, protégée) · `develop` (intégration, protégée) · `feature/<Epic>-<description>`.
+- Règle : **un Epic = une branche (`feature/E0-fondations`) = une PR vers `develop`** ; fin de sprint = PR `develop → main` + release `v0.X`.
+- Commits : `feat(E4): …`, `fix(E7): …`, `chore: …`, `docs: …`.
+- Labels : `epic`, `spike`, `bug`, `P1`/`P2`/`P3`, `app`, `extension`, `functions`, `firestore`, `E0`…`E15`.
 - Milestones : `S1` … `S11`.
-- Epics = issues parents ; stories = **sub-issues** de leur Epic.
+- Les 16 Epics sont les seuls items du board (pas de sub-issues).
 - GitHub Project **« Courtier Intelligent »**, vue Board « Kanban » avec 4 colonnes : **Backlog → Todo → In Progress → Done**.
 - Configuration faite **manuellement** dans l'interface GitHub (choix du porteur de projet).
 
@@ -215,7 +215,7 @@ Le détail ligne par ligne (titre, labels, sprint, points, critère d'acceptatio
 - ✅ Repo GitHub `courtier-intelligent` créé.
 - ✅ GitHub Project créé, avec les 4 colonnes et la vue Kanban.
 - ✅ 16 Epics créés en issues (#1 à #20, quelques numéros sautés).
-- ⏳ À faire : labels, milestones, stories en sub-issues, protection des branches, puis **démarrer S1**.
+- ⏳ À faire : protection des branches, puis **démarrer S1**.
 
 ## 16. Préférences du porteur de projet
 
