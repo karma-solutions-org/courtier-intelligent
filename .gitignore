@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.angular/
+.firebase/
+*.log
+.env
+.env.*
+functions/lib/
+extension/dist/
+**/environments/environment.prod.ts
+*-debug.log

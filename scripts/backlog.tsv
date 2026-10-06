@@ -1,0 +1,85 @@
+E0-1 · Créer le projet Angular (standalone, routing, Material, @angular/fire)	story,P1,app,E0	S1	2	L'app démarre et se connecte à Firebase
+E0-2 · Initialiser Firebase (Auth, Firestore, Functions, Storage, Hosting) + emulators	story,P1,firestore,E0	S1	3	Tout fonctionne en local avec les emulators
+E0-3 · Créer le projet extension MV3 (TypeScript, build, side panel)	story,P1,extension,E0	S1	2	L'extension se charge dans Chrome en mode développeur
+E0-4 · Types partagés : modèle canonique, Dossier, QuoteJob, Offer, FormMemory, statuts	story,P1,app,extension,functions,E0	S1	3	Types utilisés par l'app, l'extension et les Functions
+E0-5 · Layout de l'app (sidebar et topbar selon le rôle, page 404)	story,P1,app,E0	S1	3	La navigation s'adapte au rôle
+E1-1 · Connexion, déconnexion, mot de passe oublié	story,P1,app,E1	S1	3	Connexion et déconnexion fonctionnelles, email de réinitialisation envoyé
+E1-2 · Guards de routes par rôle	story,P1,app,E1	S1	3	Un courtier n'accède ni à l'admin ni au super-admin
+E1-3 · Function createTenant (le super-admin crée un cabinet et son admin)	story,P1,functions,E1	S1	5	Tenant et membre créés, claims {tenantId, role} posés
+E1-4 · Règles Firestore d'isolation des cabinets	story,P1,firestore,E1	S1	5	Le cabinet A ne peut rien lire du cabinet B (vérifié dans l'emulator)
+E1-5 · Inviter un membre par email et accepter l'invitation	story,P1,app,functions,E1	S2	5	Compte créé avec les bons claims
+E1-6 · Changer le rôle d'un membre, le désactiver	story,P2,app,functions,E1	S2	3	Claims mis à jour, membre désactivé bloqué
+E1-7 · Paramètres du cabinet (nom, ORIAS, coordonnées, logo)	story,P2,app,E1	S2	2	Données enregistrées dans tenants/{id}
+E1-8 · Super-admin : liste des cabinets, activation et désactivation	story,P2,app,firestore,E1	S2	3	Un cabinet désactivé est bloqué par les règles
+E2-1 · Format JSON du questionnaire (sections, champs, canonicalPath, type, obligatoire, conditions, knowledge)	story,P1,app,E2	S2	3	Format typé et documenté
+E2-2 · Seed : produit Auto (questionnaire canonique, garanties, synonymes) et 3 assureurs	story,P1,firestore,E2	S2	3	Données présentes en local et en dev
+E2-3 · Super-admin : CRUD des produits et éditeur de questionnaire avec aperçu	story,P2,app,E2	S2	5	Modifications visibles immédiatement côté cabinet
+E2-4 · Super-admin : CRUD des garanties et de leurs synonymes	story,P1,app,E2	S2	3	Chaque garantie a un code, un libellé, un type et des synonymes
+E2-5 · Super-admin : CRUD des assureurs (URL et domaines de l'extranet)	story,P1,app,E2	S2	2	Assureurs créés et modifiables
+E2-6 · Admin du cabinet : choisir les assureurs et produits actifs	story,P2,app,E2	S2	2	Seuls ceux-ci apparaissent ensuite dans les dossiers
+SPIKE · Extension sur l'extranet de l'assureur A (3 jours)	spike,P1,extension,E7	S2	5	Remplissage et lecture du résultat validés comme faisables (iframes, anti-bot, captcha)
+E3-1 · Créer un assuré (particulier ou pro) avec validation des formats	story,P1,app,E3	S3	3	Email, téléphone, code postal et date validés
+E3-2 · Liste des assurés avec recherche et pagination	story,P1,app,E3	S3	3	Recherche par nom, email ou téléphone
+E3-3 · Fiche assuré : infos modifiables et liste de ses dossiers	story,P1,app,E3	S3	3	Infos modifiables, dossiers listés
+E3-4 · Alerte de doublon d'assuré	story,P2,app,E3	S3	2	Alerte si même email, ou même nom et date de naissance
+E4-1 · Stepper Nouveau dossier (assuré → produit → questionnaire → récapitulatif)	story,P1,app,E4	S3	5	Dossier en brouillon dès l'étape 2
+E4-2 · Moteur de questionnaire dynamique depuis le JSON	story,P1,app,E4	S3	8	Gère les types, les champs obligatoires, les conditions et le knowledge
+E4-3 · Sauvegarde automatique du brouillon	story,P1,app,E4	S3	3	Reprise exacte là où le courtier s'était arrêté
+E4-4 · Complétude : liste des champs manquants	story,P1,app,functions,E4	S4	3	Statut complet bloqué tant qu'il manque un champ obligatoire
+E4-5 · Référence automatique du dossier	story,P2,functions,E4	S4	2	Format 2026-000123, unique par cabinet
+E4-6 · Liste des dossiers (filtres statut, produit, courtier ; Mes dossiers)	story,P1,app,E4	S4	3	Filtre Mes dossiers actif par défaut
+E4-7 · Détail du dossier avec onglets, onglet Infos modifiable	story,P1,app,E4	S4	5	Onglets Infos, Besoin, Tarification, Comparatif, Suivi, Historique
+E4-8 · Machine à états des statuts du dossier	story,P1,functions,firestore,E4	S4	5	Une transition interdite est refusée
+E4-9 · Historique (events) et timeline	story,P1,app,functions,E4	S4	3	Chaque action importante est tracée et visible
+E4-10 · Assigner ou réassigner un dossier	story,P2,app,E4	S4	2	Courtier assigné modifiable et tracé
+E4-11 · Construire quoteData depuis le dossier (modèle canonique)	story,P1,app,E4	S4	3	Valeurs null et knowledge respectées, aucune donnée inventée
+E5-1 · Formulaire du besoin (couverture, budget, franchise max, garanties, notes)	story,P1,app,E5	S4	5	Données enregistrées dans needAnalysis
+E5-2 · Valider le besoin	story,P1,app,E5	S4	2	Statut besoin_validé, modifications ultérieures tracées
+E5-3 · Suggestions de besoin selon le questionnaire	story,P3,app,E5	S9	3	Suggestions modifiables par le courtier
+E6-1 · Function createExtensionToken	story,P1,functions,E6	S5	2	Custom token avec le même uid, tenantId et role
+E6-2 · L'app détecte l'extension et lui envoie le token	story,P1,app,extension,E6	S5	3	Indicateur Extension connectée dans la topbar
+E6-3 · Session Firebase dans le service worker	story,P1,extension,E6	S5	5	Session conservée, rafraîchissement automatique
+E6-4 · Règles Firestore propres à l'extension	story,P1,firestore,E6	S5	3	Écriture limitée au statut du job, aux offres et à formMemories
+E6-5 · Side panel : courtier connecté, dossier et job en cours	story,P1,extension,E6	S5	3	Informations affichées en temps réel
+E6-6 · Function aiProxy (auth, tenantId, limite d'appels)	story,P1,functions,E6	S5	5	Aucune clé IA dans l'extension
+E7-1 · Écoute des jobs requested et détection du domaine assureur	story,P1,extension,E7	S5	3	Le job est pris en charge à l'ouverture de l'extranet
+E7-2 · Analyseur DOM (champs, libellés, types, sections, empreinte)	story,P1,extension,E7	S5	5	Structure du formulaire extraite avec son empreinte
+E7-3 · Mapping par synonymes et scoring vers le modèle canonique	story,P1,extension,E7	S5	8	Aucun chemin hors liste
+E7-4 · Repli IA via aiProxy pour les champs incertains	story,P1,extension,functions,E7	S5	5	Réponse de l'IA validée avant usage
+E7-5 · Écrire needs_info et missingFields	story,P1,extension,E7	S5	3	L'app reçoit les champs manquants
+E7-6 · Moteur de remplissage (tous types de champs, événements input et change)	story,P1,extension,E7	S6	8	Fonctionne sur l'extranet de l'assureur A
+E7-7 · Parcours multi-étapes (détection de l'étape, attente, currentStep)	story,P1,extension,E7	S6	5	Progression mise à jour étape par étape
+E7-8 · Side panel : progression, champs non trouvés, correction manuelle	story,P1,extension,E7	S6	3	Le courtier voit et corrige ce qui manque
+E8-1 · Collection formMemories avec validation des règles	story,P1,firestore,E8	S6	3	Seuls les champs de structure sont acceptés
+E8-2 · Lecture de la mémoire : mapping immédiat sans IA	story,P1,extension,E8	S6	3	Aucun appel IA sur un formulaire connu
+E8-3 · Écriture de la mémoire après un mapping validé	story,P1,extension,E8	S6	3	Mémoire disponible pour tous les cabinets
+E8-4 · Invalidation par empreinte et réapprentissage	story,P2,extension,E8	S8	3	Un formulaire modifié est réappris
+E8-5 · Super-admin : consulter et supprimer des mémoires	story,P2,app,E8	S8	3	Liste et suppression fonctionnelles
+E9-1 · Onglet Tarification : une carte par assureur, statut en temps réel	story,P1,app,E9	S5	3	Statut du job mis à jour en direct
+E9-2 · Bouton Tarifer : crée le job et ouvre l'extranet	story,P1,app,E9	S5	3	Bloqué si le besoin n'est pas validé
+E9-3 · Formulaire des champs manquants (dossier et quoteData mis à jour)	story,P1,app,E9	S6	5	L'extension reprend après la réponse du courtier
+E9-4 · Relancer un job en échec	story,P2,app,E9	S7	2	Le job repasse à requested
+E9-5 · Saisie manuelle d'une offre et upload du devis	story,P1,app,E9	S7	5	Offre enregistrée avec source manual
+E10-1 · Détecter la page de résultat	story,P1,extension,E10	S7	3	Page résultat reconnue sur l'assureur A
+E10-2 · Extraire prime, franchises, garanties, plafonds, exclusions, numéro de devis	story,P1,extension,E10	S7	8	Extraction DOM, puis IA si besoin
+E10-3 · Confirmation de la capture dans le side panel, puis écriture de l'offre	story,P1,extension,E10	S7	3	Job à captured, offre visible dans l'app
+E10-4 · Rapport d'échec sans donnée client	story,P2,extension,E10	S7	2	Rapport écrit dans extensionReports
+E11-1 · Assureur A de bout en bout	story,P1,extension,E11	S7	5	Analyse, remplissage et capture fonctionnels
+E11-2 · Assureur B de bout en bout	story,P1,extension,E11	S8	8	Analyse, remplissage et capture fonctionnels
+E11-3 · Assureur C de bout en bout	story,P1,extension,E11	S8	8	Analyse, remplissage et capture fonctionnels
+E11-4 · Super-admin : monitoring de l'extension par assureur	story,P2,app,E11	S8	5	Taux de réussite et derniers échecs visibles
+E12-1 · Upload d'un document vers Storage	story,P2,app,E12	S11	2	Carte grise, permis ou relevé stocké
+E12-2 · OCR via aiProxy vers le modèle canonique	story,P2,functions,E12	S11	5	Champs extraits avec leur confiance
+E12-3 · Pré-remplissage proposé avec confirmation	story,P2,app,E12	S11	3	Rien n'est écrit sans validation du courtier
+E13-1 · Normaliser les garanties des offres par les synonymes	story,P1,functions,E13	S9	3	Garanties converties en codes normalisés
+E13-2 · Calculer les écarts offre / besoin	story,P1,functions,E13	S9	5	Écarts écrits dans offers.gaps
+E13-3 · Tableau comparatif côte à côte avec badges	story,P1,app,E13	S9	5	Badges ✅ ⚠️ ❌ par critère
+E13-4 · Choisir l'offre avec justification obligatoire	story,P1,app,E13	S9	3	Statut décision
+E13-5 · Score d'adéquation indicatif	story,P3,functions,E13	S9	3	Score affiché par offre
+E14-1 · Envoyer la proposition par email	story,P1,app,functions,E14	S10	5	Statut proposition_envoyée
+E14-2 · Enregistrer la réponse de l'assuré	story,P1,app,E14	S10	2	Accepté, refusé ou sans suite
+E14-3 · Marquer le dossier souscrit	story,P1,app,E14	S10	2	Numéro de contrat et date d'effet enregistrés
+E14-4 · Relances quotidiennes des propositions sans réponse	story,P2,functions,E14	S10	3	Liste des propositions à relancer
+E15-1 · Compteurs par statut avec accès à la liste filtrée	story,P1,app,E15	S10	3	Un clic ouvre la liste filtrée
+E15-2 · Mes dossiers à traiter et propositions à relancer	story,P1,app,E15	S10	3	Listes à jour sur le tableau de bord
+E15-3 · Taux de transformation par courtier et par produit	story,P3,app,E15	S10	3	Vue réservée à l'admin
