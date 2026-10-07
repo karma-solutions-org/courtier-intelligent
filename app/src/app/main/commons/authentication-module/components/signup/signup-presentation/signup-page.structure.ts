@@ -1,0 +1,16 @@
+export const SIGNUP_PAGE_STRUCTURE = {
+  title: 'Créer un compte',
+  subtitle: 'Créez votre accès à Courtier Intelligent.',
+  displayNameLabel: 'Nom complet',
+  displayNameRequired: 'Le nom est obligatoire',
+  emailLabel: 'Email',
+  emailRequired: "L'email est obligatoire",
+  emailInvalid: "L'email n'est pas valide",
+  passwordLabel: 'Mot de passe',
+  passwordRequired: 'Le mot de passe est obligatoire',
+  passwordMinLength: 'Au moins 8 caractères',
+  confirmLabel: 'Confirmer le mot de passe',
+  confirmMismatch: 'Les mots de passe ne correspondent pas',
+  submit: 'Créer mon compte',
+  alreadyAccount: 'Déjà un compte ? Se connecter',
+} as const;

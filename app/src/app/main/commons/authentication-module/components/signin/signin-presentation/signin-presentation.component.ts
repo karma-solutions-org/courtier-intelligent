@@ -6,12 +6,14 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
+import { LogoComponent } from '../../../../../../core/components/logo/logo.component';
 import { CredentialsModel } from '../../../models/credentials.model';
 import { SIGNIN_PAGE_STRUCTURE } from './signin-page.structure';
 
 @Component({
   selector: 'app-signin-presentation',
   imports: [
+    LogoComponent,
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
@@ -28,6 +30,7 @@ export class SigninPresentationComponent {
   readonly isPending = input(false);
   readonly error = input<string | null>(null);
   readonly forgotPasswordUrl = input.required<string>();
+  readonly signupUrl = input.required<string>();
   readonly submitted = output<CredentialsModel>();
 
   protected readonly structure = SIGNIN_PAGE_STRUCTURE;

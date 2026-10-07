@@ -1,14 +1,17 @@
 import { inject, Injectable } from '@angular/core';
+import { UserRole } from '@shared';
 import {
+  createUserWithEmailAndPassword,
   onIdTokenChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
+  updateProfile,
 } from 'firebase/auth';
-import { from, map, Observable } from 'rxjs';
+import { catchError, from, map, Observable, of, throwError } from 'rxjs';
 import { FIREBASE_AUTH } from './firebase';
 
-export type UserRole = 'superadmin' | 'admin' | 'courtier';
+export type { UserRole };
 
 export interface AuthUser {
   uid: string;
@@ -22,8 +25,11 @@ export interface AuthUser {
 export abstract class AuthenticationProvider {
   abstract readonly user$: Observable<AuthUser | null>;
   abstract signIn(email: string, password: string): Observable<void>;
+  abstract signUp(displayName: string, email: string, password: string): Observable<void>;
   abstract signOut(): Observable<void>;
-  abstract sendPasswordReset(email: string): Observable<void>;
+  abstract sendPasswordReset(email: string, continueUrl: string): Observable<void>;
+  /** Recharge le token pour récupérer des claims modifiés côté serveur (cabinet, rôle). */
+  abstract refreshToken(): Observable<void>;
 }
 
 @Injectable()
@@ -42,8 +48,8 @@ export class FireauthProvider extends AuthenticationProvider {
         uid: user.uid,
         email: user.email,
         displayName: user.displayName,
-        tenantId: (claims['tenantId'] as string | undefined) ?? null,
-        role: (claims['role'] as UserRole | undefined) ?? null,
+        tenantId: (claims['ci_tenant_id'] as string | undefined) ?? null,
+        role: (claims['ci_role'] as UserRole | undefined) ?? null,
       });
     }),
   );
@@ -52,11 +58,29 @@ export class FireauthProvider extends AuthenticationProvider {
     return from(signInWithEmailAndPassword(this._auth, email, password)).pipe(map(() => undefined));
   }
 
+  signUp(displayName: string, email: string, password: string): Observable<void> {
+    return from(
+      createUserWithEmailAndPassword(this._auth, email, password).then(({ user }) => updateProfile(user, { displayName })),
+    );
+  }
+
   signOut(): Observable<void> {
     return from(signOut(this._auth));
   }
 
-  sendPasswordReset(email: string): Observable<void> {
-    return from(sendPasswordResetEmail(this._auth, email));
+  sendPasswordReset(email: string, continueUrl: string): Observable<void> {
+    // Email rédigé en français ; après le changement de mot de passe, le lien ramène à la connexion.
+    this._auth.languageCode = 'fr';
+    return from(sendPasswordResetEmail(this._auth, email, { url: continueUrl })).pipe(
+      catchError(error =>
+        // Ne pas révéler si un compte existe pour cet email.
+        (error as { code?: string })?.code === 'auth/user-not-found' ? of(undefined) : throwError(() => error),
+      ),
+    );
+  }
+
+  refreshToken(): Observable<void> {
+    const user = this._auth.currentUser;
+    return user ? from(user.getIdToken(true)).pipe(map(() => undefined)) : of(undefined);
   }
 }

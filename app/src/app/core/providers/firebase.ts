@@ -17,7 +17,8 @@ export function provideFirebase() {
   const app = initializeApp(environment.firebaseConfig);
   const auth = getAuth(app);
   const firestore = initializeFirestore(app, { ignoreUndefinedProperties: true });
-  const functions = getFunctions(app);
+  // Même région que les Cloud Functions de courtier-intelligent-back.
+  const functions = getFunctions(app, 'europe-west3');
   const storage = getStorage(app);
 
   if (environment.useEmulators) {

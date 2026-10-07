@@ -5,6 +5,8 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   // Message identique à un mauvais mot de passe : ne pas révéler si un compte existe.
   'auth/user-not-found': 'Email ou mot de passe incorrect.',
   'auth/wrong-password': 'Email ou mot de passe incorrect.',
+  'auth/email-already-in-use': "Un compte existe déjà avec cet email.",
+  'auth/weak-password': 'Le mot de passe doit contenir au moins 6 caractères.',
   'auth/too-many-requests': 'Trop de tentatives. Réessayez dans quelques minutes.',
   'auth/network-request-failed': 'Problème de connexion réseau.',
 };

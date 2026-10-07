@@ -1,25 +1,36 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { AuthStore } from '../../../authentication-module/store/auth.store';
 
-/** Accueil provisoire : sera remplacé par le layout et le tableau de bord. */
+/** Tableau de bord provisoire : les compteurs de dossiers arriveront avec l'Epic E15. */
 @Component({
   selector: 'app-home-container',
-  imports: [MatButtonModule],
   template: `
-    <main class="home">
-      <h1>Bienvenue {{ authStore.user()?.email }}</h1>
-      <p>Cabinet : {{ authStore.tenantId() ?? 'aucun' }} · Rôle : {{ authStore.role() ?? 'aucun' }}</p>
-      <button mat-stroked-button (click)="authStore.signOut()">Se déconnecter</button>
-    </main>
+    <h1>Bonjour {{ firstName() }}</h1>
+    @if (!authStore.tenantId()) {
+      <p class="notice">Votre compte n'est rattaché à aucun cabinet pour l'instant.</p>
+    }
   `,
   styles: `
-    .home {
-      padding: 32px;
+    h1 {
+      margin: 0 0 16px;
+      font-size: 26px;
+      font-weight: 600;
+    }
+
+    .notice {
+      margin: 0;
+      padding: 14px 16px;
+      border-radius: 10px;
+      color: var(--mat-sys-on-tertiary-container);
+      background: var(--mat-sys-tertiary-container);
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HomeContainerComponent {
   protected readonly authStore = inject(AuthStore);
+  protected readonly firstName = computed(() => {
+    const user = this.authStore.user();
+    return user?.displayName?.split(' ')[0] ?? '';
+  });
 }

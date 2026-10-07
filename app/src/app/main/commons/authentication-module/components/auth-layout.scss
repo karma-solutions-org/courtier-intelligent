@@ -60,6 +60,13 @@ mat-form-field {
 }
 
 .auth-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin-top: 16px;
   text-align: center;
+}
+
+.auth-logo {
+  margin-bottom: 20px;
 }

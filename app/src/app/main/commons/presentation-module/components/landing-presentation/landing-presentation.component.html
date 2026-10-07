@@ -1,0 +1,214 @@
+<!-- En-tête -->
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" routerLink="/" aria-label="Accueil">
+      <app-logo [size]="40" />
+    </a>
+
+    <nav class="topnav" aria-label="Navigation principale">
+      @for (item of structure.nav; track item.fragment) {
+        <a routerLink="/" [fragment]="item.fragment">{{ item.label }}</a>
+      }
+    </nav>
+
+    @if (isAuthenticated()) {
+      <a mat-flat-button [routerLink]="homeUrl()">
+        <mat-icon>space_dashboard</mat-icon>
+        {{ structure.mySpace }}
+      </a>
+    } @else {
+      <div class="topbar-actions">
+        <a mat-stroked-button [routerLink]="signinUrl()">
+          <mat-icon>login</mat-icon>
+          {{ structure.signin }}
+        </a>
+        <a mat-flat-button [routerLink]="signupUrl()">{{ structure.signup }}</a>
+      </div>
+    }
+  </div>
+</header>
+
+<main>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container hero-inner">
+      <div class="hero-text">
+        <p class="eyebrow">{{ structure.hero.eyebrow }}</p>
+        <h1>
+          {{ structure.hero.title }}
+          <span class="highlight">{{ structure.hero.highlight }}</span>
+        </h1>
+        <p class="lead">{{ structure.hero.subtitle }}</p>
+        <div class="hero-actions">
+          <a mat-flat-button class="cta-large" [routerLink]="isAuthenticated() ? homeUrl() : signinUrl()">
+            {{ isAuthenticated() ? structure.mySpace : structure.hero.primaryCta }}
+          </a>
+          <a mat-stroked-button class="cta-large" routerLink="/" fragment="fonctionnement">
+            {{ structure.hero.secondaryCta }}
+          </a>
+        </div>
+      </div>
+
+      <!-- Aperçu du comparatif -->
+      <div class="mock" aria-hidden="true">
+        <div class="mock-header">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+        <div class="mock-body">
+          <p class="mock-title">{{ structure.mock.title }}</p>
+          <p class="mock-subtitle">{{ structure.mock.subtitle }}</p>
+          <div class="offers">
+            @for (offer of structure.mock.offers; track offer.insurer; let first = $first) {
+              <div class="offer" [class.chosen]="first">
+                @if (first) {
+                  <span class="chosen-badge">{{ structure.mock.chosen }}</span>
+                }
+                <p class="offer-insurer">{{ offer.insurer }}</p>
+                <p class="offer-premium">{{ offer.premium }}</p>
+                <p class="offer-meta">{{ structure.mock.premiumLabel }}</p>
+                <p class="offer-line">
+                  <span>{{ structure.mock.deductibleLabel }}</span><strong>{{ offer.deductible }}</strong>
+                </p>
+                <p class="gap" [class]="'gap gap-' + offer.status">
+                  <mat-icon>{{ offer.status === 'ok' ? 'check_circle' : offer.status === 'warn' ? 'error' : 'cancel' }}</mat-icon>
+                  {{ offer.label }}
+                </p>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Chiffres -->
+  <section class="stats">
+    <div class="container stats-inner">
+      @for (stat of structure.stats; track stat.label) {
+        <div class="stat">
+          <p class="stat-value">{{ stat.value }}</p>
+          <p class="stat-label">{{ stat.label }}</p>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Comment ça marche -->
+  <section id="fonctionnement" class="section">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">{{ structure.steps.eyebrow }}</p>
+        <h2>{{ structure.steps.title }}</h2>
+      </div>
+      <ol class="steps">
+        @for (step of structure.steps.items; track step.title; let i = $index) {
+          <li class="step">
+            <span class="step-number">{{ i + 1 }}</span>
+            <span class="icon-tile"><mat-icon>{{ step.icon }}</mat-icon></span>
+            <h3>{{ step.title }}</h3>
+            <p>{{ step.text }}</p>
+          </li>
+        }
+      </ol>
+    </div>
+  </section>
+
+  <!-- Fonctionnalités -->
+  <section id="fonctionnalites" class="section section-alt">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">{{ structure.features.eyebrow }}</p>
+        <h2>{{ structure.features.title }}</h2>
+      </div>
+      <div class="features">
+        @for (feature of structure.features.items; track feature.title) {
+          <article class="feature">
+            <span class="icon-tile"><mat-icon>{{ feature.icon }}</mat-icon></span>
+            <h3>{{ feature.title }}</h3>
+            <p>{{ feature.text }}</p>
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Extension -->
+  <section id="extension" class="section">
+    <div class="container split">
+      <div>
+        <p class="eyebrow">{{ structure.extension.eyebrow }}</p>
+        <h2>{{ structure.extension.title }}</h2>
+        <p class="lead">{{ structure.extension.text }}</p>
+        <ul class="checklist">
+          @for (point of structure.extension.points; track point) {
+            <li><mat-icon>check</mat-icon>{{ point }}</li>
+          }
+        </ul>
+      </div>
+
+      <div class="panel" aria-hidden="true">
+        <p class="panel-title">
+          <mat-icon>extension</mat-icon>
+          {{ structure.extension.panelTitle }}
+        </p>
+        <ul class="panel-steps">
+          @for (step of structure.extension.panelSteps; track step.label) {
+            <li [class.done]="step.done">
+              <mat-icon>{{ step.done ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+              {{ step.label }}
+            </li>
+          }
+        </ul>
+        <p class="panel-missing">
+          <mat-icon>info</mat-icon>
+          {{ structure.extension.panelMissing }}
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Conformité -->
+  <section id="conformite" class="section section-alt">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">{{ structure.compliance.eyebrow }}</p>
+        <h2>{{ structure.compliance.title }}</h2>
+        <p class="lead">{{ structure.compliance.text }}</p>
+      </div>
+      <div class="features features-3">
+        @for (item of structure.compliance.items; track item.title) {
+          <article class="feature">
+            <span class="icon-tile"><mat-icon>{{ item.icon }}</mat-icon></span>
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.text }}</p>
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Appel à l'action -->
+  <section class="section">
+    <div class="container">
+      <div class="cta-band">
+        <h2>{{ structure.cta.title }}</h2>
+        <p>{{ structure.cta.text }}</p>
+        <a mat-flat-button class="cta-large cta-inverse" [routerLink]="isAuthenticated() ? homeUrl() : signinUrl()">
+          {{ isAuthenticated() ? structure.mySpace : structure.cta.button }}
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div>
+      <a class="brand" routerLink="/" aria-label="Accueil">
+        <app-logo [size]="36" />
+      </a>
+      <p class="footer-tagline">{{ structure.footer.tagline }}</p>
+    </div>
+    <p class="footer-copy">{{ structure.footer.copyright }}</p>
+  </div>
+</footer>

@@ -14,6 +14,7 @@ import {
   withRequestStatus,
 } from '../../../../core/store-features/with-request-status';
 import { CredentialsModel } from '../models/credentials.model';
+import { SignupModel } from '../models/signup.model';
 import { AuthService } from '../services/auth.service';
 import { toAuthErrorMessage } from '../util/auth-error.utils';
 
@@ -22,12 +23,14 @@ interface AuthState {
   /** Vrai dès que Firebase a indiqué l'état de connexion initial. */
   initialized: boolean;
   resetEmailSent: boolean;
+  /** Page où revenir après connexion ou inscription (ex. acceptation d'une invitation). */
+  redirectUrl: string | null;
 }
 
 /** Store global de l'authentification : utilisateur courant, cabinet et rôle. */
 export const AuthStore = signalStore(
   { providedIn: 'root' },
-  withState<AuthState>({ user: null, initialized: false, resetEmailSent: false }),
+  withState<AuthState>({ user: null, initialized: false, resetEmailSent: false, redirectUrl: null }),
   withRequestStatus(),
   withComputed(({ user }) => ({
     isAuthenticated: computed(() => user() !== null),
@@ -43,7 +46,25 @@ export const AuthStore = signalStore(
             tapResponse({
               next: () => {
                 patchState(store, setFulfilled());
-                router.navigateByUrl(CommonRouteContainerModel.HOME_ROUTE.url);
+                router.navigateByUrl(store.redirectUrl() ?? CommonRouteContainerModel.HOME_ROUTE.url);
+                patchState(store, { redirectUrl: null });
+              },
+              error: error => patchState(store, setError(toAuthErrorMessage(error))),
+            }),
+          ),
+        ),
+      ),
+    ),
+    signUp: rxMethod<SignupModel>(
+      pipe(
+        tap(() => patchState(store, setPending())),
+        exhaustMap(signup =>
+          authService.signUp(signup).pipe(
+            tapResponse({
+              next: () => {
+                patchState(store, setFulfilled());
+                router.navigateByUrl(store.redirectUrl() ?? CommonRouteContainerModel.HOME_ROUTE.url);
+                patchState(store, { redirectUrl: null });
               },
               error: error => patchState(store, setError(toAuthErrorMessage(error))),
             }),
@@ -56,7 +77,7 @@ export const AuthStore = signalStore(
         exhaustMap(() =>
           authService.signOut().pipe(
             tapResponse({
-              next: () => router.navigateByUrl(CommonRouteContainerModel.SIGNIN_ROUTE.url),
+              next: () => router.navigateByUrl(CommonRouteContainerModel.LANDING_ROUTE.url),
               error: error => patchState(store, setError(toAuthErrorMessage(error))),
             }),
           ),
@@ -76,6 +97,10 @@ export const AuthStore = signalStore(
         ),
       ),
     ),
+    /** N'accepte que des chemins internes à l'app, pour éviter toute redirection externe. */
+    setRedirectUrl: (url: string | null) =>
+      patchState(store, { redirectUrl: url && url.startsWith('/') && !url.startsWith('//') ? url : null }),
+    refreshClaims: rxMethod<void>(pipe(exhaustMap(() => authService.refreshToken()))),
     resetStatus: () => patchState(store, resetRequestStatus(), { resetEmailSent: false }),
     _listenUser: rxMethod<void>(
       pipe(switchMap(() => authService.user$.pipe(tap(user => patchState(store, { user, initialized: true }))))),

@@ -9,3 +9,4 @@ functions/lib/
 extension/dist/
 **/environments/environment.prod.ts
 *-debug.log
+google-application-credentials.json

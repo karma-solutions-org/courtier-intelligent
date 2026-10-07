@@ -12,6 +12,7 @@ import { SigninPresentationComponent } from '../signin-presentation/signin-prese
       [isPending]="authStore.isPending()"
       [error]="authStore.error()"
       [forgotPasswordUrl]="forgotPasswordUrl"
+      [signupUrl]="signupUrl"
       (submitted)="signIn($event)"
     />
   `,
@@ -20,6 +21,7 @@ import { SigninPresentationComponent } from '../signin-presentation/signin-prese
 export class SigninContainerComponent implements OnInit {
   protected readonly authStore = inject(AuthStore);
   protected readonly forgotPasswordUrl = CommonRouteContainerModel.FORGOT_PASSWORD_ROUTE.url;
+  protected readonly signupUrl = CommonRouteContainerModel.SIGNUP_ROUTE.url;
 
   ngOnInit(): void {
     this.authStore.resetStatus();

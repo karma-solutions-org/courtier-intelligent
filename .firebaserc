@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "default": "aibs-partenaire-testing",
+    "test": "aibs-partenaire-testing"
+  },
+  "targets": {
+    "aibs-partenaire-testing": {
+      "hosting": {
+        "courtier-intelligent": ["courtier-intelligent-test"]
+      }
+    }
+  }
+}

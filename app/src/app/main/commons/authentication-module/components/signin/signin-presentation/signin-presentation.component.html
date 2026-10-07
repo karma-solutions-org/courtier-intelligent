@@ -1,5 +1,5 @@
 <div class="auth-card">
-  <h1 class="auth-brand">{{ structure.brand }}</h1>
+  <app-logo class="auth-logo" [size]="44" />
   <p class="auth-subtitle">{{ structure.subtitle }}</p>
 
   @if (error()) {
@@ -50,5 +50,6 @@
 
   <div class="auth-link">
     <a mat-button [routerLink]="forgotPasswordUrl()">{{ structure.forgotPassword }}</a>
+    <a mat-button [routerLink]="signupUrl()">{{ structure.noAccount }}</a>
   </div>
 </div>
