@@ -1,0 +1,61 @@
+name: Deploy to Firebase
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-to-firebase:
+    runs-on: ubuntu-latest
+    # Tests (~3 min) plus the framework build and deploy.
+    timeout-minutes: 15
+    # The environment records every deployment in the repository's Deployments
+    # history, which replaces the marker commit this job used to push to main.
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+      # Lets the job request a GitHub OIDC token for keyless Google Cloud auth.
+      id-token: write
+    env:
+      # Pinned here rather than in devDependencies: only this job needs the CLI,
+      # and its ~600 packages would otherwise slow every CI install.
+      FIREBASE_TOOLS_VERSION: 15.32.1
+    steps:
+      # A release event checks out the released tag, so this deploys exactly
+      # what was released, not whatever main has moved on to since.
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up project
+        uses: ./.github/actions/setup
+        with:
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Set up Playwright
+        uses: ./.github/actions/playwright
+
+      # Nothing else gates a release on the tests, so a red main would deploy.
+      - name: Testing
+        run: npm run test
+
+      # Keyless: exchanges the job's GitHub OIDC token for short-lived
+      # credentials of the deploy service account, exported through
+      # GOOGLE_APPLICATION_CREDENTIALS for firebase-tools. Only this
+      # repository's `production` environment may impersonate it.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: **projects/1045695684946/locations/global/workloadIdentityPools/github/providers/github-actions
+          service_account: **github-action-deploy@aibs-part.iam.gserviceaccount.com
+          project_id: **aibs-part
+
+      - name: Enable Firebase web frameworks
+        run: npx --yes "firebase-tools@$FIREBASE_TOOLS_VERSION" experiments:enable webframeworks
+
+      - name: Deploy
+        run: npx --yes "firebase-tools@$FIREBASE_TOOLS_VERSION" deploy --project aibs-part

@@ -1,0 +1,79 @@
+# Dependabot version updates.
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Updates are grouped and weekly on purpose. A previous daily, ungrouped setup
+# opened one PR per package and accumulated 24 stale ones, all superseded by the
+# Angular 22 migration before anybody could merge them. Grouping keeps a version
+# line (Angular, the ESLint toolchain, the test stack) moving as a single
+# reviewable PR, which is also the only way these bumps can pass CI together.
+#
+# Groups are declared per `applies-to`: a group only batches the update kind it
+# names, and security updates ignore `ignore` rules, so a pinned or manually
+# migrated dependency is still allowed through when it carries an advisory.
+#
+# Angular major bumps are ignored: they are framework migrations run by hand with
+# `ng update`, not dependency bumps.
+
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 5
+    registries:
+      - karma-solutions-org
+    ignore:
+      # Framework migrations are driven manually with `ng update`.
+      - dependency-name: '@angular/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@ngrx/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'angular-eslint'
+        update-types: ['version-update:semver-major']
+      # Pinned by @angular/compiler-cli (>=6.0 <6.1); bumping it alone breaks the build.
+      - dependency-name: 'typescript'
+    groups:
+      angular:
+        applies-to: version-updates
+        patterns: ['@angular/*', '@angular-devkit/*', 'angular-eslint']
+      ngrx:
+        applies-to: version-updates
+        patterns: ['@ngrx/*']
+      ngx-sg:
+        applies-to: version-updates
+        patterns: ['@karma-solutions-org/*']
+      linting:
+        applies-to: version-updates
+        patterns:
+          ['eslint', '@eslint/*', '@typescript-eslint/*', 'prettier', 'prettier-*', 'eslint-*']
+      testing:
+        applies-to: version-updates
+        patterns: ['vitest', '@vitest/*', 'playwright', '@faker-js/faker']
+      remaining:
+        applies-to: version-updates
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+      security:
+        applies-to: security-updates
+        patterns: ['*']
+
+  - package-ecosystem: 'github-actions'
+    # Workflows plus the local composite actions they call.
+    directories: ['/', '/.github/actions/*']
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        applies-to: version-updates
+        patterns: ['*']
+      security:
+        applies-to: security-updates
+        patterns: ['*']
+
+registries:
+  karma-solutions-org:
+    type: 'npm-registry'
+    url: 'https://npm.pkg.github.com/karma-solutions-org'
+    token: '${{ secrets.DEPENDABOT_TOKEN }}'
