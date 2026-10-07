@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Courtier Intelligent</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="header">
+      <img src="../logo/logo-symbol.svg" alt="" width="22" height="26" />
+      <span>Courtier Intelligent</span>
+    </header>
+
+    <main>
+      <section class="card">
+        <p class="label">Compte</p>
+        <p id="account" class="value muted">Non connecté à l'application</p>
+      </section>
+
+      <section class="card">
+        <p class="label">Page active</p>
+        <p id="page-origin" class="value">—</p>
+        <p id="page-fields" class="muted"></p>
+      </section>
+    </main>
+
+    <footer id="version" class="footer"></footer>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

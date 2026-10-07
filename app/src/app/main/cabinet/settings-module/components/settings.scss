@@ -1,0 +1,50 @@
+:host {
+  display: grid;
+  gap: 20px;
+}
+
+.card {
+  padding: 24px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 14px;
+  background: #fff;
+}
+
+h2 {
+  margin: 0 0 16px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--mat-sys-error);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

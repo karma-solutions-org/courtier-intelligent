@@ -199,7 +199,7 @@ On **change** : communication via Firestore (et non plus par messages), mémoire
 
 ## 14. GitHub
 
-- Repo : **`dhiamockchahasg-coder/courtier-intelligent`** (privé).
+- Repos : **`karma-solutions-org/courtier-intelligent`** (front : app + extension + types partagés) et **`karma-solutions-org/courtier-intelligent-back`** (Cloud Functions, règles).
 - Branches : `main` (production, protégée) · `develop` (intégration, protégée) · `feature/<Epic>-<description>`.
 - Règle : **un Epic = une branche (`feature/E0-fondations`) = une PR vers `develop`** ; fin de sprint = PR `develop → main` + release `v0.X`.
 - Commits : `feat(E4): …`, `fix(E7): …`, `chore: …`, `docs: …`.
