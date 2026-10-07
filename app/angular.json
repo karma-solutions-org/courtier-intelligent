@@ -11,30 +11,15 @@
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
-          "style": "scss",
-          "skipTests": true
+          "style": "scss"
         },
-        "@schematics/angular:class": {
-          "skipTests": true
-        },
-        "@schematics/angular:directive": {
-          "skipTests": true
-        },
-        "@schematics/angular:guard": {
-          "skipTests": true
-        },
-        "@schematics/angular:interceptor": {
-          "skipTests": true
-        },
-        "@schematics/angular:pipe": {
-          "skipTests": true
-        },
-        "@schematics/angular:resolver": {
-          "skipTests": true
-        },
-        "@schematics/angular:service": {
-          "skipTests": true
-        }
+        "@schematics/angular:class": {},
+        "@schematics/angular:directive": {},
+        "@schematics/angular:guard": {},
+        "@schematics/angular:interceptor": {},
+        "@schematics/angular:pipe": {},
+        "@schematics/angular:resolver": {},
+        "@schematics/angular:service": {}
       },
       "root": "",
       "sourceRoot": "src",
@@ -97,6 +82,25 @@
             }
           },
           "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "tsconfig.spec.json",
+            "browsers": [
+              "chromium"
+            ],
+            "browserViewport": "1280x800",
+            "reporters": [
+              "verbose"
+            ],
+            "coverageReporters": [
+              "html",
+              "text-summary",
+              "json-summary"
+            ],
+            "runnerConfig": "vitest.config.mts"
+          }
         }
       }
     }

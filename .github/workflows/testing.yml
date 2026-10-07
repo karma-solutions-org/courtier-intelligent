@@ -1,0 +1,42 @@
+name: Testing
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+# Un nouveau push sur la branche remplace la vérification en cours.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: 'app/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./app
+        run: npm ci
+
+      - name: Set up Playwright
+        uses: ./.github/actions/playwright
+
+      # Vitest en mode navigateur (Chromium via Playwright), lancé par `ng test`.
+      - name: Testing
+        working-directory: ./app
+        run: npm run test:ci

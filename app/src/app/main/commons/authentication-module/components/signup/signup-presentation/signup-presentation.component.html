@@ -44,7 +44,7 @@
       <p class="auth-error" role="alert">{{ structure.confirmMismatch }}</p>
     }
 
-    <button mat-flat-button class="auth-submit" type="submit" [disabled]="isPending()">
+    <button mat-flat-button class="auth-submit" type="submit" [disabled]="isPending()" [attr.aria-busy]="isPending()" [attr.aria-label]="isPending() ? 'Traitement en cours' : null">
       @if (isPending()) {
         <mat-spinner diameter="20" />
       } @else {

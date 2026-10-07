@@ -29,7 +29,7 @@ import { ACCEPT_INVITATION_PAGE_STRUCTURE } from './accept-invitation-page.struc
         @if (error()) {
           <p class="auth-error" role="alert">{{ error() }}</p>
         }
-        <button mat-flat-button class="auth-submit full" [disabled]="isPending()" (click)="accepted.emit()">
+        <button mat-flat-button class="auth-submit full" [disabled]="isPending()" [attr.aria-busy]="isPending()" [attr.aria-label]="isPending() ? 'Traitement en cours' : null" (click)="accepted.emit()">
           @if (isPending()) {
             <mat-spinner diameter="20" />
           } @else {
