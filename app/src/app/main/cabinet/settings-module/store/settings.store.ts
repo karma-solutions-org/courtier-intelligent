@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { tapResponse } from '@ngrx/operators';
 import { patchState, signalStore, withHooks, withMethods, withState } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import { Invitation, Member, MemberStatus, Tenant, TenantRole } from '@shared';
+import { Invitation, Member, MemberStatus, Cabinet, CabinetRole } from '@shared';
 import { EMPTY, exhaustMap, merge, Observable, pipe, switchMap, tap } from 'rxjs';
 import {
   setError,
@@ -12,11 +12,11 @@ import {
 } from '../../../../core/store-features/with-request-status';
 import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
-import { TenantInfoModel } from '../models/tenant-info.model';
+import { CabinetInfoModel } from '../models/cabinet-info.model';
 import { SettingsService } from '../services/settings.service';
 
 interface SettingsState {
-  tenant: Tenant | null;
+  cabinet: Cabinet | null;
   members: Member[];
   invitations: Invitation[];
   /** Message de confirmation de la dernière action réussie. */
@@ -25,10 +25,10 @@ interface SettingsState {
 
 /** Store de la page Paramètres (fourni par la route). */
 export const SettingsStore = signalStore(
-  withState<SettingsState>({ tenant: null, members: [], invitations: [], successMessage: null }),
+  withState<SettingsState>({ cabinet: null, members: [], invitations: [], successMessage: null }),
   withRequestStatus(),
   withMethods((store, service = inject(SettingsService), authStore = inject(AuthStore)) => {
-    const tenantId = () => authStore.tenantId()!;
+    const cabinetId = () => authStore.cabinetId()!;
 
     /** Exécute une action et met à jour le statut et le message de confirmation. */
     const runAction = <T>(action: (input: T) => Observable<unknown>, successMessage: string) =>
@@ -47,13 +47,13 @@ export const SettingsStore = signalStore(
       );
 
     return {
-      saveTenant: runAction<TenantInfoModel>(info => service.updateTenant(tenantId(), info), 'Informations enregistrées.'),
-      uploadLogo: runAction<File>(file => service.uploadLogo(tenantId(), file), 'Logo mis à jour.'),
-      invite: runAction<{ email: string; role: TenantRole }>(
+      saveCabinet: runAction<CabinetInfoModel>(info => service.updateCabinet(cabinetId(), info), 'Informations enregistrées.'),
+      uploadLogo: runAction<File>(file => service.uploadLogo(cabinetId(), file), 'Logo mis à jour.'),
+      invite: runAction<{ email: string; role: CabinetRole }>(
         ({ email, role }) => service.invite(email, role),
         'Invitation envoyée.',
       ),
-      setRole: runAction<{ uid: string; role: TenantRole }>(({ uid, role }) => service.setRole(uid, role), 'Rôle modifié.'),
+      setRole: runAction<{ uid: string; role: CabinetRole }>(({ uid, role }) => service.setRole(uid, role), 'Rôle modifié.'),
       setStatus: runAction<{ uid: string; status: MemberStatus }>(
         ({ uid, status }) => service.setStatus(uid, status),
         'Statut du membre modifié.',
@@ -64,7 +64,7 @@ export const SettingsStore = signalStore(
           switchMap(id =>
             id
               ? merge(
-                  service.watchTenant(id).pipe(tap(tenant => patchState(store, { tenant }))),
+                  service.watchCabinet(id).pipe(tap(cabinet => patchState(store, { cabinet }))),
                   service.watchMembers(id).pipe(tap(members => patchState(store, { members }))),
                   service.watchPendingInvitations(id).pipe(tap(invitations => patchState(store, { invitations }))),
                 )
@@ -77,7 +77,7 @@ export const SettingsStore = signalStore(
   withHooks({
     onInit: store => {
       const authStore = inject(AuthStore);
-      store._listen(authStore.tenantId);
+      store._listen(authStore.cabinetId);
     },
   }),
 );

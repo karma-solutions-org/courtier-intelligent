@@ -8,7 +8,7 @@ export class CabinetRouteContainerModel {
 
 /** Chemins de la console super-admin (/espace/admin/...). */
 export class SuperAdminRouteContainerModel {
-  static readonly TENANTS_ROUTE = { path: 'admin/cabinets', url: '/espace/admin/cabinets' };
+  static readonly CABINETS_ROUTE = { path: 'admin/cabinets', url: '/espace/admin/cabinets' };
   static readonly CATALOGUE_ROUTE = { path: 'admin/catalogue', url: '/espace/admin/catalogue' };
   static readonly INSURERS_ROUTE = { path: 'admin/assureurs', url: '/espace/admin/assureurs' };
 }

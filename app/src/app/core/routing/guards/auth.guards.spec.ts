@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { CanMatchFn, PartialMatchRouteSnapshot, provideRouter, Route, UrlSegment, UrlTree } from '@angular/router';
 import { UserRole } from '@shared';
 import { firstValueFrom, isObservable, Observable } from 'rxjs';
-import { mockAuthUser } from '../../utils/unit-test-utils/mocks/tenant.mock';
+import { mockAuthUser } from '../../utils/unit-test-utils/mocks/cabinet.mock';
 import {
   FakeAuthenticationProvider,
   provideFakeAuthentication,
@@ -22,7 +22,7 @@ async function evaluate(guard: CanMatchFn): Promise<true | string> {
 describe('Guards', () => {
   let auth: FakeAuthenticationProvider;
 
-  const signInAs = (role: UserRole | null) => auth.signInAs(mockAuthUser({ role, tenantId: role ? 'cabinet' : null }));
+  const signInAs = (role: UserRole | null) => auth.signInAs(mockAuthUser({ role, cabinetId: role ? 'cabinet' : null }));
 
   beforeEach(() => {
     auth = new FakeAuthenticationProvider();

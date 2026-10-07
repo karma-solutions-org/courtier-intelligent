@@ -6,7 +6,7 @@ import { AuthStore } from '../../../authentication-module/store/auth.store';
   selector: 'app-home-container',
   template: `
     <h1>Bonjour {{ firstName() }}</h1>
-    @if (!authStore.tenantId()) {
+    @if (!authStore.cabinetId()) {
       <p class="notice">Votre compte n'est rattaché à aucun cabinet pour l'instant.</p>
     }
   `,

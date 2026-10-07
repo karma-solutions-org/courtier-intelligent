@@ -1,5 +1,5 @@
 import { CanonicalData, CanonicalPath } from './canonical-paths';
-import { DossierStatus, InvitationStatus, MemberStatus, QuoteJobStatus, TenantRole } from './statuses';
+import { DossierStatus, InvitationStatus, MemberStatus, QuoteJobStatus, CabinetRole } from './statuses';
 
 /**
  * Horodatage Firestore. Côté client et côté Admin SDK les classes diffèrent :
@@ -10,7 +10,7 @@ export interface TimestampLike {
 }
 
 // ── Cabinet ────────────────────────────────────────────────────────────────
-export interface Tenant {
+export interface Cabinet {
   id: string;
   name: string;
   orias: string | null;
@@ -29,7 +29,7 @@ export interface Member {
   id: string; // uid
   email: string | null;
   displayName: string | null;
-  role: TenantRole;
+  role: CabinetRole;
   status: MemberStatus;
   createdAt?: TimestampLike;
 }
@@ -37,7 +37,7 @@ export interface Member {
 export interface Invitation {
   id: string;
   email: string;
-  role: TenantRole;
+  role: CabinetRole;
   status: InvitationStatus;
   invitedBy: string;
   expiresAt: TimestampLike;
@@ -153,7 +153,7 @@ export interface MissingField {
   choices?: QuestionChoice[];
 }
 
-/** tenants/{t}/dossiers/{d}/quoteJobs/{insurerId} */
+/** cabinets/{t}/dossiers/{d}/quoteJobs/{insurerId} */
 export interface QuoteJob {
   id: string; // insurerId
   status: QuoteJobStatus;
@@ -183,7 +183,7 @@ export interface OfferGap {
   message: string;
 }
 
-/** tenants/{t}/dossiers/{d}/offers/{insurerId} */
+/** cabinets/{t}/dossiers/{d}/offers/{insurerId} */
 export interface Offer {
   id: string; // insurerId
   quoteNumber: string | null;

@@ -4,21 +4,21 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { TenantsManagementStore } from '../../store/tenants-management.store';
-import { NewTenantFormComponent } from '../new-tenant-form/new-tenant-form.component';
-import { TENANTS_MANAGEMENT_STRUCTURE } from '../tenants-management.structure';
-import { TenantsListComponent } from '../tenants-list/tenants-list.component';
+import { CabinetsManagementStore } from '../../store/cabinets-management.store';
+import { NewCabinetFormComponent } from '../new-cabinet-form/new-cabinet-form.component';
+import { CABINETS_MANAGEMENT_STRUCTURE } from '../cabinets-management.structure';
+import { CabinetsListComponent } from '../cabinets-list/cabinets-list.component';
 
 @Component({
-  selector: 'app-tenants-management-container',
-  imports: [MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, NewTenantFormComponent, TenantsListComponent],
+  selector: 'app-cabinets-management-container',
+  imports: [MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, NewCabinetFormComponent, CabinetsListComponent],
   template: `
     <div class="head">
       <h1>{{ structure.title }}</h1>
       @if (!showForm()) {
         <button mat-flat-button (click)="showForm.set(true)">
           <mat-icon>add</mat-icon>
-          {{ structure.newTenant }}
+          {{ structure.newCabinet }}
         </button>
       }
     </div>
@@ -28,7 +28,7 @@ import { TenantsListComponent } from '../tenants-list/tenants-list.component';
     }
 
     @if (showForm()) {
-      <app-new-tenant-form
+      <app-new-cabinet-form
         [isPending]="store.isPending()"
         (submitted)="store.create($event)"
         (cancelled)="showForm.set(false)"
@@ -41,8 +41,8 @@ import { TenantsListComponent } from '../tenants-list/tenants-list.component';
       <input matInput [value]="store.search()" (input)="store.setSearch($any($event.target).value)" />
     </mat-form-field>
 
-    <app-tenants-list
-      [tenants]="store.filteredTenants()"
+    <app-cabinets-list
+      [cabinets]="store.filteredCabinets()"
       [isPending]="store.isPending()"
       (activeChanged)="store.setActive($event)"
     />
@@ -80,9 +80,9 @@ import { TenantsListComponent } from '../tenants-list/tenants-list.component';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TenantsManagementContainerComponent {
-  protected readonly store = inject(TenantsManagementStore);
-  protected readonly structure = TENANTS_MANAGEMENT_STRUCTURE;
+export class CabinetsManagementContainerComponent {
+  protected readonly store = inject(CabinetsManagementStore);
+  protected readonly structure = CABINETS_MANAGEMENT_STRUCTURE;
   protected readonly showForm = signal(false);
   private readonly _snackBar = inject(MatSnackBar);
 

@@ -5,7 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { Invitation, Member, MemberStatus, TenantRole } from '@shared';
+import { Invitation, Member, MemberStatus, CabinetRole } from '@shared';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
 
 @Component({
@@ -210,18 +210,18 @@ export class MembersPanelComponent {
   readonly invitations = input<Invitation[]>([]);
   readonly currentUid = input<string | null>(null);
   readonly isPending = input(false);
-  readonly invited = output<{ email: string; role: TenantRole }>();
-  readonly roleChanged = output<{ uid: string; role: TenantRole }>();
+  readonly invited = output<{ email: string; role: CabinetRole }>();
+  readonly roleChanged = output<{ uid: string; role: CabinetRole }>();
   readonly statusChanged = output<{ uid: string; status: MemberStatus }>();
 
   protected readonly structure = SETTINGS_STRUCTURE.members;
   protected readonly roles = SETTINGS_STRUCTURE.roles;
   protected readonly inviteForm = new FormGroup({
     email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
-    role: new FormControl<TenantRole>('courtier', { nonNullable: true }),
+    role: new FormControl<CabinetRole>('courtier', { nonNullable: true }),
   });
 
-  protected roleLabel(role: TenantRole): string {
+  protected roleLabel(role: CabinetRole): string {
     return this.roles.find(r => r.value === role)?.label ?? role;
   }
 

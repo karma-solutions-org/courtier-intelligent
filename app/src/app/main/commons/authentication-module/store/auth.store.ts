@@ -34,7 +34,7 @@ export const AuthStore = signalStore(
   withRequestStatus(),
   withComputed(({ user }) => ({
     isAuthenticated: computed(() => user() !== null),
-    tenantId: computed(() => user()?.tenantId ?? null),
+    cabinetId: computed(() => user()?.cabinetId ?? null),
     role: computed(() => user()?.role ?? null),
   })),
   withMethods((store, authService = inject(AuthService), router = inject(Router)) => ({

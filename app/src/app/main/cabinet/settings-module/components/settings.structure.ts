@@ -1,8 +1,8 @@
 export const SETTINGS_STRUCTURE = {
   title: 'Paramètres du cabinet',
-  tabs: { tenant: 'Cabinet', members: 'Membres' },
+  tabs: { cabinet: 'Cabinet', members: 'Membres' },
 
-  tenant: {
+  cabinet: {
     logoTitle: 'Logo',
     logoHint: 'PNG, JPG ou SVG, 2 Mo maximum. Il apparaîtra sur les propositions envoyées aux clients.',
     logoButton: 'Choisir un logo',

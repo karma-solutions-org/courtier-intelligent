@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { faker } from '@faker-js/faker';
-import { Invitation, Member, MemberStatus, TenantRole } from '@shared';
+import { Invitation, Member, MemberStatus, CabinetRole } from '@shared';
 import { page } from 'vitest/browser';
-import { mockInvitation, mockMember } from '../../../../../core/utils/unit-test-utils/mocks/tenant.mock';
+import { mockInvitation, mockMember } from '../../../../../core/utils/unit-test-utils/mocks/cabinet.mock';
 import { MembersPanelComponent } from './members-panel.component';
 
 /** L'onglet « Membres » des paramètres, tel que l'admin du cabinet le manipule. */
@@ -14,8 +14,8 @@ class MembersPanelTester {
   readonly inviteEmail = this.root.getByRole('textbox', { name: 'Email' });
   readonly inviteButton = this.root.getByRole('button', { name: 'Inviter' });
 
-  readonly invited: { email: string; role: TenantRole }[] = [];
-  readonly roleChanges: { uid: string; role: TenantRole }[] = [];
+  readonly invited: { email: string; role: CabinetRole }[] = [];
+  readonly roleChanges: { uid: string; role: CabinetRole }[] = [];
   readonly statusChanges: { uid: string; status: MemberStatus }[] = [];
 
   constructor() {

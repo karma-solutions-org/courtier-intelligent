@@ -25,15 +25,11 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
 chrome.tabs.onRemoved.addListener(tabId => pagesByTab.delete(tabId));
 
 // Messages de l'app Angular (domaines autorisés dans manifest.json → externally_connectable).
+// L'app ne transmet aucun identifiant : l'extension a sa propre connexion Firebase (Epic E6).
 chrome.runtime.onMessageExternal.addListener((message: ExternalMessage, _sender, sendResponse) => {
   switch (message.type) {
     case 'PING':
       sendResponse({ type: 'PONG', version: chrome.runtime.getManifest().version });
-      return false;
-
-    case 'AUTH':
-      // Connexion Firebase avec le custom token : prévue dans l'Epic E6.
-      sendResponse({ type: 'AUTH_NOT_IMPLEMENTED' });
       return false;
   }
 });

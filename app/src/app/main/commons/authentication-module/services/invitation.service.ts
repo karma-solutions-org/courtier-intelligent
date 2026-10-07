@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { TenantRole } from '@shared';
+import { CabinetRole } from '@shared';
 import { Observable } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 
@@ -7,7 +7,7 @@ import { BackendProvider } from '../../../../core/providers/backend.provider';
 export class InvitationService {
   private readonly _backend = inject(BackendProvider);
 
-  accept(tenantId: string, invitationId: string): Observable<{ tenantId: string; role: TenantRole }> {
-    return this._backend.call('members-acceptInvitation', { tenantId, invitationId });
+  accept(cabinetId: string, invitationId: string): Observable<{ cabinetId: string; role: CabinetRole }> {
+    return this._backend.call('equipe-accepterInvitation', { cabinetId, invitationId });
   }
 }

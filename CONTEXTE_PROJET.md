@@ -4,7 +4,7 @@
 
 ## 1. Le produit
 
-**Courtier Intelligent** est un **SaaS multi-tenant** vendu à des **cabinets de courtage en assurance**.
+**Courtier Intelligent** est un **SaaS multi-cabinet** vendu à des **cabinets de courtage en assurance**.
 Il permet au courtier de :
 
 1. **saisir un dossier** : assuré, produit (auto, habitation, santé…) et questionnaire du produit ;
@@ -14,7 +14,7 @@ Il permet au courtier de :
 5. **envoyer la proposition** à l'assuré et **suivre le dossier** jusqu'à la souscription.
 
 **Vocabulaire :**
-- **Tenant / Cabinet** = le cabinet de courtage qui achète l'app (notre client).
+- **Cabinet** = le cabinet de courtage qui achète l'app (notre client). C'est l'unité d'isolation des données (collection `cabinets`, claim `ci_cabinet_id`). Le mot « tenant » n'est pas utilisé dans le projet.
 - **Utilisateur** = courtier ou admin du cabinet.
 - **Assuré** = le client du courtier. Il n'a **aucun accès** à l'app : c'est le courtier qui saisit tout manuellement.
 
@@ -41,8 +41,8 @@ Assurés et dossiers sont visibles par tout le cabinet ; chaque dossier a un cou
 
 ```
             ┌────────────────────── Firebase ───────────────────────┐
-            │ Auth      : claims { tenantId, role }                 │
-            │ Firestore : tenants/*, catalogue global, formMemories │
+            │ Auth      : claims { cabinetId, role }                 │
+            │ Firestore : cabinets/*, catalogue global, formMemories │
             │ Functions : cabinets, invitations, token extension,   │
             │             proxy IA, référence dossier, email        │
             │ Storage   : documents (carte grise, devis…)           │
@@ -54,7 +54,9 @@ Assurés et dossiers sont visibles par tout le cabinet ; chaque dossier a un cou
 ```
 
 **Principe clé : Firestore est la source unique de vérité.**
-L'app et l'extension n'échangent **qu'un seul message** : l'app envoie à l'extension un **custom token Firebase** (même `uid`, `tenantId` et `role` que le courtier). Ensuite, tout passe par Firestore en temps réel.
+**L'app et l'extension ne s'échangent aucun identifiant.** L'extension a **sa propre connexion Firebase** : le courtier s'y connecte une fois, dans le side panel, avec **le même compte** que dans l'app (email et mot de passe). Elle obtient donc les mêmes claims (`ci_cabinet_id`, `ci_role`) et les mêmes droits. Ensuite, app et extension communiquent uniquement via Firestore, en temps réel.
+
+*Choix « B » (07/10/2026) : pas de custom token, donc pas besoin du rôle IAM « Service Account Token Creator ». Contrepartie : le courtier se connecte deux fois (app + extension).*
 
 **Pourquoi ce choix** (plutôt que des messages directs app ↔ extension) : aucun résultat perdu si l'onglet de l'app est fermé ; reprise possible plus tard ou sur un autre poste ; suivi en temps réel natif ; historique complet ; aucun code de synchronisation à écrire.
 
@@ -104,13 +106,13 @@ formMemories/{memoryKey}          origin, formFingerprint, version,
 extensionReports/{id}             insurerId, origin, step, issue, at   // AUCUNE donnée client
 
 // PAR CABINET
-tenants/{tenantId}                name, orias, address, phone, email, logoPath, active,
+cabinets/{cabinetId}                name, orias, address, phone, email, logoPath, active,
                                   enabledInsurers[], enabledProducts[]
-tenants/{t}/members/{uid}         email, displayName, role, status
-tenants/{t}/invitations/{id}      email, role, expiresAt, status
-tenants/{t}/counters/dossiers     value
-tenants/{t}/assures/{id}          type, civilite, firstName, lastName, birthDate, email, phone, address{}
-tenants/{t}/dossiers/{id}
+cabinets/{t}/members/{uid}         email, displayName, role, status
+cabinets/{t}/invitations/{id}      email, role, expiresAt, status
+cabinets/{t}/counters/dossiers     value
+cabinets/{t}/assures/{id}          type, civilite, firstName, lastName, birthDate, email, phone, address{}
+cabinets/{t}/dossiers/{id}
     reference, assureId, productId, assignedTo, status,
     data{}                         // valeurs par canonicalPath
     completeness{ ok, missing[] },
@@ -133,7 +135,7 @@ tenants/{t}/dossiers/{id}
 
 ## 8. Flux de tarification
 
-1. **Connexion** : App → Function `createExtensionToken` → message → Extension → `signInWithCustomToken`.
+1. **Connexion** : le courtier se connecte dans le side panel de l'extension avec le même compte que dans l'app (Firebase Auth email/mot de passe). L'extension vérifie que le compte a bien un cabinet (`ci_cabinet_id`).
 2. **Lancer** : le courtier clique « Tarifer chez A » → l'app écrit `quoteJobs/A {requested, quoteData}` et ouvre l'extranet.
 3. **Analyser** : l'extension détecte la page → mémoire partagée connue ? → mapping immédiat ; sinon DOM + synonymes + scoring → IA via proxy si doute → sauvegarde dans `formMemories`.
 4. **Compléter** : champs requis absents → `{needs_info, missingFields}` → l'app affiche un formulaire → le courtier répond → l'extension reprend.
@@ -146,7 +148,7 @@ tenants/{t}/dossiers/{id}
 
 ## 9. Sécurité
 
-- Isolation des cabinets : tout accès à `tenants/{t}` exige `request.auth.token.tenantId == t`.
+- Isolation des cabinets : tout accès à `cabinets/{t}` exige `request.auth.token.cabinetId == t`.
 - Claims posés **uniquement** par les Functions.
 - Extension : même identité que le courtier ; elle n'écrit que le statut du job, les offres et `formMemories`.
 - `formMemories` et `extensionReports` : jamais de donnée client.
@@ -162,7 +164,7 @@ tenants/{t}/dossiers/{id}
 
 ## 11. Cloud Functions
 
-`createTenant` · `inviteMember` / `acceptInvitation` · `setMemberRole` / `setMemberStatus` · `createExtensionToken` · `aiProxy` · `onDossierCreate` (référence `2026-000123`) · `onDossierWrite` (complétude, transitions, historique) · `onOfferWrite` (normalisation des garanties, écarts, score) · `sendProposal` · `dailyReminders`.
+`cabinets-creerMonCabinet` · `cabinets-creer` · `cabinets-activer` · `equipe-inviter` · `equipe-accepterInvitation` · `equipe-changerRole` · `equipe-activerMembre` · `aiProxy` · `onDossierCreate` (référence `2026-000123`) · `onDossierWrite` (complétude, transitions, historique) · `onOfferWrite` (normalisation des garanties, écarts, score) · `sendProposal` · `dailyReminders`.
 
 ## 12. Extension existante de référence
 
@@ -175,12 +177,12 @@ On **change** : communication via Firestore (et non plus par messages), mémoire
 | Epic | Contenu | Sprint |
 |---|---|---|
 | E0 · Fondations | Projet Angular, Firebase + emulators, extension MV3, types partagés, layout | S1 |
-| E1 · Cabinets et utilisateurs | Connexion, guards par rôle, `createTenant`, règles d'isolation, invitations, rôles, paramètres, liste des cabinets | S1–S2 |
+| E1 · Cabinets et utilisateurs | Connexion, guards par rôle, `cabinets-creer`, règles d'isolation, invitations, rôles, paramètres, liste des cabinets | S1–S2 |
 | E2 · Catalogue | Format JSON du questionnaire, seed Auto + 3 assureurs, CRUD produits / garanties / assureurs | S2 |
 | E3 · Assurés | Création, liste et recherche, fiche, doublons | S3 |
 | E4 · Dossiers | Stepper, questionnaire dynamique, brouillon auto, complétude, référence, liste, détail, machine à états, historique, assignation, `quoteData` | S3–S4 |
 | E5 · Analyse du besoin | Formulaire, validation, suggestions | S4 |
-| E6 · Connexion de l'extension | `createExtensionToken`, détection, session, règles, side panel, `aiProxy` | S5 |
+| E6 · Connexion de l'extension | Connexion Firebase propre à l'extension (side panel), session, règles, `aiProxy` | S5 |
 | E7 · Mapping et remplissage | Écoute des jobs, analyse DOM, synonymes et scoring, repli IA, champs manquants, remplissage, multi-étapes, side panel | S5–S6 |
 | E8 · Mémoire partagée | `formMemories` : lecture, écriture, invalidation, gestion super-admin | S6, S8 |
 | E9 · Tarification dans l'app | Onglet tarification, bouton Tarifer, champs manquants, relance, saisie manuelle | S5–S7 |

@@ -1,5 +1,5 @@
 /** Informations du cabinet modifiables par son admin (mêmes champs que les règles Firestore). */
-export interface TenantInfoModel {
+export interface CabinetInfoModel {
   name: string;
   orias: string | null;
   address: string | null;

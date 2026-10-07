@@ -18,7 +18,7 @@ import { AcceptInvitationPresentationComponent } from '../accept-invitation-pres
       [error]="invitationStore.error()"
       [signinUrl]="signinUrl"
       [signupUrl]="signupUrl"
-      (accepted)="invitationStore.accept({ tenantId: cabinet(), invitationId: invitation() })"
+      (accepted)="invitationStore.accept({ cabinetId: cabinet(), invitationId: invitation() })"
     />
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

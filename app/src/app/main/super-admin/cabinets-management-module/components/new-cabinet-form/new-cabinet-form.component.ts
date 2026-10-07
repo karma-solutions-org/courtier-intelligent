@@ -3,11 +3,11 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { NewTenantModel } from '../../models/new-tenant.model';
-import { TENANTS_MANAGEMENT_STRUCTURE } from '../tenants-management.structure';
+import { NewCabinetModel } from '../../models/new-cabinet.model';
+import { CABINETS_MANAGEMENT_STRUCTURE } from '../cabinets-management.structure';
 
 @Component({
-  selector: 'app-new-tenant-form',
+  selector: 'app-new-cabinet-form',
   imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule],
   template: `
     <section class="card">
@@ -86,12 +86,12 @@ import { TENANTS_MANAGEMENT_STRUCTURE } from '../tenants-management.structure';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class NewTenantFormComponent {
+export class NewCabinetFormComponent {
   readonly isPending = input(false);
-  readonly submitted = output<NewTenantModel>();
+  readonly submitted = output<NewCabinetModel>();
   readonly cancelled = output<void>();
 
-  protected readonly structure = TENANTS_MANAGEMENT_STRUCTURE.form;
+  protected readonly structure = CABINETS_MANAGEMENT_STRUCTURE.form;
   protected readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     orias: new FormControl('', { nonNullable: true, validators: [Validators.pattern(/^\d{8}$/)] }),

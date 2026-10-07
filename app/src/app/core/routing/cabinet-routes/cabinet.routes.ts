@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { SettingsStore } from '../../../main/cabinet/settings-module/store/settings.store';
-import { TenantsManagementStore } from '../../../main/super-admin/tenants-management-module/store/tenants-management.store';
+import { CabinetsManagementStore } from '../../../main/super-admin/cabinets-management-module/store/cabinets-management.store';
 import { roleGuard } from '../guards/auth.guards';
 import { CabinetRouteContainerModel, SuperAdminRouteContainerModel } from './cabinet-route-container.model';
 
@@ -45,14 +45,14 @@ export const CABINET_ROUTES: Routes = [
       ).then(c => c.SettingsContainerComponent),
   },
   {
-    path: SuperAdminRouteContainerModel.TENANTS_ROUTE.path,
+    path: SuperAdminRouteContainerModel.CABINETS_ROUTE.path,
     canMatch: [roleGuard('superadmin')],
     title: 'Cabinets — Courtier Intelligent',
-    providers: [TenantsManagementStore],
+    providers: [CabinetsManagementStore],
     loadComponent: () =>
       import(
-        '../../../main/super-admin/tenants-management-module/components/tenants-management-container/tenants-management-container.component'
-      ).then(c => c.TenantsManagementContainerComponent),
+        '../../../main/super-admin/cabinets-management-module/components/cabinets-management-container/cabinets-management-container.component'
+      ).then(c => c.CabinetsManagementContainerComponent),
   },
   {
     path: SuperAdminRouteContainerModel.CATALOGUE_ROUTE.path,

@@ -17,7 +17,7 @@ export interface AuthUser {
   uid: string;
   email: string | null;
   displayName: string | null;
-  tenantId: string | null;
+  cabinetId: string | null;
   role: UserRole | null;
 }
 
@@ -36,7 +36,7 @@ export abstract class AuthenticationProvider {
 export class FireauthProvider extends AuthenticationProvider {
   private readonly _auth = inject(FIREBASE_AUTH);
 
-  /** Utilisateur courant avec ses claims (tenantId, role), réémis à chaque rafraîchissement du token. */
+  /** Utilisateur courant avec ses claims (cabinetId, role), réémis à chaque rafraîchissement du token. */
   readonly user$ = new Observable<AuthUser | null>(subscriber =>
     onIdTokenChanged(this._auth, async user => {
       if (!user) {
@@ -48,7 +48,7 @@ export class FireauthProvider extends AuthenticationProvider {
         uid: user.uid,
         email: user.email,
         displayName: user.displayName,
-        tenantId: (claims['ci_tenant_id'] as string | undefined) ?? null,
+        cabinetId: (claims['ci_cabinet_id'] as string | undefined) ?? null,
         role: (claims['ci_role'] as UserRole | undefined) ?? null,
       });
     }),

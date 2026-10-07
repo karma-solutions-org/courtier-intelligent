@@ -1,15 +1,15 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { Tenant } from '@shared';
-import { TENANTS_MANAGEMENT_STRUCTURE } from '../tenants-management.structure';
+import { Cabinet } from '@shared';
+import { CABINETS_MANAGEMENT_STRUCTURE } from '../cabinets-management.structure';
 
 @Component({
-  selector: 'app-tenants-list',
+  selector: 'app-cabinets-list',
   imports: [DatePipe, MatButtonModule],
   template: `
     <div class="card">
-      @if (tenants().length) {
+      @if (cabinets().length) {
         <div class="table-scroll">
           <table>
             <thead>
@@ -22,19 +22,19 @@ import { TENANTS_MANAGEMENT_STRUCTURE } from '../tenants-management.structure';
               </tr>
             </thead>
             <tbody>
-              @for (tenant of tenants(); track tenant.id) {
-                <tr [class.inactive]="!tenant.active">
-                  <td><strong>{{ tenant.name }}</strong></td>
-                  <td>{{ tenant.orias || '—' }}</td>
-                  <td>{{ tenant.createdAt ? (tenant.createdAt.toMillis() | date: 'd MMM y') : '—' }}</td>
+              @for (cabinet of cabinets(); track cabinet.id) {
+                <tr [class.inactive]="!cabinet.active">
+                  <td><strong>{{ cabinet.name }}</strong></td>
+                  <td>{{ cabinet.orias || '—' }}</td>
+                  <td>{{ cabinet.createdAt ? (cabinet.createdAt.toMillis() | date: 'd MMM y') : '—' }}</td>
                   <td>
-                    <span class="status" [class.off]="!tenant.active">
-                      {{ tenant.active ? structure.active : structure.inactive }}
+                    <span class="status" [class.off]="!cabinet.active">
+                      {{ cabinet.active ? structure.active : structure.inactive }}
                     </span>
                   </td>
                   <td class="right">
-                    <button mat-button [disabled]="isPending()" (click)="toggle(tenant)">
-                      {{ tenant.active ? structure.deactivate : structure.activate }}
+                    <button mat-button [disabled]="isPending()" (click)="toggle(cabinet)">
+                      {{ cabinet.active ? structure.deactivate : structure.activate }}
                     </button>
                   </td>
                 </tr>
@@ -115,15 +115,15 @@ import { TENANTS_MANAGEMENT_STRUCTURE } from '../tenants-management.structure';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TenantsListComponent {
-  readonly tenants = input<Tenant[]>([]);
+export class CabinetsListComponent {
+  readonly cabinets = input<Cabinet[]>([]);
   readonly isPending = input(false);
-  readonly activeChanged = output<{ tenantId: string; active: boolean }>();
+  readonly activeChanged = output<{ cabinetId: string; active: boolean }>();
 
-  protected readonly structure = TENANTS_MANAGEMENT_STRUCTURE.list;
+  protected readonly structure = CABINETS_MANAGEMENT_STRUCTURE.list;
 
-  protected toggle(tenant: Tenant): void {
-    if (tenant.active && !confirm(this.structure.confirmDeactivate)) return;
-    this.activeChanged.emit({ tenantId: tenant.id, active: !tenant.active });
+  protected toggle(cabinet: Cabinet): void {
+    if (cabinet.active && !confirm(this.structure.confirmDeactivate)) return;
+    this.activeChanged.emit({ cabinetId: cabinet.id, active: !cabinet.active });
   }
 }

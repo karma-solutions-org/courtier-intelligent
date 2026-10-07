@@ -35,7 +35,7 @@ export const NAVIGATION: NavSection[] = [
   {
     title: 'Super-admin',
     items: [
-      { label: 'Cabinets', icon: 'apartment', url: SuperAdminRouteContainerModel.TENANTS_ROUTE.url, roles: ['superadmin'] },
+      { label: 'Cabinets', icon: 'apartment', url: SuperAdminRouteContainerModel.CABINETS_ROUTE.url, roles: ['superadmin'] },
       { label: 'Catalogue', icon: 'inventory_2', url: SuperAdminRouteContainerModel.CATALOGUE_ROUTE.url, roles: ['superadmin'] },
       { label: 'Assureurs', icon: 'shield', url: SuperAdminRouteContainerModel.INSURERS_ROUTE.url, roles: ['superadmin'] },
     ],

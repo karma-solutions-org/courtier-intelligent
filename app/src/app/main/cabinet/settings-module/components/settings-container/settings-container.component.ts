@@ -5,23 +5,23 @@ import { AuthStore } from '../../../../commons/authentication-module/store/auth.
 import { SettingsStore } from '../../store/settings.store';
 import { MembersPanelComponent } from '../members-panel/members-panel.component';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
-import { TenantFormComponent } from '../tenant-form/tenant-form.component';
+import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
 
 @Component({
   selector: 'app-settings-container',
-  imports: [MatTabsModule, TenantFormComponent, MembersPanelComponent],
+  imports: [MatTabsModule, CabinetFormComponent, MembersPanelComponent],
   template: `
     <h1>{{ structure.title }}</h1>
     @if (store.error()) {
       <p class="error" role="alert">{{ store.error() }}</p>
     }
     <mat-tab-group animationDuration="0ms">
-      <mat-tab [label]="structure.tabs.tenant">
+      <mat-tab [label]="structure.tabs.cabinet">
         <div class="tab">
-          <app-tenant-form
-            [tenant]="store.tenant()"
+          <app-cabinet-form
+            [cabinet]="store.cabinet()"
             [isPending]="store.isPending()"
-            (saved)="store.saveTenant($event)"
+            (saved)="store.saveCabinet($event)"
             (logoSelected)="store.uploadLogo($event)"
           />
         </div>

@@ -1,6 +1,6 @@
-export const TENANTS_MANAGEMENT_STRUCTURE = {
+export const CABINETS_MANAGEMENT_STRUCTURE = {
   title: 'Cabinets',
-  newTenant: 'Nouveau cabinet',
+  newCabinet: 'Nouveau cabinet',
   search: 'Rechercher un cabinet ou un ORIAS',
 
   form: {

@@ -15,11 +15,11 @@ export const InvitationStore = signalStore(
   withRequestStatus(),
   withMethods(
     (store, invitationService = inject(InvitationService), authService = inject(AuthService), router = inject(Router)) => ({
-      accept: rxMethod<{ tenantId: string; invitationId: string }>(
+      accept: rxMethod<{ cabinetId: string; invitationId: string }>(
         pipe(
           tap(() => patchState(store, setPending())),
-          exhaustMap(({ tenantId, invitationId }) =>
-            invitationService.accept(tenantId, invitationId).pipe(
+          exhaustMap(({ cabinetId, invitationId }) =>
+            invitationService.accept(cabinetId, invitationId).pipe(
               // Le cabinet et le rôle viennent d'être posés côté serveur : on recharge le token.
               switchMap(() => authService.refreshToken()),
               tapResponse({

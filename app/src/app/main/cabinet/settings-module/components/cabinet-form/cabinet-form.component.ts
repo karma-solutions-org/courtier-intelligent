@@ -4,22 +4,22 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { Tenant } from '@shared';
-import { TenantInfoModel } from '../../models/tenant-info.model';
+import { Cabinet } from '@shared';
+import { CabinetInfoModel } from '../../models/cabinet-info.model';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 
 @Component({
-  selector: 'app-tenant-form',
+  selector: 'app-cabinet-form',
   imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule],
   template: `
     <section class="card">
       <h2>{{ structure.logoTitle }}</h2>
       <div class="logo-row">
         <div class="logo-preview">
-          @if (tenant()?.logoPath) {
-            <img [src]="tenant()!.logoPath" alt="Logo du cabinet" />
+          @if (cabinet()?.logoPath) {
+            <img [src]="cabinet()!.logoPath" alt="Logo du cabinet" />
           } @else {
             <mat-icon>apartment</mat-icon>
           }
@@ -104,13 +104,13 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TenantFormComponent {
-  readonly tenant = input<Tenant | null>(null);
+export class CabinetFormComponent {
+  readonly cabinet = input<Cabinet | null>(null);
   readonly isPending = input(false);
-  readonly saved = output<TenantInfoModel>();
+  readonly saved = output<CabinetInfoModel>();
   readonly logoSelected = output<File>();
 
-  protected readonly structure = SETTINGS_STRUCTURE.tenant;
+  protected readonly structure = SETTINGS_STRUCTURE.cabinet;
   protected readonly logoError = signal<string | null>(null);
   protected readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -123,14 +123,14 @@ export class TenantFormComponent {
   constructor() {
     // Remplit le formulaire avec les données du cabinet, sans écraser une saisie en cours.
     effect(() => {
-      const tenant = this.tenant();
-      if (tenant && this.form.pristine) {
+      const cabinet = this.cabinet();
+      if (cabinet && this.form.pristine) {
         this.form.reset({
-          name: tenant.name ?? '',
-          orias: tenant.orias ?? '',
-          address: tenant.address ?? '',
-          phone: tenant.phone ?? '',
-          email: tenant.email ?? '',
+          name: cabinet.name ?? '',
+          orias: cabinet.orias ?? '',
+          address: cabinet.address ?? '',
+          phone: cabinet.phone ?? '',
+          email: cabinet.email ?? '',
         });
       }
     });

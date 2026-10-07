@@ -10,4 +10,4 @@ export interface ActivePage {
 }
 
 /** Messages reçus depuis l'app Angular (chrome.runtime.onMessageExternal). */
-export type ExternalMessage = { type: 'PING' } | { type: 'AUTH'; token: string };
+export type ExternalMessage = { type: 'PING' };
