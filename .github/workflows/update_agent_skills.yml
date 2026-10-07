@@ -1,0 +1,81 @@
+name: Update Agent Skills
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-agent-skills:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.BOT_GITHUB_ACTION_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Detect existing skills
+        id: detect
+        # No lock file means the skills were never installed in this repository:
+        # `skills update` has nothing to refresh, so bootstrap them with `skills add`.
+        run: |
+          if [ -f skills-lock.json ]; then
+            echo "mode=update" >> "$GITHUB_OUTPUT"
+            echo "action=Update" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=install" >> "$GITHUB_OUTPUT"
+            echo "action=Install" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install agent skills (first time)
+        if: steps.detect.outputs.mode == 'install'
+        run: npx -y skills add angular/skills --agent claude-code --yes
+
+      - name: Update agent skills
+        if: steps.detect.outputs.mode == 'update'
+        run: npx -y skills update
+
+      - name: Materialise skills into .claude
+        # skills >= 1.5 installs into .agents/skills and leaves a symlink behind at
+        # .claude/skills/<name>. Swap the link back for the real files so the committed
+        # layout stays plain directories: this repo is also cloned on Windows with
+        # core.symlinks=false, where a checked-out symlink degrades into a text file
+        # and the skill silently stops loading.
+        run: |
+          for link in .claude/skills/*; do
+            if [ -L "$link" ]; then
+              target=$(readlink -f "$link")
+              rm "$link"
+              cp -r "$target" "$link"
+            fi
+          done
+          rm -rf .agents
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.BOT_GITHUB_ACTION_TOKEN }}
+          branch: chore/update-agent-skills
+          delete-branch: true
+          add-paths: |
+            .claude
+            skills-lock.json
+          commit-message: 'chore(skills): ${{ steps.detect.outputs.action }} Angular agent skills'
+          title: 'chore(skills): ${{ steps.detect.outputs.action }} Angular agent skills'
+          body: |
+            Automated ${{ steps.detect.outputs.mode }} of the official Angular agent skills from
+            [angular/skills](https://github.com/angular/skills).
+
+            Review the diff before merging: these files steer how coding
+            agents generate Angular code in this repository.

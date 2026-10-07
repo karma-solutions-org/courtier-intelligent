@@ -1,0 +1,64 @@
+name: Linting
+
+on:
+  push:
+    branches:
+      - '**'
+
+# A newer push to a branch supersedes the running check. On main every run is
+# kept, because "Fix formatting" may still have a commit to push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # Dependabot runs cannot read repository secrets, so the bot token is
+          # empty there and checkout hard-errors with "Input required and not
+          # supplied: token", failing this required check on every Dependabot PR.
+          # The token is only needed by "Fix formatting" below, which pushes to
+          # main; everywhere else the default GITHUB_TOKEN is enough.
+          token: ${{ secrets.BOT_GITHUB_ACTION_TOKEN || github.token }}
+
+      - name: Set up project
+        uses: ./.github/actions/setup
+        with:
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Linting
+        run: npm run lint
+
+      - name: Check formatting
+        if: ${{ github.ref != 'refs/heads/main' && !contains(github.ref, 'release-please') }}
+        run: npm run format:check
+
+      - name: Fix formatting
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          set -e
+          git pull origin main
+          npm run format:fix
+          if [[ -z $(git status --porcelain) ]]; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
+          git add .
+          git commit -m "chore: Fix linting [skip actions]"
+          # The README workflow also pushes to main after every push, so rebase
+          # onto whatever it landed in the meantime instead of failing.
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin main && exit 0
+            sleep $((attempt * 5))
+          done
+          exit 1

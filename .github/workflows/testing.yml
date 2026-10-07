@@ -2,11 +2,10 @@ name: Testing
 
 on:
   push:
-    branches:
-      - '**'
-  pull_request:
+    branches-ignore:
+      - main
 
-# Un nouveau push sur la branche remplace la vérification en cours.
+# A newer push to a branch supersedes the running check.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -14,29 +13,22 @@ concurrency:
 jobs:
   testing:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: read
+      packages: read
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up project
+        uses: ./.github/actions/setup
         with:
-          node-version: '24'
-          cache: 'npm'
-          cache-dependency-path: 'app/package-lock.json'
-
-      - name: Install dependencies
-        working-directory: ./app
-        run: npm ci
+          registry-url: 'https://npm.pkg.github.com'
 
       - name: Set up Playwright
         uses: ./.github/actions/playwright
 
-      # Vitest en mode navigateur (Chromium via Playwright), lancé par `ng test`.
       - name: Testing
-        working-directory: ./app
-        run: npm run test:ci
+        run: npm run test
