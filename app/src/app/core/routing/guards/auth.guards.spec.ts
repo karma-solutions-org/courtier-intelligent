@@ -1,6 +1,6 @@
 import { EnvironmentInjector, runInInjectionContext } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { CanMatchFn, PartialMatchRouteSnapshot, provideRouter, Route, UrlSegment, UrlTree } from '@angular/router';
+import { CanMatchFn, PartialMatchRouteSnapshot, provideRouter, Route, Router, UrlSegment, UrlTree } from '@angular/router';
 import { UserRole } from '@shared';
 import { firstValueFrom, isObservable, Observable, of } from 'rxjs';
 import { BackendProvider } from '../../providers/backend.provider';
@@ -10,6 +10,7 @@ import {
   provideFakeAuthentication,
 } from '../../utils/unit-test-utils/mocks/fake-authentication.provider';
 import { FakeSessionService, provideFakeSession } from '../../utils/unit-test-utils/mocks/fake-session.service';
+import { AuthStore } from '../../../main/commons/authentication-module/store/auth.store';
 import { authGuard, guestGuard, roleGuard } from './auth.guards';
 
 /** Le résultat d'un guard : `true`, ou l'URL vers laquelle il redirige. */
@@ -100,8 +101,10 @@ describe('Guards', () => {
       expect(session.open).toHaveBeenCalledOnce();
     });
 
-    it('refuse un deuxième appareil et le déconnecte', async () => {
-      session.refuseWith = 'Ce compte est déjà connecté sur un autre appareil.';
+    it('refuse un autre appareil, le déconnecte et affiche l’écran « Appareil non autorisé »', async () => {
+      session.refuseWith = 'Cet appareil n’est pas autorisé : votre compte est lié à un autre appareil.';
+      session.refuseReason = 'device_not_authorized';
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
       const decision = evaluate(authGuard);
       signInAs('courtier');
 
@@ -110,6 +113,8 @@ describe('Guards', () => {
       auth.signOutUser();
       // … et renvoyé vers la connexion, sans jamais être entré dans l'espace.
       expect(await decision).toBe('/connexion');
+      expect(TestBed.inject(AuthStore).sessionIssue()).toBe('device_not_authorized');
+      expect(navigate).toHaveBeenCalledWith('/appareil-non-autorise');
     });
 
     it("n'ouvre pas de session pour un compte sans cabinet", async () => {

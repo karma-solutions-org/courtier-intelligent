@@ -13,7 +13,7 @@ import {
   setPending,
   withRequestStatus,
 } from '../../../../core/store-features/with-request-status';
-import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
+import { toBackendErrorMessage, toBackendErrorReason } from '../../../../core/utils/backend-error.utils';
 import { CredentialsModel } from '../models/credentials.model';
 import { SignupModel } from '../models/signup.model';
 import { AuthService } from '../services/auth.service';
@@ -29,6 +29,9 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
  */
 type SessionStatus = 'none' | 'opening' | 'open';
 
+/** Pourquoi cet appareil a été déconnecté : chaque cas a son écran. */
+export type SessionIssue = 'device_not_authorized' | 'session_replaced';
+
 interface AuthState {
   user: AuthUser | null;
   /** Vrai dès que Firebase a indiqué l'état de connexion initial. */
@@ -39,6 +42,8 @@ interface AuthState {
   sessionStatus: SessionStatus;
   /** Message affiché sur la page de connexion (ex. compte déjà connecté sur un autre appareil). */
   sessionNotice: string | null;
+  /** Écran à afficher après une déconnexion automatique (null : simple message sur la page de connexion). */
+  sessionIssue: SessionIssue | null;
 }
 
 /** Store global de l'authentification : utilisateur courant, cabinet, rôle et session de l'appareil. */
@@ -51,6 +56,7 @@ export const AuthStore = signalStore(
     redirectUrl: null,
     sessionStatus: 'none',
     sessionNotice: null,
+    sessionIssue: null,
   }),
   withRequestStatus(),
   withComputed(({ user, initialized, sessionStatus }) => ({
@@ -63,12 +69,12 @@ export const AuthStore = signalStore(
   // ── Session : un seul appareil connecté par utilisateur ───────────────────
   withMethods((store, authService = inject(AuthService), session = inject(SessionService), router = inject(Router)) => {
     /** Déconnecte cet appareil sans fermer la session (elle appartient à un autre appareil). */
-    const kickOut = (notice: string) => {
-      patchState(store, { sessionStatus: 'none', sessionNotice: notice });
+    const kickOut = (notice: string, issue: SessionIssue | null) => {
+      patchState(store, { sessionStatus: 'none', sessionNotice: notice, sessionIssue: issue });
       authService
         .signOut()
         .pipe(take(1))
-        .subscribe(() => router.navigateByUrl(CommonRouteContainerModel.SIGNIN_ROUTE.url));
+        .subscribe(() => router.navigateByUrl(issueUrl(issue)));
     };
 
     return {
@@ -78,8 +84,12 @@ export const AuthStore = signalStore(
           exhaustMap(() =>
             session.open().pipe(
               tapResponse({
-                next: () => patchState(store, { sessionStatus: 'open', sessionNotice: null }),
-                error: error => kickOut(toBackendErrorMessage(error)),
+                next: () => patchState(store, { sessionStatus: 'open', sessionNotice: null, sessionIssue: null }),
+                error: error =>
+                  kickOut(
+                    toBackendErrorMessage(error),
+                    toBackendErrorReason(error) === 'device_not_authorized' ? 'device_not_authorized' : null,
+                  ),
               }),
             ),
           ),
@@ -99,7 +109,12 @@ export const AuthStore = signalStore(
                   session.watchActiveSession(target.cabinetId, target.uid).pipe(
                     filter(active => active?.authTime !== target.authTime),
                     take(1),
-                    tap(() => kickOut('Votre session a été fermée. Reconnectez-vous sur cet appareil.')),
+                    tap(() =>
+                      kickOut(
+                        'Votre session a été fermée : une nouvelle connexion a été ouverte ou un administrateur a réinitialisé votre appareil.',
+                        'session_replaced',
+                      ),
+                    ),
                   ),
                 )
               : EMPTY,
@@ -112,7 +127,7 @@ export const AuthStore = signalStore(
   withMethods((store, authService = inject(AuthService), session = inject(SessionService), router = inject(Router)) => ({
     signIn: rxMethod<CredentialsModel>(
       pipe(
-        tap(() => patchState(store, setPending(), { sessionNotice: null })),
+        tap(() => patchState(store, setPending(), { sessionNotice: null, sessionIssue: null })),
         exhaustMap(credentials =>
           authService.signIn(credentials).pipe(
             tapResponse({
@@ -210,6 +225,17 @@ export const AuthStore = signalStore(
     },
   }),
 );
+
+function issueUrl(issue: SessionIssue | null): string {
+  switch (issue) {
+    case 'device_not_authorized':
+      return CommonRouteContainerModel.DEVICE_NOT_AUTHORIZED_ROUTE.url;
+    case 'session_replaced':
+      return CommonRouteContainerModel.SESSION_REPLACED_ROUTE.url;
+    default:
+      return CommonRouteContainerModel.SIGNIN_ROUTE.url;
+  }
+}
 
 /** L'inscription enchaîne Firebase Auth (codes « auth/… ») puis la création du cabinet (function). */
 function toSignupErrorMessage(error: unknown): string {

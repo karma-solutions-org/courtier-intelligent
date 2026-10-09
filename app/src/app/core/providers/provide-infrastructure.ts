@@ -1,6 +1,7 @@
 import { AuthenticationProvider, FireauthProvider } from './authentication.provider';
 import { BackendProvider, FirebaseFunctionsProvider } from './backend.provider';
 import { DatabaseProvider, FirestoreProvider } from './database.provider';
+import { ChromeExtensionProvider, ExtensionProvider } from './extension.provider';
 import { provideFirebase } from './firebase';
 import { FirestorageProvider, StorageProvider } from './storage.provider';
 
@@ -12,5 +13,6 @@ export function provideInfrastructure() {
     { provide: DatabaseProvider, useClass: FirestoreProvider },
     { provide: BackendProvider, useClass: FirebaseFunctionsProvider },
     { provide: StorageProvider, useClass: FirestorageProvider },
+    { provide: ExtensionProvider, useClass: ChromeExtensionProvider },
   ];
 }

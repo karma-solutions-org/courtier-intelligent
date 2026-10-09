@@ -13,15 +13,95 @@
     </header>
 
     <main>
-      <section class="card">
-        <p class="label">Compte</p>
-        <p id="account" class="value muted">Non connecté à l'application</p>
+      <!-- Connexion : compte de l'application (email et mot de passe) -->
+      <section id="login" class="card" hidden>
+        <p class="label">Connexion</p>
+        <p id="login-notice" class="notice" role="status" hidden></p>
+        <form id="login-form" novalidate>
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="username" required />
+          <label for="password">Mot de passe</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required />
+          <p id="login-error" class="error" role="alert" hidden></p>
+          <button id="login-submit" type="submit">Se connecter</button>
+        </form>
+        <p class="muted small">Utilisez le compte de l'application. Courtier Intelligent doit être ouvert et connecté dans votre navigateur.</p>
       </section>
 
-      <section class="card">
-        <p class="label">Page active</p>
-        <p id="page-origin" class="value">—</p>
-        <p id="page-fields" class="muted"></p>
+      <!-- Courtier connecté -->
+      <section id="connected" hidden>
+        <section class="card">
+          <p class="label">Courtier connecté</p>
+          <p id="account-name" class="value"></p>
+          <p id="account-meta" class="muted"></p>
+          <button id="sign-out" type="button" class="link">Se déconnecter</button>
+        </section>
+
+        <section class="card">
+          <p class="label">Dossier et tarification en cours</p>
+          <p id="job-title" class="value">—</p>
+          <p id="job-status" class="muted"></p>
+          <p id="job-progress" class="muted"></p>
+          <p id="job-error" class="error" hidden></p>
+        </section>
+
+        <!-- Remplissage de l'extranet ouvert dans l'onglet actif -->
+        <section id="run" class="card" hidden>
+          <p class="label">Remplissage de l'extranet</p>
+          <p id="run-step" class="value"></p>
+          <p id="run-phase" class="muted"></p>
+          <p id="run-summary" class="muted"></p>
+          <p id="run-message" class="notice" role="status" hidden></p>
+          <p id="run-memory" class="muted small" hidden></p>
+          <p id="run-ai" class="muted small" hidden></p>
+
+          <div id="run-missing-block" hidden>
+            <p class="label">À compléter dans l'application</p>
+            <ul id="run-missing" class="list"></ul>
+          </div>
+
+          <div id="run-problems-block" hidden>
+            <p class="label">Champs à vérifier</p>
+            <ul id="run-problems" class="list"></ul>
+          </div>
+
+          <!-- Page de résultat : le tarif lu, à confirmer par le courtier avant tout enregistrement -->
+          <div id="capture" hidden>
+            <form id="capture-form" novalidate>
+              <label for="capture-annual">Prime annuelle (€)</label>
+              <input id="capture-annual" name="premiumAnnual" inputmode="decimal" autocomplete="off" />
+              <label for="capture-monthly">Prime mensuelle (€)</label>
+              <input id="capture-monthly" name="premiumMonthly" inputmode="decimal" autocomplete="off" />
+              <label for="capture-quote">Numéro de devis</label>
+              <input id="capture-quote" name="quoteNumber" autocomplete="off" />
+              <p id="capture-deductible" class="muted small" hidden></p>
+
+              <div id="capture-guarantees-block" hidden>
+                <p class="label">Garanties</p>
+                <ul id="capture-guarantees" class="list"></ul>
+              </div>
+              <div id="capture-exclusions-block" hidden>
+                <p class="label">Exclusions</p>
+                <ul id="capture-exclusions" class="list"></ul>
+              </div>
+
+              <p id="capture-source" class="muted small" hidden></p>
+              <p id="capture-error" class="error" role="alert" hidden></p>
+              <button id="capture-confirm" type="submit">Confirmer et enregistrer</button>
+            </form>
+            <button id="capture-retry" type="button" class="link">Relire le tarif</button>
+            <button id="capture-reject" type="button" class="link danger"></button>
+          </div>
+
+          <button id="capture-now" type="button" class="link">Lire le tarif de cette page</button>
+          <button id="refill" type="button" class="link">Remplir à nouveau</button>
+        </section>
+
+        <section class="card">
+          <p class="label">Page active</p>
+          <p id="page-origin" class="value">—</p>
+          <p id="page-fields" class="muted"></p>
+        </section>
       </section>
     </main>
 

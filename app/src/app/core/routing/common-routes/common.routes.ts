@@ -2,6 +2,11 @@ import { Routes } from '@angular/router';
 import { guestGuard } from '../guards/auth.guards';
 import { CommonRouteContainerModel } from './common-route-container.model';
 
+const sessionIssue = () =>
+  import('../../../main/commons/authentication-module/components/session-issue/session-issue.component').then(
+    c => c.SessionIssueComponent,
+  );
+
 /** Pages publiques : accessibles uniquement sans être connecté. */
 export const COMMON_ROUTES: Routes = [
   {
@@ -39,5 +44,18 @@ export const COMMON_ROUTES: Routes = [
       import(
         '../../../main/commons/authentication-module/components/forget-password/forget-password-container/forget-password-container.component'
       ).then(c => c.ForgetPasswordContainerComponent),
+  },
+  {
+    // Déconnexion automatique : l'utilisateur n'est plus connecté, pas de guard.
+    path: CommonRouteContainerModel.DEVICE_NOT_AUTHORIZED_ROUTE.path,
+    title: 'Appareil non autorisé — Courtier Intelligent',
+    data: { issue: 'device_not_authorized' },
+    loadComponent: sessionIssue,
+  },
+  {
+    path: CommonRouteContainerModel.SESSION_REPLACED_ROUTE.path,
+    title: 'Session ouverte ailleurs — Courtier Intelligent',
+    data: { issue: 'session_replaced' },
+    loadComponent: sessionIssue,
   },
 ];

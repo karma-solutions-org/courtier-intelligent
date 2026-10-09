@@ -2,6 +2,11 @@
 export const environment = {
   production: false,
   useEmulators: false,
+  /**
+   * Identifiant de l'extension Chrome « Courtier Intelligent » (chrome://extensions, mode développeur) : l'app s'en sert
+   * pour détecter l'extension. Vide : la détection est désactivée.
+   */
+  extensionId: '',
   firebaseConfig: {
     apiKey: 'AIzaSyDq9ewLvlEluB0AMN_PRHG-a1G7nRTxYOw',
     authDomain: 'aibs-partenaire-testing.firebaseapp.com',

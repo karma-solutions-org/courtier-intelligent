@@ -1,6 +1,6 @@
 export const SETTINGS_STRUCTURE = {
   title: 'Paramètres du cabinet',
-  tabs: { cabinet: 'Cabinet', members: 'Membres' },
+  tabs: { cabinet: 'Cabinet', members: 'Membres', catalog: 'Assureurs et produits', audit: 'Connexions' },
 
   cabinet: {
     logoTitle: 'Logo',
@@ -31,7 +31,15 @@ export const SETTINGS_STRUCTURE = {
     role: 'Rôle',
     invite: 'Inviter',
     listTitle: 'Membres',
-    columns: { member: 'Membre', role: 'Rôle', status: 'Statut' },
+    columns: { member: 'Membre', role: 'Rôle', device: 'Appareil', status: 'Statut' },
+    noDevice: 'Aucun appareil lié',
+    deviceSince: 'lié le',
+    lastSeen: 'actif le',
+    resetDevice: "Réinitialiser l'appareil",
+    confirmReset: 'Confirmer',
+    cancelReset: 'Annuler',
+    resetsThisMonth: "Réinitialisations d'appareil ce mois-ci",
+    resetsExhausted: "Quota de réinitialisations atteint pour ce mois : réessayez le mois prochain ou changez d'offre.",
     you: 'vous',
     active: 'Actif',
     disabled: 'Désactivé',
@@ -39,6 +47,33 @@ export const SETTINGS_STRUCTURE = {
     enable: 'Réactiver',
     pendingTitle: 'Invitations en attente',
     expiresOn: 'expire le',
+  },
+
+  catalog: {
+    title: 'Assureurs et produits actifs',
+    hint: "Seuls les assureurs et produits cochés sont proposés dans votre cabinet (dossiers, tarification, comparatif).",
+    productsTitle: 'Produits',
+    insurersTitle: 'Assureurs',
+    noProducts: 'Aucun produit au catalogue pour le moment.',
+    noInsurers: 'Aucun assureur au catalogue pour le moment.',
+    save: 'Enregistrer',
+  },
+
+  audit: {
+    title: 'Journal des connexions et des appareils',
+    hint: 'Les 50 dernières actions : connexions, appareils liés, refus et réinitialisations.',
+    empty: 'Aucune activité enregistrée pour le moment.',
+    columns: { date: 'Date', member: 'Membre', event: 'Événement' },
+    unknownMember: 'Membre supprimé',
+    events: {
+      connexion: 'Connexion',
+      connexion_refusee_appareil: 'Connexion refusée : appareil non autorisé',
+      appareil_lie: 'Appareil lié au compte',
+      extension_connexion: "Extension Chrome connectée",
+      appareil_reinitialise: 'Appareil réinitialisé par un administrateur',
+      reinitialisation_refusee_quota: 'Réinitialisation refusée : quota mensuel atteint',
+    },
+    device: 'Appareil',
   },
 
   roles: [

@@ -4,15 +4,18 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
+import { ExtensionStore } from '../../../../extension-module/store/extension.store';
 import { AuthStore } from '../../../../authentication-module/store/auth.store';
 import { navigationFor, ROLE_LABELS } from '../navigation.structure';
+import { CabinetStatusStore } from '../../../store/cabinet-status.store';
+import { LimitBannerComponent } from '../limit-banner/limit-banner.component';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { TopbarComponent } from '../topbar/topbar.component';
 
 /** Layout de l'espace connecté : menu latéral selon le rôle, barre du haut, contenu routé. */
 @Component({
   selector: 'app-shell-container',
-  imports: [RouterOutlet, MatSidenavModule, SidebarComponent, TopbarComponent],
+  imports: [RouterOutlet, MatSidenavModule, SidebarComponent, TopbarComponent, LimitBannerComponent],
   template: `
     <mat-sidenav-container class="container">
       <mat-sidenav
@@ -30,9 +33,13 @@ import { TopbarComponent } from '../topbar/topbar.component';
           [email]="authStore.user()?.email ?? null"
           [roleLabel]="roleLabel()"
           [showMenuButton]="isMobile()"
+          [extension]="extensionStore.ping()"
           (menuToggled)="sidenav.toggle()"
           (signedOut)="authStore.signOut()"
         />
+        @if (cabinetStatus.graceEndsAt(); as graceEndsAt) {
+          <app-limit-banner [graceEndsAt]="graceEndsAt" [maxUtilisateurs]="cabinetStatus.maxUtilisateurs()" [role]="authStore.role()" />
+        }
         <main class="page">
           <router-outlet />
         </main>
@@ -72,6 +79,8 @@ import { TopbarComponent } from '../topbar/topbar.component';
 })
 export class ShellContainerComponent {
   protected readonly authStore = inject(AuthStore);
+  protected readonly extensionStore = inject(ExtensionStore);
+  protected readonly cabinetStatus = inject(CabinetStatusStore);
 
   protected readonly isMobile = toSignal(
     inject(BreakpointObserver)

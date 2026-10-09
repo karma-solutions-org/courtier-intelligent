@@ -3,16 +3,20 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
+import { ExtensionPing } from '../../../../../../core/providers/extension.provider';
+import { ExtensionIndicatorComponent } from '../../../../extension-module/components/extension-indicator/extension-indicator.component';
 
 @Component({
   selector: 'app-topbar',
-  imports: [MatButtonModule, MatIconModule, MatMenuModule, MatDividerModule],
+  imports: [MatButtonModule, MatIconModule, MatMenuModule, MatDividerModule, ExtensionIndicatorComponent],
   template: `
     @if (showMenuButton()) {
       <button mat-icon-button (click)="menuToggled.emit()" aria-label="Ouvrir le menu">
         <mat-icon>menu</mat-icon>
       </button>
     }
+
+    <app-extension-indicator class="extension" [ping]="extension()" />
 
     <button class="user" [matMenuTriggerFor]="userMenu" aria-label="Menu utilisateur">
       <span class="avatar">{{ initials() }}</span>
@@ -50,7 +54,6 @@ import { MatMenuModule } from '@angular/material/menu';
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-left: auto;
       padding: 6px 8px;
       border: none;
       border-radius: 10px;
@@ -62,6 +65,10 @@ import { MatMenuModule } from '@angular/material/menu';
       &:hover {
         background: var(--mat-sys-surface-container);
       }
+    }
+
+    .extension {
+      margin-left: auto;
     }
 
     .avatar {
@@ -122,6 +129,8 @@ export class TopbarComponent {
   readonly email = input<string | null>(null);
   readonly roleLabel = input('');
   readonly showMenuButton = input(false);
+  /** Résultat de la détection de l'extension Chrome (null : pas encore vérifié). */
+  readonly extension = input<ExtensionPing | null>(null);
   readonly menuToggled = output<void>();
   readonly signedOut = output<void>();
 

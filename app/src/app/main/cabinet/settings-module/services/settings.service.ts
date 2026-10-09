@@ -1,10 +1,11 @@
 import { inject, Injectable } from '@angular/core';
-import { Invitation, Member, MemberStatus, Cabinet, CabinetRole } from '@shared';
+import { AuditLogEntry, Cabinet, CabinetRole, Insurer, Invitation, Member, MemberStatus, Product } from '@shared';
 import { Observable, switchMap } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
 import { StorageProvider } from '../../../../core/providers/storage.provider';
 import { CabinetInfoModel } from '../models/cabinet-info.model';
+import { CatalogChoicesModel } from '../models/catalog-choices.model';
 
 @Injectable({ providedIn: 'root' })
 export class SettingsService {
@@ -48,6 +49,31 @@ export class SettingsService {
 
   cancelInvitation(invitationId: string): Observable<{ success: boolean }> {
     return this._backend.call('equipe-annulerInvitation', { invitationId });
+  }
+
+  /** Journal des connexions et des appareils : les 50 dernières entrées (lecture réservée aux admins). */
+  watchAuditLog(cabinetId: string): Observable<AuditLogEntry[]> {
+    return this._database.watchCollection<AuditLogEntry>(`cabinets/${cabinetId}/auditLog`, {
+      orderBy: [{ field: 'at', direction: 'desc' }],
+      limit: 50,
+    });
+  }
+
+  resetDevice(uid: string): Observable<{ success: boolean; remaining: number }> {
+    return this._backend.call('equipe-reinitialiserAppareil', { uid });
+  }
+
+  watchProducts(): Observable<Product[]> {
+    return this._database.watchCollection<Product>('products');
+  }
+
+  watchInsurers(): Observable<Insurer[]> {
+    return this._database.watchCollection<Insurer>('insurers');
+  }
+
+  /** Assureurs et produits que le cabinet utilise : seuls ceux-ci sont ensuite proposés. */
+  saveCatalogChoices(cabinetId: string, choices: CatalogChoicesModel): Observable<void> {
+    return this._database.update(`cabinets/${cabinetId}`, { ...choices });
   }
 
   setStatus(uid: string, status: MemberStatus): Observable<{ success: boolean }> {

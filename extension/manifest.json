@@ -5,8 +5,15 @@
   "version": "0.1.0",
   "description": "Remplit les extranets des assureurs à partir des dossiers Courtier Intelligent.",
   "minimum_chrome_version": "116",
-  "permissions": ["storage", "sidePanel", "tabs"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": [
+    "storage",
+    "sidePanel",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
@@ -19,12 +26,20 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content/content-script.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/content-script.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "externally_connectable": {
-    "matches": ["http://localhost:4200/*"]
+    "matches": [
+      "http://localhost:4200/*",
+      "https://courtier-intelligent-test.web.app/*",
+      "https://courtier-intelligent-test.firebaseapp.com/*"
+    ]
   }
 }

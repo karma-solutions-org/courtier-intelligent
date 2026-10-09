@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(root, 'dist');
 const isWatch = process.argv.includes('--watch');
+// `--emulators` : l'extension vise les emulators Firebase locaux (auth 9099, firestore 8080, functions 5001).
+const useEmulators = process.argv.includes('--emulators');
 
 function copyStatic() {
   fs.mkdirSync(path.join(dist, 'sidepanel'), { recursive: true });
@@ -18,7 +20,14 @@ function copyStatic() {
   fs.cpSync(path.join(root, 'public'), dist, { recursive: true });
 }
 
-const common = { bundle: true, target: 'es2022', sourcemap: true, platform: 'browser', logLevel: 'info' };
+const common = {
+  bundle: true,
+  target: 'es2022',
+  sourcemap: true,
+  platform: 'browser',
+  logLevel: 'info',
+  define: { __USE_EMULATORS__: String(useEmulators) },
+};
 
 const builds = [
   // Le service worker MV3 est déclaré en "type": "module".

@@ -1,51 +1,45 @@
 import { inject, Injectable } from '@angular/core';
-import { Member, MemberSession } from '@shared';
-import { catchError, map, Observable, of } from 'rxjs';
+import { Member, Session } from '@shared';
+import { catchError, from, map, Observable, of, switchMap } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
 
-const SESSION_STORAGE_KEY = 'ci_session_id';
+const DEVICE_DB = 'courtier-intelligent';
+const DEVICE_STORE = 'device';
+const DEVICE_KEY = 'deviceId';
 
 /**
- * Un seul appareil connecté par utilisateur.
- * L'identifiant de session est propre au navigateur (conservé dans le localStorage) :
- * recharger la page garde la même session, un autre appareil en a une autre.
+ * Un seul appareil par utilisateur : le compte est lié à l'appareil de sa première connexion.
+ * L'identifiant d'appareil est généré une fois et conservé dans l'IndexedDB du navigateur :
+ * recharger la page ou se reconnecter garde le même appareil, un autre navigateur ou poste en a un autre.
  */
 @Injectable({ providedIn: 'root' })
 export class SessionService {
   private readonly _backend = inject(BackendProvider);
   private readonly _database = inject(DatabaseProvider);
-  private _fallbackId: string | null = null;
+  private _deviceId: Promise<string> | null = null;
 
-  /** Identifiant de session de ce navigateur, créé à la première connexion. */
-  sessionId(): string {
-    try {
-      let id = localStorage.getItem(SESSION_STORAGE_KEY);
-      if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem(SESSION_STORAGE_KEY, id);
-      }
-      return id;
-    } catch {
-      // Stockage indisponible (navigation privée stricte) : session limitée à cet onglet.
-      return (this._fallbackId ??= crypto.randomUUID());
-    }
+  /** Identifiant de cet appareil, créé à la première utilisation. */
+  deviceId(): Promise<string> {
+    return (this._deviceId ??= readOrCreateDeviceId());
   }
 
-  /** Ouvre la session de cet appareil ; refusée si l'utilisateur est connecté ailleurs. */
+  /** Ouvre la session de cet appareil ; refusée (`device_not_authorized`) si le compte est lié à un autre. */
   open(): Observable<unknown> {
-    return this._backend.call('sessions-ouvrir', { sessionId: this.sessionId(), appareil: describeDevice() });
+    return from(this.deviceId()).pipe(
+      switchMap(deviceId => this._backend.call('sessions-ouvrir', { deviceId, appareil: describeDevice() })),
+    );
   }
 
   /** Ferme la session de cet appareil. Une erreur n'empêche pas la déconnexion. */
   close(): Observable<void> {
-    return this._backend.call('sessions-fermer', { sessionId: this.sessionId() }).pipe(
+    return this._backend.call('sessions-fermer', {}).pipe(
       map(() => undefined),
       catchError(() => of(undefined)),
     );
   }
 
-  /** Signal de vie : tant qu'il arrive, aucun autre appareil ne peut se connecter. */
+  /** Signal de vie : dernière activité de l'appareil, visible dans le suivi des membres. */
   heartbeat(cabinetId: string, uid: string): Observable<void> {
     return this._database.update(`cabinets/${cabinetId}/members/${uid}`, {
       'session.lastSeen': this._database.serverTimestamp(),
@@ -53,7 +47,7 @@ export class SessionService {
   }
 
   /** Session actuellement autorisée pour ce membre (null si aucune). */
-  watchActiveSession(cabinetId: string, uid: string): Observable<MemberSession | null> {
+  watchActiveSession(cabinetId: string, uid: string): Observable<Session | null> {
     return this._database
       .watchDocument<Member>(`cabinets/${cabinetId}/members/${uid}`)
       .pipe(map(member => member?.session ?? null));
@@ -66,4 +60,32 @@ function describeDevice(): string {
   const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Navigateur';
   const os = /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'macOS' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Linux/.test(ua) ? 'Linux' : 'Système inconnu';
   return `${browser} · ${os}`;
+}
+
+/** Lit l'identifiant d'appareil dans l'IndexedDB, ou le crée. Sans IndexedDB : identifiant limité à cette visite. */
+async function readOrCreateDeviceId(): Promise<string> {
+  try {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(DEVICE_DB, 1);
+      request.onupgradeneeded = () => request.result.createObjectStore(DEVICE_STORE);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const existing = await idbRequest<string | undefined>(db.transaction(DEVICE_STORE).objectStore(DEVICE_STORE).get(DEVICE_KEY));
+    if (existing) {
+      return existing;
+    }
+    const created = crypto.randomUUID();
+    await idbRequest(db.transaction(DEVICE_STORE, 'readwrite').objectStore(DEVICE_STORE).put(created, DEVICE_KEY));
+    return created;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
+function idbRequest<T>(request: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
 }

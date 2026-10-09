@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -16,7 +16,12 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       <h2>{{ structure.inviteTitle }}</h2>
       <p class="seats" [class.full]="isFull()">
         {{ structure.seats }} : <strong>{{ usedSeats() }} / {{ maxUtilisateurs() }}</strong>
+        · {{ structure.resetsThisMonth }} :
+        <strong [class.full]="resetsExhausted()">{{ deviceResetsUsed() }} / {{ deviceResetsQuota() }}</strong>
       </p>
+      @if (resetsExhausted()) {
+        <p class="limit" role="status">{{ structure.resetsExhausted }}</p>
+      }
       @if (isFull()) {
         <p class="limit" role="status">{{ structure.limitReached }}</p>
       }
@@ -51,6 +56,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
             <tr>
               <th>{{ structure.columns.member }}</th>
               <th>{{ structure.columns.role }}</th>
+              <th>{{ structure.columns.device }}</th>
               <th>{{ structure.columns.status }}</th>
               <th></th>
             </tr>
@@ -78,6 +84,27 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
                       <mat-option [value]="role.value">{{ role.label }}</mat-option>
                     }
                   </mat-select>
+                </td>
+                <td class="device">
+                  @if (member.device; as device) {
+                    <strong>{{ device.label || structure.columns.device }}</strong>
+                    @if (device.boundAt) {
+                      <span class="sub">{{ structure.deviceSince }} {{ device.boundAt.toMillis() | date: 'd MMM y' }}</span>
+                    }
+                    @if (member.session?.lastSeen; as lastSeen) {
+                      <span class="sub">{{ structure.lastSeen }} {{ lastSeen.toMillis() | date: 'd MMM HH:mm' }}</span>
+                    }
+                    @if (confirmingResetUid() === member.id) {
+                      <button mat-button [disabled]="isPending()" (click)="confirmReset(member.id)">{{ structure.confirmReset }}</button>
+                      <button mat-button (click)="confirmingResetUid.set(null)">{{ structure.cancelReset }}</button>
+                    } @else {
+                      <button mat-button [disabled]="isPending() || resetsExhausted()" (click)="confirmingResetUid.set(member.id)">
+                        {{ structure.resetDevice }}
+                      </button>
+                    }
+                  } @else {
+                    <span class="sub">{{ structure.noDevice }}</span>
+                  }
                 </td>
                 <td>
                   <span class="status" [class.disabled]="member.status === 'disabled'">
@@ -244,12 +271,19 @@ export class MembersPanelComponent {
   readonly invitations = input<Invitation[]>([]);
   /** Nombre d'utilisateurs autorisés par l'offre du cabinet (admin compris). */
   readonly maxUtilisateurs = input(3);
+  /** Réinitialisations d'appareil consommées ce mois-ci et quota mensuel de l'offre. */
+  readonly deviceResetsUsed = input(0);
+  readonly deviceResetsQuota = input(2);
   readonly currentUid = input<string | null>(null);
   readonly isPending = input(false);
   readonly invited = output<{ email: string; role: CabinetRole }>();
   readonly roleChanged = output<{ uid: string; role: CabinetRole }>();
   readonly statusChanged = output<{ uid: string; status: MemberStatus }>();
   readonly invitationCancelled = output<string>();
+  readonly deviceReset = output<string>();
+
+  protected readonly confirmingResetUid = signal<string | null>(null);
+  protected readonly resetsExhausted = computed(() => this.deviceResetsUsed() >= this.deviceResetsQuota());
 
   /** Membres actifs + invitations en attente : une invitation réserve une place. */
   protected readonly usedSeats = computed(
@@ -263,6 +297,11 @@ export class MembersPanelComponent {
     email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
     role: new FormControl<CabinetRole>('courtier', { nonNullable: true }),
   });
+
+  protected confirmReset(uid: string): void {
+    this.confirmingResetUid.set(null);
+    this.deviceReset.emit(uid);
+  }
 
   protected roleLabel(role: CabinetRole): string {
     return this.roles.find(r => r.value === role)?.label ?? role;

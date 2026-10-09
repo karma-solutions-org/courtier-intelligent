@@ -9,3 +9,9 @@ export function toBackendErrorMessage(error: unknown): string {
   }
   return message;
 }
+
+/** Raison métier d'une erreur (`details.reason` de l'HttpsError), ex. « device_not_authorized ». */
+export function toBackendErrorReason(error: unknown): string | null {
+  const reason = ((error ?? {}) as { details?: { reason?: unknown } }).details?.reason;
+  return typeof reason === 'string' ? reason : null;
+}

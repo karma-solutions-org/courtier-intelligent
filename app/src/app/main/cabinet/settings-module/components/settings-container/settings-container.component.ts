@@ -5,11 +5,13 @@ import { AuthStore } from '../../../../commons/authentication-module/store/auth.
 import { SettingsStore } from '../../store/settings.store';
 import { MembersPanelComponent } from '../members-panel/members-panel.component';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
+import { AuditLogPanelComponent } from '../audit-log-panel/audit-log-panel.component';
+import { CatalogPanelComponent } from '../catalog-panel/catalog-panel.component';
 import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
 
 @Component({
   selector: 'app-settings-container',
-  imports: [MatTabsModule, CabinetFormComponent, MembersPanelComponent],
+  imports: [MatTabsModule, CabinetFormComponent, MembersPanelComponent, CatalogPanelComponent, AuditLogPanelComponent],
   template: `
     <h1>{{ structure.title }}</h1>
     @if (store.error()) {
@@ -31,14 +33,34 @@ import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
           <app-members-panel
             [members]="store.members()"
             [invitations]="store.invitations()"
-            [maxUtilisateurs]="store.cabinet()?.maxUtilisateurs ?? 3"
+            [maxUtilisateurs]="store.cabinet()?.limits?.maxUtilisateurs ?? 3"
+            [deviceResetsUsed]="store.deviceResetsUsed()"
+            [deviceResetsQuota]="store.cabinet()?.limits?.resetsAppareilParMois ?? 2"
             [currentUid]="authStore.user()?.uid ?? null"
             [isPending]="store.isPending()"
             (invited)="store.invite($event)"
             (roleChanged)="store.setRole($event)"
             (statusChanged)="store.setStatus($event)"
             (invitationCancelled)="store.cancelInvitation($event)"
+            (deviceReset)="store.resetDevice($event)"
           />
+        </div>
+      </mat-tab>
+      <mat-tab [label]="structure.tabs.catalog">
+        <div class="tab">
+          <app-catalog-panel
+            [products]="store.products()"
+            [insurers]="store.insurers()"
+            [enabledProducts]="store.cabinet()?.enabledProducts ?? []"
+            [enabledInsurers]="store.cabinet()?.enabledInsurers ?? []"
+            [isPending]="store.isPending()"
+            (saved)="store.saveCatalogChoices($event)"
+          />
+        </div>
+      </mat-tab>
+      <mat-tab [label]="structure.tabs.audit">
+        <div class="tab">
+          <app-audit-log-panel [entries]="store.auditLog()" [members]="store.members()" />
         </div>
       </mat-tab>
     </mat-tab-group>

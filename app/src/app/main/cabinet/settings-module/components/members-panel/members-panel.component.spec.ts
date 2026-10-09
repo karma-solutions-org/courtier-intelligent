@@ -3,7 +3,7 @@ import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { faker } from '@faker-js/faker';
 import { Invitation, Member, MemberStatus, CabinetRole } from '@shared';
 import { page } from 'vitest/browser';
-import { mockInvitation, mockMember } from '../../../../../core/utils/unit-test-utils/mocks/cabinet.mock';
+import { mockInvitation, mockMember, mockTimestamp } from '../../../../../core/utils/unit-test-utils/mocks/cabinet.mock';
 import { MembersPanelComponent } from './members-panel.component';
 
 /** L'onglet « Membres » des paramètres, tel que l'admin du cabinet le manipule. */
@@ -18,6 +18,7 @@ class MembersPanelTester {
   readonly roleChanges: { uid: string; role: CabinetRole }[] = [];
   readonly statusChanges: { uid: string; status: MemberStatus }[] = [];
   readonly cancelledInvitations: string[] = [];
+  readonly deviceResets: string[] = [];
 
   constructor() {
     const component = this.fixture.componentInstance;
@@ -25,6 +26,7 @@ class MembersPanelTester {
     component.roleChanged.subscribe(event => this.roleChanges.push(event));
     component.statusChanged.subscribe(event => this.statusChanges.push(event));
     component.invitationCancelled.subscribe(id => this.cancelledInvitations.push(id));
+    component.deviceReset.subscribe(uid => this.deviceResets.push(uid));
   }
 
   setInputs(inputs: {
@@ -32,6 +34,8 @@ class MembersPanelTester {
     invitations?: Invitation[];
     currentUid?: string | null;
     maxUtilisateurs?: number;
+    deviceResetsUsed?: number;
+    deviceResetsQuota?: number;
   }): void {
     for (const [name, value] of Object.entries(inputs)) {
       this.fixture.componentRef.setInput(name, value);
@@ -153,6 +157,39 @@ describe('MembersPanelComponent', () => {
       await tester.root.getByRole('button', { name: 'Annuler' }).click();
 
       expect(tester.cancelledInvitations).toEqual([invitation.id]);
+    });
+  });
+
+  describe('Appareil lié', () => {
+    const withDevice = () => mockMember({ device: { id: 'appareil-1', label: 'Chrome · Windows', boundAt: mockTimestamp() } });
+
+    it("montre l'appareil lié de chaque membre", async () => {
+      const member = withDevice();
+      const noDevice = mockMember({ device: null });
+      tester.setInputs({ members: [member, noDevice] });
+
+      await expect.element(tester.row(member).getByText('Chrome · Windows')).toBeVisible();
+      await expect.element(tester.row(noDevice).getByText('Aucun appareil lié')).toBeVisible();
+    });
+
+    it("réinitialise l'appareil après confirmation seulement", async () => {
+      const member = withDevice();
+      tester.setInputs({ members: [member] });
+
+      await tester.row(member).getByRole('button', { name: "Réinitialiser l'appareil" }).click();
+      expect(tester.deviceResets).toEqual([]);
+
+      await tester.row(member).getByRole('button', { name: 'Confirmer' }).click();
+      expect(tester.deviceResets).toEqual([member.id]);
+    });
+
+    it('bloque la réinitialisation quand le quota du mois est atteint', async () => {
+      const member = withDevice();
+      tester.setInputs({ members: [member], deviceResetsUsed: 2, deviceResetsQuota: 2 });
+
+      await expect.element(tester.root.getByText('2 / 2')).toBeVisible();
+      await expect.element(tester.root.getByText(/Quota de réinitialisations atteint/)).toBeVisible();
+      await expect.element(tester.row(member).getByRole('button', { name: "Réinitialiser l'appareil" })).toBeDisabled();
     });
   });
 });
