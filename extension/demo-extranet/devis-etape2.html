@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Devis auto – Véhicule – Assureur Test (démo locale)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="demo-banner">Site de démonstration local – aucun contrat réel, aucune donnée transmise.</div>
+  <div class="topbar"><div class="logo">Assureur <span>Test</span> <small>(démo locale)</small></div><div class="user">Espace courtier – Cabinet démo</div></div>
+  <main class="container">
+    <div class="card">
+      <h1>Devis automobile</h1>
+      <p class="subtitle">Tarification d'un contrat auto pour votre client.</p>
+      <p class="step-indicator">Étape 2 sur 3</p>
+      <ol class="steps"><li class="done">1. Souscripteur</li><li class="active" aria-current="step">2. Véhicule</li><li class="">3. Conducteur et antécédents</li></ol>
+      <form id="devis" data-next="devis-etape3.html" novalidate>
+        <h2>Véhicule</h2>
+        <div class="grid">
+          <div class="field"><label for="immatriculation">Immatriculation <span class="req">*</span></label><input id="immatriculation" name="immatriculation" type="text" placeholder="AB-123-CD" required></div>
+          <div class="field"><label for="vehicleType">Type de véhicule <span class="req">*</span></label><select id="vehicleType" name="vehicleType" required><option value="">Sélectionner…</option><option value="voiture">Voiture</option><option value="utilitaire">Utilitaire léger</option><option value="moto">Moto</option></select></div>
+          <div class="field"><label for="marque">Marque <span class="req">*</span></label><input id="marque" name="marque" type="text" required></div>
+          <div class="field"><label for="modele">Modèle <span class="req">*</span></label><input id="modele" name="modele" type="text" required></div>
+          <div class="field"><label for="version">Version</label><input id="version" name="version" type="text"></div>
+          <div class="field"><label for="dateMiseEnCirculation">Date de première mise en circulation <span class="req">*</span></label><input id="dateMiseEnCirculation" name="dateMiseEnCirculation" type="date" required></div>
+          <div class="field"><label for="puissanceFiscale">Puissance fiscale <span class="req">*</span></label><input id="puissanceFiscale" name="puissanceFiscale" type="number" min="1" max="99" required></div>
+          <div class="field"><label for="valeurVehicule">Valeur du véhicule</label><input id="valeurVehicule" name="valeurVehicule" type="number" min="0" step="1"></div>
+          <div class="field"><label for="usage">Usage du véhicule <span class="req">*</span></label><select id="usage" name="usage" required><option value="">Sélectionner…</option><option value="prive">Privé</option><option value="prive_trajet">Privé et trajet domicile-travail</option><option value="professionnel">Professionnel</option></select></div>
+          <div class="field"><label for="stationnement">Lieu de stationnement la nuit <span class="req">*</span></label><select id="stationnement" name="stationnement" required><option value="">Sélectionner…</option><option value="garage_prive">Garage privé</option><option value="parking_ferme">Parking fermé</option><option value="voie_publique">Voie publique</option></select></div>
+        </div>
+        <div class="actions"><a class="link" href="devis-etape1.html">‹ Précédent</a><button type="submit" class="btn">Suivant</button></div>
+      </form>
+    </div>
+  </main>
+  <footer>Assureur Test (démo locale) – extranet fictif pour la démonstration de Courtier Intelligent.</footer>
+  <script src="app.js"></script>
+</body>
+</html>

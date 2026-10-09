@@ -18,7 +18,7 @@ export function mockCabinet(overrides: Partial<Cabinet> = {}): Cabinet {
     logoPath: null,
     active: true,
     planId: 'essentiel',
-    limits: { maxUtilisateurs: 3, resetsAppareilParMois: 2, appelsIaParMois: 200 },
+    limits: { maxUtilisateurs: 3, resetsAppareilParMois: 2, appelsIaParMois: 200, maxAppareilsParUtilisateur: 1, delaiGraceJours: 14 },
     ownerUid: faker.string.alphanumeric(28),
     enabledInsurers: [],
     enabledProducts: [],

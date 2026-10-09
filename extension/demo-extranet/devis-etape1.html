@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Devis auto – Souscripteur – Assureur Test (démo locale)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="demo-banner">Site de démonstration local – aucun contrat réel, aucune donnée transmise.</div>
+  <div class="topbar"><div class="logo">Assureur <span>Test</span> <small>(démo locale)</small></div><div class="user">Espace courtier – Cabinet démo</div></div>
+  <main class="container">
+    <div class="card">
+      <h1>Devis automobile</h1>
+      <p class="subtitle">Tarification d'un contrat auto pour votre client.</p>
+      <p class="step-indicator">Étape 1 sur 3</p>
+      <ol class="steps"><li class="active" aria-current="step">1. Souscripteur</li><li class="">2. Véhicule</li><li class="">3. Conducteur et antécédents</li></ol>
+      <form id="devis" data-next="devis-etape2.html" novalidate>
+        <h2>Souscripteur</h2>
+        <div class="grid">
+          <div class="field"><label for="nom">Nom <span class="req">*</span></label><input id="nom" name="nom" type="text" required></div>
+          <div class="field"><label for="prenom">Prénom <span class="req">*</span></label><input id="prenom" name="prenom" type="text" required></div>
+          <div class="field"><label for="dateNaissance">Date de naissance <span class="req">*</span></label><input id="dateNaissance" name="dateNaissance" type="date" required></div>
+          <div class="field"><label for="email">Adresse e-mail <span class="req">*</span></label><input id="email" name="email" type="email" required></div>
+          <div class="field"><label for="telephone">Téléphone</label><input id="telephone" name="telephone" type="tel"></div>
+          <div class="field full"><label for="adresse">Adresse <span class="req">*</span></label><input id="adresse" name="adresse" type="text" required></div>
+          <div class="field"><label for="codePostal">Code postal <span class="req">*</span></label><input id="codePostal" name="codePostal" type="text" maxlength="5" required></div>
+          <div class="field"><label for="ville">Ville <span class="req">*</span></label><input id="ville" name="ville" type="text" required></div>
+        </div>
+        <div class="actions"><a class="link" href="index.html">‹ Précédent</a><button type="submit" class="btn">Suivant</button></div>
+      </form>
+    </div>
+  </main>
+  <footer>Assureur Test (démo locale) – extranet fictif pour la démonstration de Courtier Intelligent.</footer>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -36,6 +36,7 @@ class MembersPanelTester {
     maxUtilisateurs?: number;
     deviceResetsUsed?: number;
     deviceResetsQuota?: number;
+    maxAppareilsParUtilisateur?: number;
   }): void {
     for (const [name, value] of Object.entries(inputs)) {
       this.fixture.componentRef.setInput(name, value);
@@ -170,6 +171,28 @@ describe('MembersPanelComponent', () => {
 
       await expect.element(tester.row(member).getByText('Chrome · Windows')).toBeVisible();
       await expect.element(tester.row(noDevice).getByText('Aucun appareil lié')).toBeVisible();
+    });
+
+    it("montre tous les appareils liés quand l'offre en autorise plusieurs", async () => {
+      const member = mockMember({
+        device: { id: 'appareil-1', label: 'Chrome · Windows', boundAt: mockTimestamp() },
+        extraDevices: [{ id: 'appareil-2', label: 'Edge · macOS', boundAt: mockTimestamp() }],
+      });
+      tester.setInputs({ members: [member], maxAppareilsParUtilisateur: 2 });
+
+      await expect.element(tester.row(member).getByText('Chrome · Windows')).toBeVisible();
+      await expect.element(tester.row(member).getByText('Edge · macOS')).toBeVisible();
+      await expect.element(tester.root.getByText(/Appareils par utilisateur/)).toBeVisible();
+
+      await tester.row(member).getByRole('button', { name: 'Réinitialiser les appareils' }).click();
+      await tester.row(member).getByRole('button', { name: 'Confirmer' }).click();
+      expect(tester.deviceResets).toEqual([member.id]);
+    });
+
+    it("n'affiche pas la limite d'appareils avec un seul appareil par utilisateur", async () => {
+      tester.setInputs({ members: [withDevice()], maxAppareilsParUtilisateur: 1 });
+
+      await expect.element(tester.root.getByText(/Appareils par utilisateur/)).not.toBeInTheDocument();
     });
 
     it("réinitialise l'appareil après confirmation seulement", async () => {

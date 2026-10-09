@@ -30,7 +30,11 @@ async function startRunner(job: JobContext): Promise<void> {
 
   runner = new FormRunner(job, {
     doc: document,
-    report: async (update: JobUpdate) => void (await send({ type: 'UPDATE_JOB', dossierId: job.dossierId, insurerId: job.insurerId, update })),
+    report: async (update: JobUpdate) => {
+      // `false` : le service worker n'a pas pu écrire l'avancement (le runner le signale, E10-4).
+      const saved = await send<boolean>({ type: 'UPDATE_JOB', dossierId: job.dossierId, insurerId: job.insurerId, update });
+      if (saved === false) throw new Error('job_update_failed');
+    },
     publish: (state: RunState) => void send({ type: 'RUN_STATE', state }).catch(() => undefined),
     memory: memoryPort,
     origin: location.origin,

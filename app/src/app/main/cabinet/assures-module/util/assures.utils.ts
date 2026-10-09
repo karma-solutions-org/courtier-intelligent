@@ -1,11 +1,11 @@
 import { AbstractControl, ValidationErrors } from '@angular/forms';
-import { Assure } from '@shared';
+import { Assure, ASSURE_EMAIL_PATTERN, ASSURE_POSTAL_CODE_PATTERN, ASSURE_SIRET_PATTERN } from '@shared';
 
-/** Formats acceptés (France). */
-export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** Formats acceptés (France). Email, code postal et SIRET : partagés avec les règles Firestore (shared/assure-format). */
+export const EMAIL_PATTERN = ASSURE_EMAIL_PATTERN;
 export const PHONE_PATTERN = /^(?:(?:\+|00)33\s?|0)[1-9](?:[\s.-]?\d{2}){4}$/;
-export const POSTAL_CODE_PATTERN = /^\d{5}$/;
-const SIRET_PATTERN = /^\d{14}$/;
+export const POSTAL_CODE_PATTERN = ASSURE_POSTAL_CODE_PATTERN;
+const SIRET_PATTERN = ASSURE_SIRET_PATTERN;
 const MIN_BIRTH_YEAR = 1900;
 
 /** Un champ vide est valide (les champs obligatoires ont leur propre validateur). */

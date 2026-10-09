@@ -1,13 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { DashboardContainerComponent } from '../../../../cabinet/dashboard-module/components/dashboard-container/dashboard-container.component';
 import { AuthStore } from '../../../authentication-module/store/auth.store';
 
-/** Tableau de bord provisoire : les compteurs de dossiers arriveront avec l'Epic E15. */
+/** Tableau de bord : salutation, puis les indicateurs du cabinet (Epic E15) dès qu'un cabinet est rattaché. */
 @Component({
   selector: 'app-home-container',
+  imports: [DashboardContainerComponent],
   template: `
     <h1>Bonjour {{ firstName() }}</h1>
     @if (!authStore.cabinetId()) {
       <p class="notice">Votre compte n'est rattaché à aucun cabinet pour l'instant.</p>
+    } @else {
+      <app-dashboard-container />
     }
   `,
   styles: `

@@ -20,6 +20,9 @@ const ICONS: Record<string, string> = {
   assigned: 'person',
   need_updated: 'fact_check',
   note: 'sticky_note_2',
+  proposal_sent: 'outgoing_mail',
+  proposal_reminder: 'notifications',
+  outcome_recorded: 'task_alt',
 };
 
 /** Historique d'un dossier (frise chronologique), du plus récent au plus ancien. */
@@ -156,6 +159,23 @@ export class DossierTimelineComponent {
         return { title: this.structure.pricingCompleted, detail: this.insurerOf(data) };
       case 'offer_entered':
         return { title: this.structure.offerEntered, detail: this.insurerOf(data) };
+      case 'decision_made':
+        return {
+          title: `${this.structure.decisionMade} : ${this.insurerOf(data) ?? ''}`,
+          detail: typeof data['justification'] === 'string' ? data['justification'] : null,
+        };
+      case 'proposal_sent':
+        return {
+          title: data['resend'] === true ? this.structure.proposalResent : this.structure.proposalSent,
+          detail: typeof data['to'] === 'string' ? data['to'] : null,
+        };
+      case 'proposal_reminder':
+        return { title: this.structure.proposalReminder, detail: this.nameOf(data['to'] as string) };
+      case 'outcome_recorded': {
+        const result = data['result'] as string;
+        const detail = [data['contractNumber'], data['effectiveDate']].filter(v => typeof v === 'string' && v).join(' · ');
+        return { title: this.structure.outcome[result] ?? result, detail: detail || null };
+      }
       case 'note':
         return { title: this.structure.note, detail: typeof data['text'] === 'string' ? data['text'] : null };
       default:

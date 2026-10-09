@@ -16,9 +16,11 @@ import { AcceptInvitationPresentationComponent } from '../accept-invitation-pres
       [userEmail]="authStore.user()?.email ?? null"
       [isPending]="invitationStore.isPending()"
       [error]="invitationStore.error()"
+      [wrongAccount]="invitationStore.wrongAccount()"
       [signinUrl]="signinUrl"
       [signupUrl]="signupUrl"
       (accepted)="invitationStore.accept({ cabinetId: cabinet(), invitationId: invitation() })"
+      (switchAccount)="switchAccount()"
     />
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -34,6 +36,12 @@ export class AcceptInvitationContainerComponent {
 
   protected readonly signinUrl = CommonRouteContainerModel.SIGNIN_ROUTE.url;
   protected readonly signupUrl = CommonRouteContainerModel.SIGNUP_ROUTE.url;
+
+  /** Déconnecte le mauvais compte ; après la connexion avec la bonne adresse, l'utilisateur revient sur cette invitation. */
+  protected switchAccount(): void {
+    this.authStore.setRedirectUrl(this._router.url);
+    this.authStore.signOut();
+  }
 
   constructor() {
     // Après connexion ou inscription, revenir sur cette invitation.

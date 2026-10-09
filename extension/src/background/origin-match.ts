@@ -8,7 +8,7 @@ export interface InsurerInfo {
   extranetDomains: string[];
 }
 
-/** Un job tel que lu dans Firestore (chemin cabinets/{t}/dossiers/{dossierId}/quoteJobs/{insurerId}). */
+/** Un job tel que lu dans Firestore (chemin cabinets/{cabinetId}/dossiers/{dossierId}/quoteJobs/{insurerId}). */
 export interface JobRecord {
   dossierId: string;
   insurerId: string;

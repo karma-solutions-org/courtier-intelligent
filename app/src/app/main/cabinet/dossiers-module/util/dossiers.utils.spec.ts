@@ -1,8 +1,20 @@
 import { Dossier, QuestionnaireSection } from '@shared';
-import { EMPTY_FILTER, filterDossiers, labelsByPath, manualTransitionsFrom, sectionIndexOf } from './dossiers.utils';
+import { DEFAULT_FILTER, EMPTY_FILTER, filterDossiers, isDefaultFilter, labelsByPath, manualTransitionsFrom, sectionIndexOf } from './dossiers.utils';
 
 const dossier = (overrides: Partial<Dossier>): Dossier =>
   ({ id: 'd', reference: '2026-000001', assureId: 'a', productId: 'auto', assignedTo: 'u1', status: 'brouillon', ...overrides }) as Dossier;
+
+describe('filtre par défaut', () => {
+  it('active « Mes dossiers » sans autre critère', () => {
+    expect(DEFAULT_FILTER).toEqual({ ...EMPTY_FILTER, mine: true });
+    expect(isDefaultFilter(DEFAULT_FILTER)).toBe(true);
+  });
+
+  it('détecte un filtre modifié (bouton « Réinitialiser »)', () => {
+    expect(isDefaultFilter(EMPTY_FILTER)).toBe(false);
+    expect(isDefaultFilter({ ...DEFAULT_FILTER, status: 'complet' })).toBe(false);
+  });
+});
 
 describe('filterDossiers', () => {
   const dossiers = [

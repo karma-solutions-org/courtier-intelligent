@@ -9,7 +9,16 @@ export interface DossierFilter {
   mine: boolean;
 }
 
+/** Aucun filtre : tous les dossiers du cabinet (ex. accès depuis un compteur du tableau de bord). */
 export const EMPTY_FILTER: DossierFilter = { status: '', productId: '', assignedTo: '', mine: false };
+
+/** Filtre initial de la liste : « Mes dossiers » activé. « Réinitialiser » y revient. */
+export const DEFAULT_FILTER: DossierFilter = { ...EMPTY_FILTER, mine: true };
+
+/** Le filtre est-il celui par défaut (le bouton « Réinitialiser » est alors inutile) ? */
+export function isDefaultFilter(filter: DossierFilter): boolean {
+  return (Object.keys(DEFAULT_FILTER) as (keyof DossierFilter)[]).every(key => filter[key] === DEFAULT_FILTER[key]);
+}
 
 /** Applique les filtres de la liste. `myUid` sert à « Mes dossiers ». */
 export function filterDossiers(dossiers: Dossier[], filter: DossierFilter, myUid: string | null): Dossier[] {
@@ -28,6 +37,8 @@ export function filterDossiers(dossiers: Dossier[], filter: DossierFilter, myUid
 const MANUAL_STATUSES: DossierStatus[] = ['brouillon', 'complet', 'sans_suite'];
 
 export function manualTransitionsFrom(status: DossierStatus): DossierStatus[] {
+  // Une fois la proposition envoyée, la réponse de l'assuré s'enregistre dans l'onglet Proposition.
+  if (status === 'proposition_envoyee') return [];
   return DOSSIER_TRANSITIONS[status].filter(target => MANUAL_STATUSES.includes(target));
 }
 

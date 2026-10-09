@@ -83,6 +83,11 @@ export const DOSSIERS_STRUCTURE = {
     pricingRetried: 'Tarification relancée',
     pricingCompleted: 'Informations manquantes complétées',
     offerEntered: 'Offre saisie manuellement',
+    decisionMade: 'Offre retenue',
+    proposalSent: 'Proposition envoyée',
+    proposalResent: 'Proposition renvoyée',
+    proposalReminder: 'Relance envoyée au courtier',
+    outcome: { souscrit: 'Contrat souscrit', refuse: 'Proposition refusée', sans_suite: 'Classé sans suite' } as Record<string, string>,
     unknownMember: 'un membre',
   },
 } as const;

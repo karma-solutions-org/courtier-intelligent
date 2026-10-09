@@ -8,7 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { RouterLink } from '@angular/router';
 import { Dossier, DOSSIER_STATUS_LABELS, DossierStatus } from '@shared';
-import { DossierFilter, STATUS_ORDER } from '../../util/dossiers.utils';
+import { DossierFilter, isDefaultFilter, STATUS_ORDER } from '../../util/dossiers.utils';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 import { StatusChipComponent } from '../status-chip/status-chip.component';
 
@@ -84,7 +84,7 @@ export interface Option {
             }
           </mat-select>
         </mat-form-field>
-        @if (hasFilter()) {
+        @if (!isDefault()) {
           <button mat-button type="button" (click)="filterReset.emit()">{{ structure.reset }}</button>
         }
       </div>
@@ -235,5 +235,9 @@ export class DossiersListComponent {
   protected hasFilter(): boolean {
     const { status, productId, assignedTo, mine } = this.filter();
     return !!status || !!productId || !!assignedTo || mine;
+  }
+
+  protected isDefault(): boolean {
+    return isDefaultFilter(this.filter());
   }
 }

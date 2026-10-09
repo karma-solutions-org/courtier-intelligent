@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Devis auto – Conducteur – Assureur Test (démo locale)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="demo-banner">Site de démonstration local – aucun contrat réel, aucune donnée transmise.</div>
+  <div class="topbar"><div class="logo">Assureur <span>Test</span> <small>(démo locale)</small></div><div class="user">Espace courtier – Cabinet démo</div></div>
+  <main class="container">
+    <div class="card">
+      <h1>Devis automobile</h1>
+      <p class="subtitle">Tarification d'un contrat auto pour votre client.</p>
+      <p class="step-indicator">Étape 3 sur 3</p>
+      <ol class="steps"><li class="done">1. Souscripteur</li><li class="done">2. Véhicule</li><li class="active" aria-current="step">3. Conducteur et antécédents</li></ol>
+      <form id="devis" data-next="resultat.html" data-final novalidate>
+        <h2>Conducteur principal</h2>
+        <div class="grid">
+          <div class="field"><label for="nomConducteur">Nom du conducteur <span class="req">*</span></label><input id="nomConducteur" name="nomConducteur" type="text" required></div>
+          <div class="field"><label for="prenomConducteur">Prénom du conducteur <span class="req">*</span></label><input id="prenomConducteur" name="prenomConducteur" type="text" required></div>
+          <div class="field"><label for="dateNaissanceConducteur">Date de naissance du conducteur <span class="req">*</span></label><input id="dateNaissanceConducteur" name="dateNaissanceConducteur" type="date" required></div>
+          <div class="field"><label for="datePermis">Date d'obtention du permis <span class="req">*</span></label><input id="datePermis" name="datePermis" type="date" required></div>
+          <div class="field"><label for="typePermis">Type de permis <span class="req">*</span></label><select id="typePermis" name="typePermis" required><option value="">Sélectionner…</option><option value="B">Permis B</option><option value="A">Permis A (moto)</option><option value="AAC">Conduite accompagnée</option></select></div>
+          <div class="field"><label for="profession">Profession</label><input id="profession" name="profession" type="text"></div>
+        </div>
+        <h2>Antécédents d'assurance</h2>
+        <div class="grid">
+          <div class="field"><fieldset class="radio"><legend>Êtes-vous actuellement assuré ?</legend>
+            <label><input type="radio" name="actuellementAssure" value="oui" required> Oui</label>
+            <label><input type="radio" name="actuellementAssure" value="non"> Non</label>
+          </fieldset></div>
+          <div class="field"><label for="assureurActuel">Assureur actuel</label><input id="assureurActuel" name="assureurActuel" type="text" list="liste-assureurs" autocomplete="off"><datalist id="liste-assureurs"><option value="Allianz"></option><option value="AXA"></option><option value="Generali"></option><option value="Groupama"></option><option value="MAAF"></option><option value="MACIF"></option><option value="MAIF"></option><option value="Matmut"></option><option value="GMF"></option><option value="Direct Assurance"></option></datalist></div>
+          <div class="field"><label for="bonusMalus">Coefficient bonus-malus <span class="req">*</span></label><input id="bonusMalus" name="bonusMalus" type="number" min="0.5" max="3.5" step="0.01" required></div>
+          <div class="field"><label for="nbSinistres">Nombre de sinistres sur 36 mois <span class="req">*</span></label><input id="nbSinistres" name="nbSinistres" type="number" min="0" max="20" required></div>
+          <div class="field"><fieldset class="radio"><legend>Avez-vous déjà été résilié ?</legend>
+            <label><input type="radio" name="resilie" value="oui" required> Oui</label>
+            <label><input type="radio" name="resilie" value="non"> Non</label>
+          </fieldset></div>
+        </div>
+        <div class="actions"><a class="link" href="devis-etape2.html">‹ Précédent</a><button type="submit" class="btn primary">Calculer mon tarif</button></div>
+      </form>
+    </div>
+  </main>
+  <footer>Assureur Test (démo locale) – extranet fictif pour la démonstration de Courtier Intelligent.</footer>
+  <script src="app.js"></script>
+</body>
+</html>

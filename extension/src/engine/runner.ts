@@ -18,7 +18,7 @@ export interface RunnerPorts {
   /** Publie l'avancement détaillé pour le side panel. */
   publish(state: RunState): void;
   askAi: AskAi;
-  /** Signale un échec de la capture du tarif (E10-4) : un code, jamais de donnée client. */
+  /** Signale un échec du remplissage ou de la capture du tarif (E10-4) : un code, jamais de donnée client. */
   reportIssue?(step: ExtensionReportStep, issue: ExtensionReportIssue): Promise<void>;
   /** Mémoire partagée des formulaires (E8) : sans elle, tout se fait par synonymes puis IA. */
   memory?: MemoryPort;
@@ -91,7 +91,7 @@ export class FormRunner {
     // La page peut encore se charger : on attend qu'elle soit stable avant de l'analyser.
     await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
     if (await this.tryCapture(false)) return;
-    await this.ports.report({ status: 'analyzing' });
+    await this.ports.report({ status: 'analyzing' }).catch(() => this.reportIssue('analyze', 'job_update_failed'));
     await this.enqueue(() => this.runStep(false));
     if (this.stopped) return;
     this.observer = new MutationObserver(() => this.scheduleCheck());
@@ -184,6 +184,8 @@ export class FormRunner {
     this.lastStep = { keys: analysis.fields.map(f => f.key), hint };
 
     if (analysis.fields.length === 0) {
+      // Seule la première page compte : en cours de parcours, une page sans champ (chargement, récapitulatif) est normale.
+      if (!newStep && this.stepCounter <= 1) await this.reportIssue('analyze', 'no_fields');
       this.publishState('analyzing', [], [], 'Aucun champ à remplir sur cette page.');
       return;
     }
@@ -208,6 +210,7 @@ export class FormRunner {
       mappings = mappings.map(m => this.aiResults.get(m.fieldKey) ?? m);
     }
     this.mappings = this.applyManual(mappings);
+    if (!this.mappings.some(m => m.status === 'mapped' && m.canonicalPath !== null)) await this.reportIssue('mapping', 'no_field_mapped');
 
     // 2. Plan : quoi remplir, quoi demander au courtier, quoi laisser.
     const plan = planFill(analysis.fields, this.mappings, this.job.quoteData);
@@ -217,9 +220,11 @@ export class FormRunner {
 
     // La mémoire a-t-elle bien servi ? Sinon elle est invalidée et on réapprend (E8-4).
     if (memory && (await this.checkMemoryHealth(analysis.fingerprint, memory.key, results))) {
+      await this.reportIssue('mapping', 'memory_invalidated');
       await this.runStep(false, depth);
       return;
     }
+    if ([...results.values()].some(r => r.status === 'failed')) await this.reportIssue('fill', 'fill_failed');
     this.snapshot = { fingerprint: analysis.fingerprint, fields: analysis.fields, mappings: this.mappings, results, usedMemory: !!memory && this.fromMemory.size > 0 };
 
     // 4. Avancement du job : champs manquants, étape en cours ou prêt à soumettre.
@@ -411,7 +416,7 @@ export class FormRunner {
     const signature = JSON.stringify([update.status, update.currentStep, update.totalSteps, (update.missingFields ?? []).map(m => m.canonicalPath)]);
     if (signature === this.lastReported) return;
     this.lastReported = signature;
-    await this.ports.report(update).catch(() => undefined);
+    await this.ports.report(update).catch(() => this.reportIssue('fill', 'job_update_failed'));
   }
 
   private publishFromPlan(plan: FillPlan, results: Map<string, FillResult>, hint: StepHint): void {

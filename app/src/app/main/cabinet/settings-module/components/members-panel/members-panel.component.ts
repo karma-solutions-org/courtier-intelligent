@@ -5,7 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { Invitation, Member, MemberStatus, CabinetRole } from '@shared';
+import { BoundDevice, Invitation, Member, MemberStatus, CabinetRole } from '@shared';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
 
 @Component({
@@ -18,6 +18,9 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
         {{ structure.seats }} : <strong>{{ usedSeats() }} / {{ maxUtilisateurs() }}</strong>
         · {{ structure.resetsThisMonth }} :
         <strong [class.full]="resetsExhausted()">{{ deviceResetsUsed() }} / {{ deviceResetsQuota() }}</strong>
+        @if (maxAppareilsParUtilisateur() > 1) {
+          · {{ structure.devicesPerUser }} : <strong>{{ maxAppareilsParUtilisateur() }}</strong>
+        }
       </p>
       @if (resetsExhausted()) {
         <p class="limit" role="status">{{ structure.resetsExhausted }}</p>
@@ -86,20 +89,27 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
                   </mat-select>
                 </td>
                 <td class="device">
-                  @if (member.device; as device) {
-                    <strong>{{ device.label || structure.columns.device }}</strong>
-                    @if (device.boundAt) {
-                      <span class="sub">{{ structure.deviceSince }} {{ device.boundAt.toMillis() | date: 'd MMM y' }}</span>
+                  @let devices = devicesOf(member);
+                  @if (devices.length) {
+                    @for (device of devices; track device.id) {
+                      <div class="bound-device">
+                        <strong>{{ device.label || structure.columns.device }}</strong>
+                        @if (device.boundAt) {
+                          <span class="sub">{{ structure.deviceSince }} {{ device.boundAt.toMillis() | date: 'd MMM y' }}</span>
+                        }
+                      </div>
                     }
                     @if (member.session?.lastSeen; as lastSeen) {
                       <span class="sub">{{ structure.lastSeen }} {{ lastSeen.toMillis() | date: 'd MMM HH:mm' }}</span>
                     }
-                    @if (confirmingResetUid() === member.id) {
+                    @if (isMe) {
+                      <span class="sub">{{ structure.resetSelfHint }}</span>
+                    } @else if (confirmingResetUid() === member.id) {
                       <button mat-button [disabled]="isPending()" (click)="confirmReset(member.id)">{{ structure.confirmReset }}</button>
                       <button mat-button (click)="confirmingResetUid.set(null)">{{ structure.cancelReset }}</button>
                     } @else {
                       <button mat-button [disabled]="isPending() || resetsExhausted()" (click)="confirmingResetUid.set(member.id)">
-                        {{ structure.resetDevice }}
+                        {{ devices.length > 1 ? structure.resetDevices : structure.resetDevice }}
                       </button>
                     }
                   } @else {
@@ -189,6 +199,10 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       color: var(--mat-sys-on-surface-variant);
     }
 
+    .bound-device + .bound-device {
+      margin-top: 6px;
+    }
+
     .me {
       margin-left: 6px;
       color: var(--mat-sys-on-surface-variant);
@@ -274,6 +288,8 @@ export class MembersPanelComponent {
   /** Réinitialisations d'appareil consommées ce mois-ci et quota mensuel de l'offre. */
   readonly deviceResetsUsed = input(0);
   readonly deviceResetsQuota = input(2);
+  /** Appareils qu'un utilisateur peut lier selon l'offre (affiché seulement au-delà de 1). */
+  readonly maxAppareilsParUtilisateur = input(1);
   readonly currentUid = input<string | null>(null);
   readonly isPending = input(false);
   readonly invited = output<{ email: string; role: CabinetRole }>();
@@ -297,6 +313,11 @@ export class MembersPanelComponent {
     email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
     role: new FormControl<CabinetRole>('courtier', { nonNullable: true }),
   });
+
+  /** Appareils liés d'un membre : le premier (`device`) puis les suivants (`extraDevices`). */
+  protected devicesOf(member: Member): BoundDevice[] {
+    return [member.device, ...(member.extraDevices ?? [])].filter((device): device is BoundDevice => !!device);
+  }
 
   protected confirmReset(uid: string): void {
     this.confirmingResetUid.set(null);

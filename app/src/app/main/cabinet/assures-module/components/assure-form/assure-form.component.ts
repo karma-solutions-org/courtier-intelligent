@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { RouterLink } from '@angular/router';
-import { Assure } from '@shared';
+import { Assure, ASSURE_MAX_LENGTHS } from '@shared';
 import { AssureFormModel } from '../../models/assure-form.model';
 import {
   birthDateValidator,
@@ -51,7 +51,7 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
           @if (isPro()) {
             <mat-form-field appearance="outline">
               <mat-label>{{ structure.companyName }}</mat-label>
-              <input matInput formControlName="companyName" />
+              <input matInput formControlName="companyName" [maxlength]="maxLengths.companyName" />
               @if (form.controls.companyName.hasError('required')) {
                 <mat-error>{{ structure.errors.required }}</mat-error>
               }
@@ -82,14 +82,14 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
           }
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.firstName }}</mat-label>
-            <input matInput formControlName="firstName" autocomplete="off" />
+            <input matInput formControlName="firstName" [maxlength]="maxLengths.firstName" autocomplete="off" />
             @if (form.controls.firstName.hasError('required')) {
               <mat-error>{{ structure.errors.required }}</mat-error>
             }
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.lastName }}</mat-label>
-            <input matInput formControlName="lastName" autocomplete="off" />
+            <input matInput formControlName="lastName" [maxlength]="maxLengths.lastName" autocomplete="off" />
             @if (form.controls.lastName.hasError('required')) {
               <mat-error>{{ structure.errors.required }}</mat-error>
             }
@@ -102,14 +102,14 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
         <div class="grid">
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.email }}</mat-label>
-            <input matInput type="email" formControlName="email" autocomplete="off" />
+            <input matInput type="email" formControlName="email" [maxlength]="maxLengths.email" autocomplete="off" />
             @if (form.controls.email.hasError('pattern')) {
               <mat-error>{{ structure.errors.email }}</mat-error>
             }
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.phone }}</mat-label>
-            <input matInput type="tel" formControlName="phone" autocomplete="off" />
+            <input matInput type="tel" formControlName="phone" [maxlength]="maxLengths.phone" autocomplete="off" />
             @if (form.controls.phone.hasError('phone')) {
               <mat-error>{{ structure.errors.phone }}</mat-error>
             }
@@ -122,7 +122,7 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
         <div class="grid">
           <mat-form-field appearance="outline" class="wide">
             <mat-label>{{ structure.street }}</mat-label>
-            <input matInput formControlName="street" autocomplete="off" />
+            <input matInput formControlName="street" [maxlength]="maxLengths.street" autocomplete="off" />
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.postalCode }}</mat-label>
@@ -133,7 +133,7 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.city }}</mat-label>
-            <input matInput formControlName="city" autocomplete="off" />
+            <input matInput formControlName="city" [maxlength]="maxLengths.city" autocomplete="off" />
           </mat-form-field>
         </div>
       </section>
@@ -252,6 +252,8 @@ export class AssureFormComponent {
   readonly candidateChanged = output<DuplicateCandidate>();
 
   protected readonly structure = ASSURES_STRUCTURE.form;
+  /** Longueurs maximales acceptées par les règles Firestore. */
+  protected readonly maxLengths = ASSURE_MAX_LENGTHS;
   protected readonly duplicateStructure = ASSURES_STRUCTURE.duplicate;
   protected readonly types = ASSURES_STRUCTURE.types;
   protected readonly civilites = ASSURES_STRUCTURE.civilites;

@@ -36,6 +36,7 @@ import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
             [maxUtilisateurs]="store.cabinet()?.limits?.maxUtilisateurs ?? 3"
             [deviceResetsUsed]="store.deviceResetsUsed()"
             [deviceResetsQuota]="store.cabinet()?.limits?.resetsAppareilParMois ?? 2"
+            [maxAppareilsParUtilisateur]="store.cabinet()?.limits?.maxAppareilsParUtilisateur ?? 1"
             [currentUid]="authStore.user()?.uid ?? null"
             [isPending]="store.isPending()"
             (invited)="store.invite($event)"

@@ -21,7 +21,7 @@ import {
 } from '../shared/messages';
 import { createAuthController, toUserMessage, UserFacingError } from './auth-controller';
 import { firebaseAuthPort, firebaseBackendPort, firestoreSessionPort } from './firebase-adapters';
-import { addExtensionReport, askAi, findJobForOrigin, listRecentJobs, updateJob, watchJob, writeCapturedOffer } from './jobs-service';
+import { addExtensionReport, askAi, findJobForOrigin, listRecentJobs, updateJob, watchJob, watchRecentJobs, writeCapturedOffer } from './jobs-service';
 import { startLiveWatch } from './live';
 import { invalidateMemory, loadMemory, saveMemory, touchMemory } from './memory-service';
 import { countRequested } from './origin-match';
@@ -71,16 +71,66 @@ async function signedInUser(): Promise<ExtensionUser | null> {
   return state.status === 'signed_in' ? state.user : null;
 }
 
-/** Affiche sur l'icône le nombre de tarifications « requested » à lancer. */
-async function refreshBadge(): Promise<void> {
+async function setBadge(count: number): Promise<void> {
   try {
-    const user = await signedInUser();
-    const count = user ? countRequested(await listRecentJobs(user)) : 0;
     await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
     await chrome.action.setBadgeBackgroundColor({ color: '#00082b' });
   } catch {
+    // Le badge est un confort : une erreur ne doit rien casser.
+  }
+}
+
+/**
+ * Affiche sur l'icône le nombre de tarifications « requested » à lancer. Tant que le suivi en continu est actif,
+ * il tient le badge à jour ; sinon (suivi coupé, réveil par l'alarme) on relit les jobs une fois.
+ */
+async function refreshBadge(): Promise<void> {
+  try {
+    const user = await signedInUser();
+    if (user && jobsWatch?.uid === user.uid && jobsWatch.received) return;
+    await setBadge(user ? countRequested(await listRecentJobs(user)) : 0);
+  } catch {
     // Le badge est un confort : une erreur réseau ne doit rien casser.
   }
+}
+
+// ── Suivi en continu des jobs du courtier (E7-1), side panel ouvert ou non ──
+/** Suivi actif : pour quel courtier, et a-t-il déjà reçu un premier résultat. */
+let jobsWatch: { uid: string; stop: () => void; received: boolean } | null = null;
+
+function stopJobsWatch(): void {
+  jobsWatch?.stop();
+  jobsWatch = null;
+}
+
+/**
+ * (Re)branche le suivi des jobs récents du courtier connecté, ou le coupe s'il est déconnecté. Appelé à chaque réveil
+ * du service worker, à chaque changement de session et par l'alarme : l'écoute Firestore s'arrête avec le service
+ * worker, l'alarme d'une minute la rattache (et relit le badge entre-temps).
+ */
+async function syncJobsWatch(): Promise<void> {
+  const user = await signedInUser();
+  if (!user) {
+    stopJobsWatch();
+    await setBadge(0);
+    return;
+  }
+  if (jobsWatch?.uid === user.uid) return;
+  stopJobsWatch();
+  const watch: NonNullable<typeof jobsWatch> = { uid: user.uid, stop: () => undefined, received: false };
+  watch.stop = watchRecentJobs(
+    user,
+    jobs => {
+      watch.received = true;
+      void setBadge(countRequested(jobs));
+    },
+    () => {
+      // Règles refusées (session coupée) ou réseau : on lâche l'écoute, la prochaine alarme la rattachera.
+      if (jobsWatch === watch) jobsWatch = null;
+      void verifySession();
+    },
+  );
+  jobsWatch = watch;
 }
 
 function stopJobWatch(tabId: number): void {
@@ -128,6 +178,7 @@ async function verifySession(): Promise<void> {
 
 // Les changements d'état (connexion, perte de session) sont diffusés au side panel.
 auth.onChange(state => {
+  void syncJobsWatch();
   if (state.status === 'signed_out') {
     runByTab.clear();
     jobWatchByTab.forEach(stop => stop());
@@ -172,15 +223,16 @@ async function ensureAlarm(): Promise<void> {
 }
 chrome.alarms.onAlarm.addListener(alarm => {
   if (alarm.name === SESSION_CHECK_ALARM) {
-    void verifySession();
-    void refreshBadge();
+    void verifySession()
+      .then(syncJobsWatch)
+      .then(refreshBadge);
   }
 });
 chrome.runtime.onInstalled.addListener(() => void ensureAlarm());
 chrome.runtime.onStartup.addListener(() => void ensureAlarm());
 // À chaque réveil du service worker : même vérification (et jeton rafraîchi s'il approche de son expiration).
 void ensureAlarm();
-void verifySession().then(refreshBadge);
+void verifySession().then(syncJobsWatch).then(refreshBadge);
 
 // ── Messages internes ───────────────────────────────────────────────────────
 /** Dernière page analysée par onglet. */

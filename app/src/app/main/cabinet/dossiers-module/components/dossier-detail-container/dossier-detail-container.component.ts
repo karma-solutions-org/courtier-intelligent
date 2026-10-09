@@ -7,14 +7,17 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink } from '@angular/router';
-import { DossierStatus } from '@shared';
+import { DossierStatus, PROPOSAL_DOSSIER_STATUSES } from '@shared';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { displayName } from '../../../assures-module/util/assures.utils';
 import { DossierStore } from '../../store/dossier.store';
+import { ComparisonTabComponent } from '../comparison-tab/comparison-tab.component';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
+import { DocumentImportContainerComponent } from '../document-import/document-import-container.component';
 import { DossierTimelineComponent } from '../dossier-timeline/dossier-timeline.component';
 import { NeedFormComponent } from '../need-form/need-form.component';
 import { PricingTabComponent } from '../pricing-tab/pricing-tab.component';
+import { ProposalTabComponent } from '../proposal-tab/proposal-tab.component';
 import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/questionnaire-form.component';
 import { StatusChipComponent } from '../status-chip/status-chip.component';
 
@@ -29,9 +32,12 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
     MatIconModule,
     MatSelectModule,
     MatTabsModule,
+    ComparisonTabComponent,
+    DocumentImportContainerComponent,
     DossierTimelineComponent,
     NeedFormComponent,
     PricingTabComponent,
+    ProposalTabComponent,
     QuestionnaireFormComponent,
     StatusChipComponent,
   ],
@@ -97,6 +103,7 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
             @if (!store.editable()) {
               <p class="hint">{{ structure.readonlyNote }}</p>
             }
+            <app-document-import-container class="documents" [editable]="store.editable()" />
             <app-questionnaire-form
               [sections]="store.schema()"
               [data]="store.answers()"
@@ -143,8 +150,20 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
             </div>
           </ng-template>
         </mat-tab>
-        <mat-tab [label]="structure.tabs.comparison" disabled />
-        <mat-tab [label]="structure.tabs.proposal" disabled />
+        <mat-tab [label]="structure.tabs.comparison" [disabled]="!comparisonEnabled()">
+          <ng-template matTabContent>
+            <div class="tab">
+              <app-comparison-tab />
+            </div>
+          </ng-template>
+        </mat-tab>
+        <mat-tab [label]="structure.tabs.proposal" [disabled]="!proposalEnabled()">
+          <ng-template matTabContent>
+            <div class="tab">
+              <app-proposal-tab />
+            </div>
+          </ng-template>
+        </mat-tab>
       </mat-tab-group>
     } @else if (store.loaded()) {
       <p>{{ structure.notFound }}</p>
@@ -244,6 +263,17 @@ export class DossierDetailContainerComponent implements OnInit {
   protected readonly structure = DOSSIERS_STRUCTURE.detail;
   protected readonly listUrl = CabinetRouteContainerModel.DOSSIERS_ROUTE.url;
   protected readonly nameOf = displayName;
+
+  /** Le comparatif s'ouvre dès la tarification (les offres arrivent au fil de l'eau). */
+  protected readonly comparisonEnabled = computed(() =>
+    ['tarification', 'comparaison', 'decision', 'proposition_envoyee', 'souscrit', 'refuse'].includes(this.store.dossier()?.status ?? ''),
+  );
+
+  /** La proposition s'ouvre dès qu'une offre est retenue (sans suite : seulement si une décision existe). */
+  protected readonly proposalEnabled = computed(() => {
+    const dossier = this.store.dossier();
+    return !!dossier && PROPOSAL_DOSSIER_STATUSES.includes(dossier.status) && !!dossier.decision;
+  });
 
   protected readonly missingLabels = computed(() =>
     this.store

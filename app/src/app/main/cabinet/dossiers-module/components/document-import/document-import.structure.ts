@@ -1,0 +1,40 @@
+import { DossierDocumentStatus } from '@shared';
+
+/** Textes du panneau « Documents » d'un dossier (E12). */
+export const DOCUMENT_IMPORT_STRUCTURE = {
+  title: 'Documents',
+  importHint: 'Importer un document (carte grise, permis, relevé d’information) : les valeurs lues vous sont proposées, rien n’est enregistré sans votre accord.',
+  type: 'Type de document',
+  types: {
+    carte_grise: 'Carte grise',
+    permis: 'Permis de conduire',
+    releve_information: 'Relevé d’information',
+    autre: 'Autre',
+    devis: 'Devis',
+  } as Record<string, string>,
+  chooseFile: 'Choisir un fichier',
+  upload: 'Envoyer et analyser',
+  uploadOnly: 'Envoyer',
+  uploading: 'Envoi…',
+  analyzing: 'Lecture du document…',
+  badFile: 'Fichier refusé : PDF, JPG ou PNG de 10 Mo maximum.',
+  analyze: 'Analyser',
+  review: 'Voir les valeurs lues',
+  download: 'Télécharger',
+  none: 'Aucun document pour ce dossier.',
+  statuses: {
+    uploaded: 'Envoyé',
+    analyzed: 'Analysé',
+    failed: 'Lecture en échec',
+  } as Record<DossierDocumentStatus, string>,
+  proposalTitle: 'Valeurs lues sur le document',
+  proposalHint: 'Cochez les valeurs à reprendre dans le dossier. Les lectures incertaines sont décochées : vérifiez-les.',
+  noProposal: 'Aucune valeur exploitable n’a été lue sur ce document.',
+  toConfirm: 'à confirmer',
+  confidence: 'Confiance',
+  current: 'Actuel',
+  apply: 'Appliquer',
+  cancel: 'Annuler',
+  applied: 'Valeurs appliquées au dossier.',
+  failed: 'Le document n’a pas pu être lu. Vous pouvez réessayer ou saisir les valeurs à la main.',
+};

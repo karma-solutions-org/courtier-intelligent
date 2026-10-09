@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { tapResponse } from '@ngrx/operators';
 import { patchState, signalStore, withComputed, withHooks, withMethods, withState } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import { catchError, EMPTY, exhaustMap, filter, interval, merge, of, pipe, startWith, switchMap, take, tap } from 'rxjs';
+import { catchError, EMPTY, exhaustMap, filter, interval, merge, of, pipe, skipWhile, startWith, switchMap, take, tap } from 'rxjs';
 import { AuthUser } from '../../../../core/providers/authentication.provider';
 import { CommonRouteContainerModel } from '../../../../core/routing/common-routes/common-route-container.model';
 import {
@@ -107,6 +107,9 @@ export const AuthStore = signalStore(
                   ),
                   // La session enregistrée n'est plus celle de cette connexion : fermée, ou reprise par un autre appareil.
                   session.watchActiveSession(target.cabinetId, target.uid).pipe(
+                    // Le cache Firestore renvoie d'abord l'état d'avant la reconnexion (session fermée ou ancien authTime) :
+                    // on ne surveille qu'à partir du moment où notre propre session est visible.
+                    skipWhile(active => active?.authTime !== target.authTime),
                     filter(active => active?.authTime !== target.authTime),
                     take(1),
                     tap(() =>

@@ -1,6 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import { DOSSIER_STATUSES, DossierStatus } from '@shared';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { DossiersStore, PAGE_SIZE_OPTIONS } from '../../store/dossiers.store';
+import { EMPTY_FILTER } from '../../util/dossiers.utils';
 import { DossierRow, DossiersListComponent, Option } from '../dossiers-list/dossiers-list.component';
 
 /** Page « Dossiers » : liste avec filtres et pagination. */
@@ -32,6 +35,14 @@ export class DossiersContainerComponent {
   protected readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
   protected readonly createUrl = CabinetRouteContainerModel.DOSSIER_NEW_ROUTE.url;
   protected readonly baseUrl = CabinetRouteContainerModel.DOSSIERS_ROUTE.url;
+
+  constructor() {
+    // Accès depuis un compteur du tableau de bord : tous les dossiers du cabinet dans ce statut.
+    const status = inject(ActivatedRoute).snapshot.queryParamMap.get('statut');
+    if (status && (DOSSIER_STATUSES as readonly string[]).includes(status)) {
+      this.store.setFilter({ ...EMPTY_FILTER, status: status as DossierStatus });
+    }
+  }
 
   protected readonly productOptions = computed<Option[]>(() => this.store.products().map(p => ({ id: p.id, label: p.name })));
   protected readonly courtierOptions = computed<Option[]>(() =>

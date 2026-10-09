@@ -5,11 +5,11 @@ import {
   doc,
   DocumentSnapshot,
   getDocs,
-  limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  Timestamp,
   updateDoc,
   where,
   writeBatch,
@@ -22,7 +22,12 @@ import { insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin } from './or
 
 /** Les assureurs changent rarement : on les relit au plus toutes les 10 minutes. */
 const INSURERS_TTL_MS = 10 * 60 * 1000;
-const RECENT_JOBS = 10;
+/**
+ * Fenêtre des jobs suivis : ceux mis à jour ces 7 derniers jours. Un job demandé plus tôt et jamais lancé est
+ * périmé (le dossier a pu changer) ; la fenêtre borne la lecture sans écarter un job récent, ce que faisait
+ * l'ancienne limite fixe des 10 derniers jobs quand le courtier lançait plusieurs dossiers à la fois.
+ */
+export const RECENT_JOBS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 const INSURERS_CACHE_KEY = 'insurers';
 
@@ -43,13 +48,32 @@ async function loadInsurers(): Promise<InsurerInfo[]> {
   return value;
 }
 
-/** Les jobs les plus récents du courtier, tous dossiers confondus (requête autorisée par les règles : `ownerUid` = soi). */
-async function loadRecentJobs(user: ExtensionUser): Promise<JobRecord[]> {
-  const { firestore } = getFirebase();
-  const snapshot = await getDocs(
-    query(collectionGroup(firestore, 'quoteJobs'), where('ownerUid', '==', user.uid), orderBy('updatedAt', 'desc'), limit(RECENT_JOBS)),
+/**
+ * Les jobs récents du courtier, tous dossiers confondus (requête autorisée par les règles : `ownerUid` = soi).
+ * Index existant (ownerUid ASC, updatedAt DESC) : le statut est filtré côté extension.
+ */
+function recentJobsQuery(user: ExtensionUser) {
+  const since = Timestamp.fromMillis(Date.now() - RECENT_JOBS_WINDOW_MS);
+  return query(
+    collectionGroup(getFirebase().firestore, 'quoteJobs'),
+    where('ownerUid', '==', user.uid),
+    where('updatedAt', '>=', since),
+    orderBy('updatedAt', 'desc'),
   );
+}
+
+async function loadRecentJobs(user: ExtensionUser): Promise<JobRecord[]> {
+  const snapshot = await getDocs(recentJobsQuery(user));
   return snapshot.docs.map(toRecord);
+}
+
+/**
+ * Suit en continu les jobs récents du courtier (E7-1), même side panel fermé : badge et détection des tarifications
+ * demandées depuis l'app. Le service worker peut être arrêté par Chrome : il rattache ce suivi à chaque réveil.
+ * Renvoie la fonction qui arrête le suivi.
+ */
+export function watchRecentJobs(user: ExtensionUser, onJobs: (jobs: JobRecord[]) => void, onError: (error: unknown) => void): () => void {
+  return onSnapshot(recentJobsQuery(user), snapshot => onJobs(snapshot.docs.map(toRecord)), onError);
 }
 
 const toRecord = (d: DocumentSnapshot): JobRecord => ({

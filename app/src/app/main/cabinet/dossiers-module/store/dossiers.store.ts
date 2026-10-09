@@ -17,7 +17,7 @@ import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-s
 import { AssuresService } from '../../assures-module/services/assures.service';
 import { displayName, matchesSearch } from '../../assures-module/util/assures.utils';
 import { DossiersService } from '../services/dossiers.service';
-import { DossierFilter, EMPTY_FILTER, filterDossiers } from '../util/dossiers.utils';
+import { DEFAULT_FILTER, DossierFilter, filterDossiers } from '../util/dossiers.utils';
 
 export const PAGE_SIZE_OPTIONS = [10, 25, 50];
 const MAX_ASSURE_RESULTS = 8;
@@ -45,7 +45,7 @@ export const DossiersStore = signalStore(
     members: [],
     products: [],
     loaded: false,
-    filter: EMPTY_FILTER,
+    filter: DEFAULT_FILTER,
     pageIndex: 0,
     pageSize: PAGE_SIZE_OPTIONS[0],
     assureQuery: '',
@@ -83,7 +83,7 @@ export const DossiersStore = signalStore(
   }),
   withMethods((store, service = inject(DossiersService), assuresService = inject(AssuresService)) => ({
     setFilter: (changes: Partial<DossierFilter>) => patchState(store, { filter: { ...store.filter(), ...changes }, pageIndex: 0 }),
-    resetFilter: () => patchState(store, { filter: EMPTY_FILTER, pageIndex: 0 }),
+    resetFilter: () => patchState(store, { filter: DEFAULT_FILTER, pageIndex: 0 }),
     setPage: (pageIndex: number, pageSize: number) => patchState(store, { pageIndex, pageSize }),
     setAssureQuery: (assureQuery: string) => patchState(store, { assureQuery }),
     assureName: (assureId: string): string => {

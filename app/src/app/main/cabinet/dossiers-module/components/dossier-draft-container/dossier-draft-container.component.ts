@@ -7,6 +7,7 @@ import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-
 import { displayName } from '../../../assures-module/util/assures.utils';
 import { DossierStore } from '../../store/dossier.store';
 import { sectionIndexOf } from '../../util/dossiers.utils';
+import { DocumentImportContainerComponent } from '../document-import/document-import-container.component';
 import { DossierStepperHeaderComponent } from '../dossier-stepper-header/dossier-stepper-header.component';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/questionnaire-form.component';
@@ -18,7 +19,7 @@ import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/
  */
 @Component({
   selector: 'app-dossier-draft-container',
-  imports: [MatButtonModule, MatIconModule, DossierStepperHeaderComponent, QuestionnaireFormComponent],
+  imports: [MatButtonModule, MatIconModule, DocumentImportContainerComponent, DossierStepperHeaderComponent, QuestionnaireFormComponent],
   template: `
     @if (store.dossier(); as dossier) {
       <header>
@@ -35,6 +36,7 @@ import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/
         <p class="progress">
           {{ structure.section }} {{ sectionIndex() + 1 }} {{ structure.of }} {{ store.schema().length }}
         </p>
+        <app-document-import-container class="documents" />
         <app-questionnaire-form
           [sections]="currentSection()"
           [data]="store.answers()"
@@ -137,6 +139,10 @@ import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/
     .progress {
       margin: 0 0 12px;
       color: var(--mat-sys-on-surface-variant);
+    }
+
+    .documents {
+      margin-bottom: 16px;
     }
 
     .card {
