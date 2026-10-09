@@ -17,6 +17,7 @@ export function mockCabinet(overrides: Partial<Cabinet> = {}): Cabinet {
     email: faker.internet.email().toLowerCase(),
     logoPath: null,
     active: true,
+    maxUtilisateurs: 3,
     ownerUid: faker.string.alphanumeric(28),
     enabledInsurers: [],
     enabledProducts: [],
@@ -56,6 +57,7 @@ export function mockAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
     displayName: faker.person.fullName(),
     cabinetId: faker.string.alphanumeric(20),
     role: 'courtier',
+    authTime: 1_790_000_000,
     ...overrides,
   };
 }

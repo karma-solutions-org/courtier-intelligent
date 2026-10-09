@@ -6,11 +6,11 @@ import { UserRole } from '../../providers/authentication.provider';
 import { AuthStore } from '../../../main/commons/authentication-module/store/auth.store';
 import { CommonRouteContainerModel } from '../common-routes/common-route-container.model';
 
-/** Attend que Firebase ait indiqué l'état de connexion initial, puis évalue la condition. */
+/** Attend que l'état de connexion soit connu (et la session de l'appareil ouverte), puis évalue la condition. */
 function whenAuthReady(check: (store: InstanceType<typeof AuthStore>, router: Router) => boolean | ReturnType<Router['parseUrl']>) {
   const store = inject(AuthStore);
   const router = inject(Router);
-  return toObservable(store.initialized).pipe(
+  return toObservable(store.ready).pipe(
     filter(Boolean),
     take(1),
     map(() => check(store, router)),

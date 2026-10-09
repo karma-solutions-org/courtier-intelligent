@@ -46,6 +46,10 @@ export class SettingsService {
     return this._backend.call('equipe-changerRole', { uid, role });
   }
 
+  cancelInvitation(invitationId: string): Observable<{ success: boolean }> {
+    return this._backend.call('equipe-annulerInvitation', { invitationId });
+  }
+
   setStatus(uid: string, status: MemberStatus): Observable<{ success: boolean }> {
     return this._backend.call('equipe-activerMembre', { uid, status });
   }

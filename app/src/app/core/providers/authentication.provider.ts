@@ -19,6 +19,8 @@ export interface AuthUser {
   displayName: string | null;
   cabinetId: string | null;
   role: UserRole | null;
+  /** Heure de connexion (secondes) de cet appareil : identifie sa session « un seul appareil ». */
+  authTime: number | null;
 }
 
 /** Port d'authentification : les services ne connaissent que cette classe. */
@@ -50,6 +52,7 @@ export class FireauthProvider extends AuthenticationProvider {
         displayName: user.displayName,
         cabinetId: (claims['ci_cabinet_id'] as string | undefined) ?? null,
         role: (claims['ci_role'] as UserRole | undefined) ?? null,
+        authTime: Number(claims['auth_time']) || null,
       });
     }),
   );

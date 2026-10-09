@@ -2,6 +2,10 @@
   <app-logo class="auth-logo" [size]="44" />
   <p class="auth-subtitle">{{ structure.subtitle }}</p>
 
+  @if (notice()) {
+    <p class="auth-notice" role="status">{{ notice() }}</p>
+  }
+
   @if (error()) {
     <p class="auth-error" role="alert">{{ error() }}</p>
   }

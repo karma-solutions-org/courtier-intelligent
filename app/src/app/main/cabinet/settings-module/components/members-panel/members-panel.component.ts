@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,6 +14,12 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
   template: `
     <section class="card">
       <h2>{{ structure.inviteTitle }}</h2>
+      <p class="seats" [class.full]="isFull()">
+        {{ structure.seats }} : <strong>{{ usedSeats() }} / {{ maxUtilisateurs() }}</strong>
+      </p>
+      @if (isFull()) {
+        <p class="limit" role="status">{{ structure.limitReached }}</p>
+      }
       <form [formGroup]="inviteForm" (ngSubmit)="submitInvite()" novalidate class="invite">
         <mat-form-field appearance="outline" class="invite-email">
           <mat-label>{{ structure.email }}</mat-label>
@@ -30,7 +36,9 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
             }
           </mat-select>
         </mat-form-field>
-        <button mat-flat-button type="submit" class="invite-button" [disabled]="isPending()">{{ structure.invite }}</button>
+        <button mat-flat-button type="submit" class="invite-button" [disabled]="isPending() || isFull()">
+          {{ structure.invite }}
+        </button>
       </form>
       <p class="hint">{{ structure.inviteHint }}</p>
     </section>
@@ -95,11 +103,16 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
         <ul class="pending">
           @for (invitation of invitations(); track invitation.id) {
             <li>
-              <span>{{ invitation.email }}</span>
-              <span class="sub">
-                {{ roleLabel(invitation.role) }} · {{ structure.expiresOn }}
-                {{ invitation.expiresAt.toMillis() | date: 'd MMMM' }}
-              </span>
+              <div>
+                <span>{{ invitation.email }}</span>
+                <span class="sub">
+                  {{ roleLabel(invitation.role) }} · {{ structure.expiresOn }}
+                  {{ invitation.expiresAt.toMillis() | date: 'd MMMM' }}
+                </span>
+              </div>
+              <button mat-button [disabled]="isPending()" (click)="invitationCancelled.emit(invitation.id)">
+                {{ structure.cancelInvitation }}
+              </button>
             </li>
           }
         </ul>
@@ -186,12 +199,33 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       font-weight: 600;
     }
 
+    .seats {
+      margin: -8px 0 12px;
+      color: var(--mat-sys-on-surface-variant);
+
+      &.full strong {
+        color: var(--mat-sys-error);
+      }
+    }
+
+    .limit {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: var(--mat-sys-on-tertiary-container);
+      background: var(--mat-sys-tertiary-container);
+    }
+
     .pending {
       margin: 0;
       padding: 0;
       list-style: none;
 
       li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
         padding: 10px 0;
         border-bottom: 1px solid var(--mat-sys-outline-variant);
       }
@@ -208,11 +242,20 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
 export class MembersPanelComponent {
   readonly members = input<Member[]>([]);
   readonly invitations = input<Invitation[]>([]);
+  /** Nombre d'utilisateurs autorisés par l'offre du cabinet (admin compris). */
+  readonly maxUtilisateurs = input(3);
   readonly currentUid = input<string | null>(null);
   readonly isPending = input(false);
   readonly invited = output<{ email: string; role: CabinetRole }>();
   readonly roleChanged = output<{ uid: string; role: CabinetRole }>();
   readonly statusChanged = output<{ uid: string; status: MemberStatus }>();
+  readonly invitationCancelled = output<string>();
+
+  /** Membres actifs + invitations en attente : une invitation réserve une place. */
+  protected readonly usedSeats = computed(
+    () => this.members().filter(m => m.status === 'active').length + this.invitations().length,
+  );
+  protected readonly isFull = computed(() => this.usedSeats() >= this.maxUtilisateurs());
 
   protected readonly structure = SETTINGS_STRUCTURE.members;
   protected readonly roles = SETTINGS_STRUCTURE.roles;

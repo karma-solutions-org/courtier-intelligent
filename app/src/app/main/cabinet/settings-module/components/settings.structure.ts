@@ -21,6 +21,10 @@ export const SETTINGS_STRUCTURE = {
 
   members: {
     inviteTitle: 'Inviter un collaborateur',
+    seats: 'Utilisateurs',
+    limitReached:
+      "Votre cabinet a atteint sa limite d'utilisateurs. Désactivez un membre ou annulez une invitation pour libérer une place.",
+    cancelInvitation: 'Annuler',
     inviteHint: "Il recevra un email avec un lien pour rejoindre le cabinet (valable 7 jours).",
     email: 'Email',
     emailInvalid: "L'email n'est pas valide",

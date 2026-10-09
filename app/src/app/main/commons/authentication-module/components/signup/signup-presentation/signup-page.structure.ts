@@ -1,6 +1,9 @@
 export const SIGNUP_PAGE_STRUCTURE = {
   title: 'Créer un compte',
-  subtitle: 'Créez votre accès à Courtier Intelligent.',
+  subtitle: "Créez l'espace de votre cabinet. Vous en serez l'administrateur.",
+  subtitleInvitation: 'Créez votre accès pour rejoindre le cabinet qui vous a invité.',
+  cabinetNameLabel: 'Nom du cabinet',
+  cabinetNameRequired: 'Le nom du cabinet est obligatoire',
   displayNameLabel: 'Nom complet',
   displayNameRequired: 'Le nom est obligatoire',
   emailLabel: 'Email',

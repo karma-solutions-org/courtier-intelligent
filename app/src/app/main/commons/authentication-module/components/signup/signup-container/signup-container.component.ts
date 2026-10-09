@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
 import { CommonRouteContainerModel } from '../../../../../../core/routing/common-routes/common-route-container.model';
 import { AuthStore } from '../../../store/auth.store';
 import { SignupPresentationComponent } from '../signup-presentation/signup-presentation.component';
@@ -11,6 +11,7 @@ import { SignupPresentationComponent } from '../signup-presentation/signup-prese
       [isPending]="authStore.isPending()"
       [error]="authStore.error()"
       [signinUrl]="signinUrl"
+      [withCabinet]="!joiningByInvitation()"
       (submitted)="authStore.signUp($event)"
     />
   `,
@@ -19,6 +20,10 @@ import { SignupPresentationComponent } from '../signup-presentation/signup-prese
 export class SignupContainerComponent implements OnInit {
   protected readonly authStore = inject(AuthStore);
   protected readonly signinUrl = CommonRouteContainerModel.SIGNIN_ROUTE.url;
+  /** Venu d'un lien d'invitation : il rejoint un cabinet existant au lieu d'en créer un. */
+  protected readonly joiningByInvitation = computed(() =>
+    (this.authStore.redirectUrl() ?? '').startsWith(CommonRouteContainerModel.INVITATION_ROUTE.url),
+  );
 
   ngOnInit(): void {
     this.authStore.resetStatus();

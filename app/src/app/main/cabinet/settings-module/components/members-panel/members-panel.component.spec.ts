@@ -17,15 +17,22 @@ class MembersPanelTester {
   readonly invited: { email: string; role: CabinetRole }[] = [];
   readonly roleChanges: { uid: string; role: CabinetRole }[] = [];
   readonly statusChanges: { uid: string; status: MemberStatus }[] = [];
+  readonly cancelledInvitations: string[] = [];
 
   constructor() {
     const component = this.fixture.componentInstance;
     component.invited.subscribe(event => this.invited.push(event));
     component.roleChanged.subscribe(event => this.roleChanges.push(event));
     component.statusChanged.subscribe(event => this.statusChanges.push(event));
+    component.invitationCancelled.subscribe(id => this.cancelledInvitations.push(id));
   }
 
-  setInputs(inputs: { members?: Member[]; invitations?: Invitation[]; currentUid?: string | null }): void {
+  setInputs(inputs: {
+    members?: Member[];
+    invitations?: Invitation[];
+    currentUid?: string | null;
+    maxUtilisateurs?: number;
+  }): void {
     for (const [name, value] of Object.entries(inputs)) {
       this.fixture.componentRef.setInput(name, value);
     }
@@ -113,5 +120,39 @@ describe('MembersPanelComponent', () => {
 
     await expect.element(tester.root.getByText('Invitations en attente')).toBeVisible();
     await expect.element(tester.root.getByText(invitation.email)).toBeVisible();
+  });
+
+  describe("Limite d'utilisateurs de l'offre", () => {
+    it('compte les membres actifs et les invitations en attente', async () => {
+      tester.setInputs({
+        members: [mockMember({ status: 'active' }), mockMember({ status: 'disabled' })],
+        invitations: [mockInvitation()],
+        maxUtilisateurs: 3,
+      });
+
+      await expect.element(tester.root.getByText('2 / 3')).toBeVisible();
+      await expect.element(tester.inviteButton).toBeEnabled();
+    });
+
+    it('bloque les invitations quand la limite est atteinte', async () => {
+      tester.setInputs({
+        members: [mockMember({ status: 'active' }), mockMember({ status: 'active' })],
+        invitations: [mockInvitation()],
+        maxUtilisateurs: 3,
+      });
+
+      await expect.element(tester.root.getByText('3 / 3')).toBeVisible();
+      await expect.element(tester.root.getByText(/a atteint sa limite/)).toBeVisible();
+      await expect.element(tester.inviteButton).toBeDisabled();
+    });
+
+    it('annule une invitation pour libérer une place', async () => {
+      const invitation = mockInvitation();
+      tester.setInputs({ invitations: [invitation] });
+
+      await tester.root.getByRole('button', { name: 'Annuler' }).click();
+
+      expect(tester.cancelledInvitations).toEqual([invitation.id]);
+    });
   });
 });

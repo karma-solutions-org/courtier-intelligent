@@ -22,7 +22,7 @@ Il permet au courtier de :
 
 | Rôle | Droits |
 |---|---|
-| `superadmin` (le propriétaire de la plateforme) | Cabinets, produits, questionnaires, garanties, assureurs, monitoring de l'extension |
+| *(pas de super-admin)* | Le catalogue global (produits, garanties, assureurs) et la limite d'utilisateurs de chaque cabinet sont gérés côté serveur (Cloud Functions, console), jamais depuis l'app |
 | `admin` (du cabinet) | Membres et paramètres du cabinet, plus les droits courtier |
 | `courtier` | Assurés et dossiers du cabinet |
 
@@ -64,7 +64,7 @@ Assurés et dossiers sont visibles par tout le cabinet ; chaque dossier a un cou
 
 ```
 courtier-intelligent/
-├─ app/          Angular (back-office cabinet + console super-admin)
+├─ app/          Angular (back-office des cabinets)
 ├─ extension/    Chrome MV3
 ├─ functions/    Cloud Functions
 ├─ shared/       Types partagés (modèle canonique, statuts…)
@@ -96,7 +96,7 @@ Le premier produit est **l'Auto**. Les autres produits ajouteront des chemins (`
 ## 6. Données Firestore
 
 ```
-// GLOBAL (super-admin)
+// GLOBAL (écrit uniquement par les Cloud Functions)
 products/{productId}              name, active, questionnaireSchema, guaranteeCatalog[]
 insurers/{insurerId}              name, logo, extranetUrl, extranetDomains[], productsSupported[]
 guaranteeSynonyms/{productId}     { "bris de glace": "BDG", ... }
@@ -160,11 +160,11 @@ cabinets/{t}/dossiers/{id}
 
 **Cabinet** : connexion · tableau de bord · liste des dossiers · stepper « Nouveau dossier » (assuré → produit → questionnaire → récapitulatif) · détail du dossier (onglets Infos, Besoin, Tarification, Comparatif, Proposition et suivi, Historique) · assurés · paramètres (cabinet, membres, assureurs et produits actifs).
 
-**Super-admin** : cabinets · produits et questionnaires · garanties et synonymes · assureurs · monitoring de l'extension.
+
 
 ## 11. Cloud Functions
 
-`cabinets-creerMonCabinet` · `cabinets-creer` · `cabinets-activer` · `equipe-inviter` · `equipe-accepterInvitation` · `equipe-changerRole` · `equipe-activerMembre` · `aiProxy` · `onDossierCreate` (référence `2026-000123`) · `onDossierWrite` (complétude, transitions, historique) · `onOfferWrite` (normalisation des garanties, écarts, score) · `sendProposal` · `dailyReminders`.
+`cabinets-creerMonCabinet` · `sessions-ouvrir` · `sessions-fermer` · `equipe-inviter` · `equipe-accepterInvitation` · `equipe-changerRole` · `equipe-activerMembre` · `equipe-annulerInvitation` · `aiProxy` · `onDossierCreate` (référence `2026-000123`) · `onDossierWrite` (complétude, transitions, historique) · `onOfferWrite` (normalisation des garanties, écarts, score) · `sendProposal` · `dailyReminders`.
 
 ## 12. Extension existante de référence
 
@@ -177,14 +177,14 @@ On **change** : communication via Firestore (et non plus par messages), mémoire
 | Epic | Contenu | Sprint |
 |---|---|---|
 | E0 · Fondations | Projet Angular, Firebase + emulators, extension MV3, types partagés, layout | S1 |
-| E1 · Cabinets et utilisateurs | Connexion, guards par rôle, `cabinets-creer`, règles d'isolation, invitations, rôles, paramètres, liste des cabinets | S1–S2 |
+| E1 · Cabinets et utilisateurs | Connexion, guards par rôle, inscription avec création du cabinet, limite d'utilisateurs, un seul appareil, règles d'isolation, invitations, rôles, paramètres, liste des cabinets | S1–S2 |
 | E2 · Catalogue | Format JSON du questionnaire, seed Auto + 3 assureurs, CRUD produits / garanties / assureurs | S2 |
 | E3 · Assurés | Création, liste et recherche, fiche, doublons | S3 |
 | E4 · Dossiers | Stepper, questionnaire dynamique, brouillon auto, complétude, référence, liste, détail, machine à états, historique, assignation, `quoteData` | S3–S4 |
 | E5 · Analyse du besoin | Formulaire, validation, suggestions | S4 |
 | E6 · Connexion de l'extension | Connexion Firebase propre à l'extension (side panel), session, règles, `aiProxy` | S5 |
 | E7 · Mapping et remplissage | Écoute des jobs, analyse DOM, synonymes et scoring, repli IA, champs manquants, remplissage, multi-étapes, side panel | S5–S6 |
-| E8 · Mémoire partagée | `formMemories` : lecture, écriture, invalidation, gestion super-admin | S6, S8 |
+| E8 · Mémoire partagée | `formMemories` : lecture, écriture, invalidation | S6, S8 |
 | E9 · Tarification dans l'app | Onglet tarification, bouton Tarifer, champs manquants, relance, saisie manuelle | S5–S7 |
 | E10 · Capture du tarif | Page résultat, extraction, confirmation, rapport d'échec | S7 |
 | E11 · Les 3 assureurs réels | Assureurs A, B, C de bout en bout, monitoring | S7–S8 |
@@ -225,3 +225,10 @@ On **change** : communication via Firestore (et non plus par messages), mémoire
 - Échanges en **français**.
 - Préfère des plans **épurés**, centrés sur l'essentiel ; ne pas ajouter de sujets hors périmètre (voir section 3).
 - Veut des noms **dans une seule langue** (d'où « Courtier Intelligent »).
+
+## 17. Offre commerciale : limite d'utilisateurs et appareil unique (07/10/2026)
+
+- **Deux rôles seulement** : `admin` et `courtier`. Il n'y a plus de super-admin. Un cabinet est créé à l'inscription (`cabinets-creerMonCabinet`) : son créateur en est l'admin.
+- **Limite d'utilisateurs par cabinet**, admin compris : champ `maxUtilisateurs` du cabinet, **3 par défaut** (`DEFAULT_MAX_UTILISATEURS`). Il n'est écrit que côté serveur (règles Firestore) : il servira aux futures offres (3, 6, 87…). Une invitation en attente réserve une place.
+- **Un seul appareil par utilisateur** : à la connexion, `sessions-ouvrir` refuse un 2e appareil tant que la session du 1er est active (signal de vie toutes les 30 s, expiration après 2 min sans signal). La session est liée à `auth_time` (heure de connexion signée par Firebase, propre à chaque appareil) : règles Firestore/Storage et fonctions comparent `session.authTime` au token, donc un autre appareil — même compte, mêmes claims — n'a accès à aucune donnée. `sessions-fermer` libère la session à la déconnexion.
+- ⚠️ **À traiter à l'Epic E6** : l'extension a sa propre connexion et compterait comme un 2e appareil. Prévoir « 1 app + 1 extension » par utilisateur.

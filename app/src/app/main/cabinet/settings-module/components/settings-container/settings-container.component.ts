@@ -31,11 +31,13 @@ import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
           <app-members-panel
             [members]="store.members()"
             [invitations]="store.invitations()"
+            [maxUtilisateurs]="store.cabinet()?.maxUtilisateurs ?? 3"
             [currentUid]="authStore.user()?.uid ?? null"
             [isPending]="store.isPending()"
             (invited)="store.invite($event)"
             (roleChanged)="store.setRole($event)"
             (statusChanged)="store.setStatus($event)"
+            (invitationCancelled)="store.cancelInvitation($event)"
           />
         </div>
       </mat-tab>

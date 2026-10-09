@@ -11,6 +11,7 @@ import { SigninPresentationComponent } from '../signin-presentation/signin-prese
     <app-signin-presentation
       [isPending]="authStore.isPending()"
       [error]="authStore.error()"
+      [notice]="authStore.sessionNotice()"
       [forgotPasswordUrl]="forgotPasswordUrl"
       [signupUrl]="signupUrl"
       (submitted)="signIn($event)"

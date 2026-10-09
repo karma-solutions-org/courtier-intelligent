@@ -1,13 +1,23 @@
 <div class="auth-card">
   <app-logo class="auth-logo" [size]="44" />
   <h1 class="auth-brand">{{ structure.title }}</h1>
-  <p class="auth-subtitle">{{ structure.subtitle }}</p>
+  <p class="auth-subtitle">{{ withCabinet() ? structure.subtitle : structure.subtitleInvitation }}</p>
 
   @if (error()) {
     <p class="auth-error" role="alert">{{ error() }}</p>
   }
 
   <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    @if (withCabinet()) {
+      <mat-form-field appearance="outline">
+        <mat-label>{{ structure.cabinetNameLabel }}</mat-label>
+        <input matInput formControlName="cabinetName" autocomplete="organization" />
+        @if (form.controls.cabinetName.hasError('required')) {
+          <mat-error>{{ structure.cabinetNameRequired }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
     <mat-form-field appearance="outline">
       <mat-label>{{ structure.displayNameLabel }}</mat-label>
       <input matInput formControlName="displayName" autocomplete="name" />

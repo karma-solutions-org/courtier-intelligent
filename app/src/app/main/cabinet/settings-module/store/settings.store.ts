@@ -54,6 +54,7 @@ export const SettingsStore = signalStore(
         'Invitation envoyée.',
       ),
       setRole: runAction<{ uid: string; role: CabinetRole }>(({ uid, role }) => service.setRole(uid, role), 'Rôle modifié.'),
+      cancelInvitation: runAction<string>(invitationId => service.cancelInvitation(invitationId), 'Invitation annulée.'),
       setStatus: runAction<{ uid: string; status: MemberStatus }>(
         ({ uid, status }) => service.setStatus(uid, status),
         'Statut du membre modifié.',

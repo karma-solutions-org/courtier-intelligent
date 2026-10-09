@@ -1,0 +1,186 @@
+    // ═══ À COLLER dans match /databases/{database}/documents, AVANT le catch-all ═══
+    // ════════════════════════════════════════════════════════════════════
+    // Courtier Intelligent (cabinets de courtage)
+    //
+    // Claims posés UNIQUEMENT par les Cloud Functions :
+    //   ci_cabinet_id : cabinet de l'utilisateur
+    //   ci_role       : 'admin' | 'courtier'
+    // Préfixe "ci_" : à ne pas confondre avec token.role / token.admin des autres
+    // applications qui partagent cette base.
+    //
+    // Un seul appareil par utilisateur : seul le token dont auth_time égale
+    // cabinets/{t}/members/{uid}.session.authTime a accès aux données
+    // (posé par la function sessions-ouvrir).
+    //
+    // Ecritures serveur uniquement (Functions / Admin SDK) : création du cabinet,
+    // maxUtilisateurs, membres (rôle, statut), invitations, compteurs, catalogue.
+    // ════════════════════════════════════════════════════════════════════
+
+    function ciCabinetId() {
+      return isConnected() ? request.auth.token.get('ci_cabinet_id', null) : null;
+    }
+
+    function ciRole() {
+      return isConnected() ? request.auth.token.get('ci_role', null) : null;
+    }
+
+    // Membre du cabinet t (claims uniquement, sans contrôle de session).
+    function ciIsMember(t) {
+      return ciCabinetId() != null && ciCabinetId() == t;
+    }
+
+    // Membre actif dont l'appareil courant détient la session.
+    function ciSessionOk(t) {
+      let member = get(/databases/$(database)/documents/cabinets/$(t)/members/$(request.auth.uid)).data;
+      return member.get('status', null) == 'active'
+        && member.get('session', null) != null
+        && member.session.get('authTime', null) == request.auth.token.auth_time;
+    }
+
+    // Membre du cabinet t, actif, sur son appareil de session.
+    function ciActive(t) {
+      return ciIsMember(t) && ciSessionOk(t);
+    }
+
+    function ciActiveAdmin(t) {
+      return ciActive(t) && ciRole() == 'admin';
+    }
+
+    // Même contrôle pour les ressources globales (catalogue, mémoire des formulaires).
+    function ciActiveAnyCabinet() {
+      return ciCabinetId() != null && ciSessionOk(ciCabinetId());
+    }
+
+    // Les champs listés ne doivent pas changer (update uniquement).
+    function ciKeysUnchanged(keys) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys);
+    }
+
+    match /cabinets/{cabinetId} {
+      allow read: if ciActive(cabinetId);
+      // Création, maxUtilisateurs, ownerUid, active : serveur uniquement.
+      allow create, delete: if false;
+      allow update: if ciActiveAdmin(cabinetId) &&
+        onlyChangedKeys(['name', 'orias', 'address', 'phone', 'email', 'logoPath',
+                         'enabledInsurers', 'enabledProducts']) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.name.size() < 200;
+
+      match /members/{uid} {
+        // Son propre document reste lisible même sans la session : l'app y détecte
+        // qu'un autre appareil a pris la main.
+        allow get: if (ciIsMember(cabinetId) && request.auth.uid == uid) || ciActive(cabinetId);
+        allow list: if ciActive(cabinetId);
+        // Seul le signal de vie (session.lastSeen) sur son propre document ;
+        // rôle, statut et session.authTime sont posés par les Functions.
+        allow update: if ciActive(cabinetId) &&
+          request.auth.uid == uid &&
+          resource.data.get('session', null) != null &&
+          onlyChangedKeys(['session']) &&
+          request.resource.data.session.diff(resource.data.session).affectedKeys().hasOnly(['lastSeen']) &&
+          request.resource.data.session.lastSeen == request.time;
+        allow create, delete: if false;
+      }
+
+      // Invitations : lecture par l'admin, écriture par les Functions.
+      match /invitations/{invitationId} {
+        allow read: if ciActiveAdmin(cabinetId);
+        allow write: if false;
+      }
+
+      match /counters/{counterId} {
+        allow read, write: if false;
+      }
+
+      match /assures/{assureId} {
+        allow read: if ciActive(cabinetId);
+        allow create: if ciActive(cabinetId) &&
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if ciActive(cabinetId) &&
+          ciKeysUnchanged(['createdBy', 'createdAt']);
+        allow delete: if ciActiveAdmin(cabinetId);
+      }
+
+      match /dossiers/{dossierId} {
+        allow read: if ciActive(cabinetId);
+        // reference et completeness sont posées par onDossierCreate / onDossierWrite.
+        allow create: if ciActive(cabinetId) &&
+          request.resource.data.status == 'brouillon' &&
+          request.resource.data.assignedTo is string &&
+          request.resource.data.get('reference', null) == null;
+        allow update: if ciActive(cabinetId) &&
+          ciKeysUnchanged(['reference', 'completeness', 'createdAt']);
+        // Un dossier ne se supprime pas : on le passe en « sans_suite ».
+        allow delete: if false;
+
+        // Tarification : l'app écrit « requested », l'extension (même identité)
+        // écrit le statut, la progression et les informations manquantes.
+        match /quoteJobs/{insurerId} {
+          allow read: if ciActive(cabinetId);
+          allow create: if ciActive(cabinetId) &&
+            request.resource.data.ownerUid == request.auth.uid;
+          allow update: if ciActive(cabinetId) &&
+            (request.resource.data.ownerUid == resource.data.ownerUid ||
+             request.resource.data.ownerUid == request.auth.uid);
+          allow delete: if false;
+        }
+
+        // Offres : écrites par l'extension (source 'auto') ou saisies à la main ;
+        // gaps et score sont recalculés par onOfferWrite.
+        match /offers/{insurerId} {
+          allow read: if ciActive(cabinetId);
+          allow create, update: if ciActive(cabinetId);
+          allow delete: if false;
+        }
+
+        match /documents/{documentId} {
+          allow read, create, update, delete: if ciActive(cabinetId);
+        }
+
+        // Historique non modifiable : création seule.
+        match /events/{eventId} {
+          allow read: if ciActive(cabinetId);
+          allow create: if ciActive(cabinetId) &&
+            request.resource.data.by == request.auth.uid;
+          allow update, delete: if false;
+        }
+      }
+    }
+
+    // ── Catalogue global : lecture pour les utilisateurs d'un cabinet, écriture serveur.
+    match /products/{productId} {
+      allow read: if ciActiveAnyCabinet();
+      allow write: if false;
+    }
+
+    match /insurers/{insurerId} {
+      allow read: if ciActiveAnyCabinet();
+      allow write: if false;
+    }
+
+    match /guaranteeSynonyms/{productId} {
+      allow read: if ciActiveAnyCabinet();
+      allow write: if false;
+    }
+
+    // ── Mémoire partagée des formulaires (structure seulement, AUCUNE donnée client).
+    // Ecrite par l'extension, partagée entre tous les cabinets.
+    match /formMemories/{memoryKey} {
+      allow read: if ciActiveAnyCabinet();
+      allow create, update: if ciActiveAnyCabinet() &&
+        request.resource.data.keys().hasOnly(['origin', 'formFingerprint', 'version', 'fields',
+                                              'hits', 'lastUsedAt', 'createdAt']) &&
+        request.resource.data.origin is string &&
+        request.resource.data.fields is list &&
+        request.resource.data.fields.size() <= 300;
+      allow delete: if false;
+    }
+
+    // ── Signalements de l'extension (AUCUNE donnée client) : création seule.
+    match /extensionReports/{reportId} {
+      allow create: if ciActiveAnyCabinet() &&
+        request.resource.data.keys().hasOnly(['insurerId', 'origin', 'step', 'issue', 'at']);
+      allow read, update, delete: if false;
+    }
+

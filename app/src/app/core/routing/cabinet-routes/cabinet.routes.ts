@@ -1,8 +1,7 @@
 import { Routes } from '@angular/router';
 import { SettingsStore } from '../../../main/cabinet/settings-module/store/settings.store';
-import { CabinetsManagementStore } from '../../../main/super-admin/cabinets-management-module/store/cabinets-management.store';
 import { roleGuard } from '../guards/auth.guards';
-import { CabinetRouteContainerModel, SuperAdminRouteContainerModel } from './cabinet-route-container.model';
+import { CabinetRouteContainerModel } from './cabinet-route-container.model';
 
 const underConstruction = () =>
   import('../../../main/commons/main-module/components/under-construction/under-construction.component').then(
@@ -40,32 +39,8 @@ export const CABINET_ROUTES: Routes = [
     title: 'Paramètres — Courtier Intelligent',
     providers: [SettingsStore],
     loadComponent: () =>
-      import(
-        '../../../main/cabinet/settings-module/components/settings-container/settings-container.component'
-      ).then(c => c.SettingsContainerComponent),
-  },
-  {
-    path: SuperAdminRouteContainerModel.CABINETS_ROUTE.path,
-    canMatch: [roleGuard('superadmin')],
-    title: 'Cabinets — Courtier Intelligent',
-    providers: [CabinetsManagementStore],
-    loadComponent: () =>
-      import(
-        '../../../main/super-admin/cabinets-management-module/components/cabinets-management-container/cabinets-management-container.component'
-      ).then(c => c.CabinetsManagementContainerComponent),
-  },
-  {
-    path: SuperAdminRouteContainerModel.CATALOGUE_ROUTE.path,
-    canMatch: [roleGuard('superadmin')],
-    title: 'Catalogue — Courtier Intelligent',
-    data: { pageTitle: 'Catalogue' },
-    loadComponent: underConstruction,
-  },
-  {
-    path: SuperAdminRouteContainerModel.INSURERS_ROUTE.path,
-    canMatch: [roleGuard('superadmin')],
-    title: 'Assureurs — Courtier Intelligent',
-    data: { pageTitle: 'Assureurs' },
-    loadComponent: underConstruction,
+      import('../../../main/cabinet/settings-module/components/settings-container/settings-container.component').then(
+        c => c.SettingsContainerComponent,
+      ),
   },
 ];

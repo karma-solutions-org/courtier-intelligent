@@ -54,6 +54,14 @@ mat-form-field {
   background: var(--mat-sys-primary-container);
 }
 
+.auth-notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--mat-sys-on-tertiary-container);
+  background: var(--mat-sys-tertiary-container);
+}
+
 .auth-submit {
   height: 44px;
   margin-top: 8px;

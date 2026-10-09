@@ -33,11 +33,14 @@ export class SignupPresentationComponent {
   readonly isPending = input(false);
   readonly error = input<string | null>(null);
   readonly signinUrl = input.required<string>();
+  /** Vrai pour créer un nouveau cabinet ; faux quand on s'inscrit pour rejoindre un cabinet (invitation). */
+  readonly withCabinet = input(true);
   readonly submitted = output<SignupModel>();
 
   protected readonly structure = SIGNUP_PAGE_STRUCTURE;
   protected readonly form = new FormGroup(
     {
+      cabinetName: new FormControl('', { nonNullable: true }),
       displayName: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
       email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
       password: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(8)] }),
@@ -47,11 +50,20 @@ export class SignupPresentationComponent {
   );
 
   protected submit(): void {
+    const cabinetNameControl = this.form.controls.cabinetName;
+    if (this.withCabinet() && !cabinetNameControl.value.trim()) {
+      cabinetNameControl.setErrors({ required: true });
+    }
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
-    const { displayName, email, password } = this.form.getRawValue();
-    this.submitted.emit({ displayName, email, password });
+    const { cabinetName, displayName, email, password } = this.form.getRawValue();
+    this.submitted.emit({
+      displayName,
+      email,
+      password,
+      ...(this.withCabinet() ? { cabinetName: cabinetName.trim() } : {}),
+    });
   }
 }

@@ -48,7 +48,6 @@ app/src/app/
 │   │   ├── routes.ts                         # routes racines (lazy par zone)
 │   │   ├── common-routes/                    # common.routes.ts + common-route-container.model.ts
 │   │   ├── cabinet-routes/                   # cabinet.routes.ts + cabinet-route-container.model.ts
-│   │   ├── super-admin-routes/               # super-admin.routes.ts + super-admin-route-container.model.ts
 │   │   ├── guards/                           # auth.guard.ts, role.guard.ts (fonctionnels, canMatch)
 │   │   └── matcher/                          # matchers d'URL si besoin
 │   ├── components/                           # composants transverses (statistics-card…)
@@ -70,11 +69,6 @@ app/src/app/
     │   ├── comparatif-module/
     │   ├── proposition-module/
     │   └── settings-module/                  # cabinet, membres, assureurs actifs
-    └── super-admin/
-        ├── cabinets-management-module/
-        ├── catalogue-management-module/      # produits, questionnaires, garanties
-        ├── insurers-management-module/
-        └── extension-monitoring-module/
 ```
 
 ### Anatomie d'un module
@@ -208,9 +202,9 @@ Aucun `provideStore`, `provideState` ni `provideEffects`.
 
 ## 8. Routing
 
-- Chaque zone (`commons`, `cabinet`, `super-admin`) et chaque module sont chargés en lazy.
+- Chaque zone (`commons`, `cabinet`) et chaque module sont chargés en lazy.
 - Chaque zone a un `xxx-route-container.model.ts` qui centralise ses chemins (comme `BackOfficeRouteContainerModel`).
-- Les guards sont fonctionnels, avec `canMatch` : `authGuard`, puis `roleGuard('superadmin' | 'admin' | 'courtier')`. Le code d'une zone non autorisée n'est jamais téléchargé.
+- Les guards sont fonctionnels, avec `canMatch` : `authGuard`, puis `roleGuard('admin' | 'courtier')`. Le code d'une zone non autorisée n'est jamais téléchargé.
 - Les paramètres de route sont liés aux `input()` grâce à `withComponentInputBinding()`.
 - Le store d'un module est fourni dans les `providers` de sa route.
 
