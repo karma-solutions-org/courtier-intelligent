@@ -34,9 +34,9 @@ const TEXT = {
   template: `
     @let job = card().job;
     @let offer = card().offer;
-    <article class="card" [attr.aria-label]="card().insurer.name">
+    <article class="card" [attr.data-tone]="tone()" [attr.aria-label]="card().insurer.name">
       <header>
-        <h3>{{ card().insurer.name }}</h3>
+        <h3><span class="insurer-mark" aria-hidden="true">{{ card().insurer.name.charAt(0) }}</span>{{ card().insurer.name }}</h3>
         <span class="status" [class]="tone()">{{ statusLabel() }}</span>
       </header>
 
@@ -117,9 +117,10 @@ const TEXT = {
       gap: 12px;
       align-content: start;
       padding: 20px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     header {
@@ -141,7 +142,7 @@ const TEXT = {
       font-size: 12px;
       font-weight: 500;
       white-space: nowrap;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
       background: var(--mat-sys-surface-container);
     }
 
@@ -187,7 +188,7 @@ const TEXT = {
     .meta {
       margin: 0;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .steps {
@@ -198,7 +199,7 @@ const TEXT = {
     .error {
       margin: 0;
       padding: 10px 12px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-error-container);
       background: var(--mat-sys-error-container);
     }
@@ -207,6 +208,75 @@ const TEXT = {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+    }
+  
+    .card {
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--ci-shadow-sm);
+      transition: border-color 0.15s;
+
+      &:hover {
+        border-color: #cbd2dc;
+      }
+    }
+
+
+
+
+
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+    }
+
+    .insurer-mark {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      font-weight: 600;
+      color: var(--ci-navy-900);
+      background: var(--ci-navy-50);
+    }
+
+    .status {
+      font-weight: 600;
+    }
+
+    .status.progress {
+      color: var(--ci-info);
+      background: var(--ci-info-soft);
+    }
+
+    .status.action {
+      color: var(--ci-warning);
+      background: var(--ci-warning-soft);
+    }
+
+    .status.ok {
+      color: var(--ci-success);
+      background: var(--ci-success-soft);
+    }
+
+    .status.ko {
+      color: var(--ci-danger);
+      background: var(--ci-danger-soft);
+    }
+
+    .offer strong {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--ci-navy-900);
+    }
+
+    .badge {
+      color: var(--ci-warning);
+      background: var(--ci-warning-soft);
+      font-weight: 600;
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

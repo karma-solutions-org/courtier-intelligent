@@ -57,7 +57,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
     td {
       padding: 10px 8px;
       text-align: left;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
+      border-bottom: 1px solid var(--ci-border);
     }
 
     th {
@@ -65,13 +65,13 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .sub {
       display: block;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .refused td:last-child {

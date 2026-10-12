@@ -82,8 +82,9 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 
     h1 {
       margin: 0 0 20px;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     h2 {
@@ -94,9 +95,10 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 
     .card {
       padding: 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     .search {
@@ -114,7 +116,7 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
     .sub {
       margin-left: 8px;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .actions {
@@ -127,9 +129,35 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
     .error {
       margin: 0 0 16px;
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-error-container);
       background: var(--mat-sys-error-container);
+    }
+  
+    .card {
+      box-shadow: var(--ci-shadow-sm);
+    }
+
+    .choices {
+      gap: 6px;
+    }
+
+    .choices mat-radio-button {
+      padding: 4px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--ci-border);
+      transition: background 0.15s, border-color 0.15s;
+
+      &:hover {
+        border-color: #cbd2dc;
+        background: var(--ci-surface-2);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .card {
+        padding: 18px 16px;
+      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

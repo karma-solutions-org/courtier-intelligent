@@ -22,7 +22,7 @@ import { ExtensionPing } from '../../../../../core/providers/extension.provider'
       padding: 4px 10px;
       border-radius: 999px;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
       background: var(--mat-sys-surface-container);
 
       mat-icon {

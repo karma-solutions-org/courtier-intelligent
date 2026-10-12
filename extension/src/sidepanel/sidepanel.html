@@ -8,8 +8,8 @@
   </head>
   <body>
     <header class="header">
-      <img src="../logo/logo-symbol.svg" alt="" width="22" height="26" />
-      <span>Courtier Intelligent</span>
+      <span class="header-logo"><img src="../logo/logo-symbol.svg" alt="" width="20" height="24" /></span>
+      <span class="header-text"><span class="header-title">Courtier Intelligent</span><span class="header-sub">Assistant extranet</span></span>
     </header>
 
     <main>
@@ -30,32 +30,33 @@
 
       <!-- Courtier connecté -->
       <section id="connected" hidden>
-        <section class="card">
+        <section class="card accent-green">
           <p class="label">Courtier connecté</p>
           <p id="account-name" class="value"></p>
           <p id="account-meta" class="muted"></p>
           <button id="sign-out" type="button" class="link">Se déconnecter</button>
         </section>
 
-        <section class="card">
+        <section class="card accent-blue">
           <p class="label">Dossier et tarification en cours</p>
           <p id="job-title" class="value">—</p>
-          <p id="job-status" class="muted"></p>
+          <p id="job-status" class="muted status"></p>
           <p id="job-progress" class="muted"></p>
           <p id="job-error" class="error" hidden></p>
         </section>
 
         <!-- Remplissage de l'extranet ouvert dans l'onglet actif -->
-        <section id="run" class="card" hidden>
+        <section id="run" class="card accent-teal" hidden>
           <p class="label">Remplissage de l'extranet</p>
           <p id="run-step" class="value"></p>
+          <div id="run-progress" class="progress" hidden><span></span></div>
           <p id="run-phase" class="muted"></p>
           <p id="run-summary" class="muted"></p>
           <p id="run-message" class="notice" role="status" hidden></p>
           <p id="run-memory" class="muted small" hidden></p>
           <p id="run-ai" class="muted small" hidden></p>
 
-          <div id="run-missing-block" hidden>
+          <div id="run-missing-block" class="missing" hidden>
             <p class="label">À compléter dans l'application</p>
             <ul id="run-missing" class="list"></ul>
           </div>
@@ -66,10 +67,10 @@
           </div>
 
           <!-- Page de résultat : le tarif lu, à confirmer par le courtier avant tout enregistrement -->
-          <div id="capture" hidden>
+          <div id="capture" class="capture" hidden>
             <form id="capture-form" novalidate>
-              <label for="capture-annual">Prime annuelle (€)</label>
-              <input id="capture-annual" name="premiumAnnual" inputmode="decimal" autocomplete="off" />
+              <label for="capture-annual" class="premium-label">Prime annuelle (€)</label>
+              <input id="capture-annual" class="premium" name="premiumAnnual" inputmode="decimal" autocomplete="off" />
               <label for="capture-monthly">Prime mensuelle (€)</label>
               <input id="capture-monthly" name="premiumMonthly" inputmode="decimal" autocomplete="off" />
               <label for="capture-quote">Numéro de devis</label>
@@ -97,7 +98,7 @@
           <button id="refill" type="button" class="link">Remplir à nouveau</button>
         </section>
 
-        <section class="card">
+        <section class="card accent-violet">
           <p class="label">Page active</p>
           <p id="page-origin" class="value">—</p>
           <p id="page-fields" class="muted"></p>

@@ -39,13 +39,26 @@ import { UserRole } from '@shared';
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 12px 32px;
-      color: var(--mat-sys-on-tertiary-container);
-      background: var(--mat-sys-tertiary-container);
+      margin: 16px 32px 0;
+      padding: 12px 18px;
+      border-radius: 8px;
+      border: 1px solid #f3d9a8;
+      color: #6b3a00;
+      background: #fff8eb;
+
+      mat-icon {
+        flex-shrink: 0;
+        color: var(--ci-warning);
+      }
 
       &.expired {
-        color: var(--mat-sys-on-error-container);
-        background: var(--mat-sys-error-container);
+        border-color: #f5c2c7;
+        color: #8a1621;
+        background: #fef2f3;
+
+        mat-icon {
+          color: var(--ci-danger);
+        }
       }
     }
 
@@ -55,7 +68,8 @@ import { UserRole } from '@shared';
 
     @media (max-width: 600px) {
       .banner {
-        padding: 12px 16px;
+        margin: 12px 16px 0;
+        padding: 12px 14px;
       }
     }
   `,

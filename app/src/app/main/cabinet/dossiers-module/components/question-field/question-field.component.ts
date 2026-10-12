@@ -127,7 +127,7 @@ const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
 
     .label {
       font-size: 14px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .known-value {

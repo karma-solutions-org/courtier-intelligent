@@ -173,9 +173,10 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
 
     .card {
       padding: 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     h2 {
@@ -204,14 +205,14 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
     .error {
       margin: 0;
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-error-container);
       background: var(--mat-sys-error-container);
     }
 
     .duplicates {
       padding: 16px 24px;
-      border-radius: 14px;
+      border-radius: 8px;
       color: var(--mat-sys-on-tertiary-container);
       background: var(--mat-sys-tertiary-container);
 

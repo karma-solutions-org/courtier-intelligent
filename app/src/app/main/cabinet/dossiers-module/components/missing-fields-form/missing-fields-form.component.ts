@@ -41,7 +41,7 @@ const TEXT = {
     .intro {
       margin: 0;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .actions {

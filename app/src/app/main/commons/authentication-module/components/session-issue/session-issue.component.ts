@@ -35,39 +35,47 @@ import { SESSION_ISSUE_ACTIONS, SESSION_ISSUE_PAGE_STRUCTURE, SessionIssueKind }
       min-height: 100vh;
       align-items: center;
       justify-content: center;
-      padding: 16px;
-      background: var(--mat-sys-surface-container-low);
+      padding: 24px 16px;
+      box-sizing: border-box;
+      background: var(--ci-bg);
     }
 
     .card {
       width: 100%;
       max-width: 460px;
       padding: 32px;
-      border-radius: 16px;
-      background: var(--mat-sys-surface);
-      box-shadow: var(--mat-sys-level2);
+      box-sizing: border-box;
+      border-radius: 8px;
+      border: 1px solid var(--ci-border);
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     .icon {
-      width: 40px;
-      height: 40px;
-      font-size: 40px;
-      color: var(--mat-sys-error);
+      width: 28px;
+      height: 28px;
+      padding: 10px;
+      box-sizing: content-box;
+      border-radius: 8px;
+      font-size: 28px;
+      color: var(--ci-danger);
+      background: var(--ci-danger-soft);
     }
 
     h1 {
-      margin: 12px 0 8px;
-      font: var(--mat-sys-headline-small);
+      margin: 16px 0 8px;
+      font-size: 22px;
+      font-weight: 600;
     }
 
     ul {
       padding-left: 20px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .detail {
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     a {

@@ -75,7 +75,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
                   }
                   <span class="sub">{{ member.email }}</span>
                 </td>
-                <td>
+                <td class="role-cell" [attr.data-role]="member.role">
                   <mat-select
                     class="role-select"
                     [value]="member.role"
@@ -182,7 +182,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
     td {
       padding: 12px 8px;
       text-align: left;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
+      border-bottom: 1px solid var(--ci-border);
     }
 
     th {
@@ -190,13 +190,13 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .sub {
       display: block;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .bound-device + .bound-device {
@@ -205,7 +205,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
 
     .me {
       margin-left: 6px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .role-select {
@@ -221,7 +221,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       background: #e3f5ec;
 
       &.disabled {
-        color: var(--mat-sys-on-surface-variant);
+        color: var(--ci-text-muted);
         background: var(--mat-sys-surface-container);
       }
     }
@@ -242,7 +242,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
 
     .seats {
       margin: -8px 0 12px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
 
       &.full strong {
         color: var(--mat-sys-error);
@@ -268,7 +268,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
         justify-content: space-between;
         gap: 12px;
         padding: 10px 0;
-        border-bottom: 1px solid var(--mat-sys-outline-variant);
+        border-bottom: 1px solid var(--ci-border);
       }
     }
 
@@ -276,6 +276,52 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       .invite {
         grid-template-columns: 1fr;
       }
+    }
+  
+    .role-cell .role-select {
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-weight: 600;
+      color: var(--ci-navy-800);
+      background: var(--ci-navy-100);
+      box-sizing: border-box;
+    }
+
+    .role-cell[data-role='admin'] .role-select {
+      background: var(--st-tarification-bg);
+    }
+
+    .role-cell[data-role='courtier'] .role-select {
+      background: var(--ci-accent-soft);
+    }
+
+    .bound-device {
+      display: inline-flex;
+      flex-direction: column;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid #c9d4f2;
+      background: var(--ci-navy-50);
+    }
+
+    th {
+      color: var(--ci-navy-800);
+      background: var(--ci-navy-50);
+    }
+
+    .status {
+      color: var(--ci-success);
+      background: var(--ci-success-soft);
+    }
+
+    .limit {
+      border-left: 3px solid var(--ci-warning);
+      color: #7a3e00;
+      background: var(--ci-warning-soft);
+    }
+
+    .seats strong {
+      color: var(--ci-navy-900);
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -7,7 +7,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink } from '@angular/router';
-import { DossierStatus, PROPOSAL_DOSSIER_STATUSES } from '@shared';
+import { DOSSIER_STATUS_LABELS, DossierStatus, PROPOSAL_DOSSIER_STATUSES } from '@shared';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { displayName } from '../../../assures-module/util/assures.utils';
 import { DossierStore } from '../../store/dossier.store';
@@ -45,8 +45,9 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
     <a mat-button [routerLink]="listUrl" class="back"><mat-icon>arrow_back</mat-icon>{{ structure.back }}</a>
 
     @if (store.dossier(); as dossier) {
-      <header class="card">
+      <header class="card header" [attr.data-status]="dossier.status">
         <div class="title">
+          <span class="title-icon" aria-hidden="true"><mat-icon>folder_open</mat-icon></span>
           <h1>{{ dossier.reference }}</h1>
           <app-status-chip [status]="dossier.status" />
         </div>
@@ -54,6 +55,27 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
           {{ store.assure() ? nameOf(store.assure()!) : '—' }} · {{ store.product()?.name ?? dossier.productId }} ·
           {{ dossier.createdAt?.toMillis() | date: 'd MMM y' }}
         </p>
+
+        <ol class="pipeline" [class.halted]="isHalted(dossier.status)" aria-label="Progression du dossier">
+          @for (step of pipeline; track step; let i = $index) {
+            <li
+              class="step"
+              [attr.data-status]="step"
+              [class.done]="stepIndex(dossier.status) > i"
+              [class.current]="stepIndex(dossier.status) === i"
+              [attr.aria-current]="stepIndex(dossier.status) === i ? 'step' : null"
+            >
+              <span class="dot" aria-hidden="true">
+                @if (stepIndex(dossier.status) > i) {
+                  <mat-icon>check</mat-icon>
+                } @else {
+                  {{ i + 1 }}
+                }
+              </span>
+              <span class="step-label">{{ statusLabels[step] }}</span>
+            </li>
+          }
+        </ol>
 
         <div class="toolbar">
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="assignee">
@@ -172,7 +194,8 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
   styles: `
     :host {
       display: grid;
-      gap: 16px;
+      gap: 18px;
+      min-width: 0;
     }
 
     .back {
@@ -180,27 +203,133 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
     }
 
     .card {
-      padding: 20px 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      min-width: 0;
+      padding: 22px 24px;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
+    }
+
+    .header {
+      position: relative;
+      overflow: hidden;
     }
 
     .title {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 12px;
     }
 
+    .title-icon {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      color: var(--ci-navy-900);
+      background: var(--ci-navy-50);
+    }
+
     h1 {
       margin: 0;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      overflow-wrap: anywhere;
     }
 
     .sub {
-      margin: 4px 0 16px;
-      color: var(--mat-sys-on-surface-variant);
+      margin: 8px 0 16px;
+      color: var(--ci-text-muted);
+      font-weight: 500;
+    }
+
+    .pipeline {
+      display: flex;
+      gap: 0;
+      margin: 0 0 18px;
+      padding: 4px 0 6px;
+      list-style: none;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .step {
+      position: relative;
+      display: flex;
+      flex: 1 0 88px;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      text-align: center;
+
+      &:not(:first-child)::before {
+        content: '';
+        position: absolute;
+        top: 13px;
+        right: 50%;
+        width: 100%;
+        height: 2px;
+        background: var(--ci-border);
+        z-index: 0;
+      }
+
+      &.done:not(:first-child)::before,
+      &.current:not(:first-child)::before {
+        background: var(--ci-navy-900);
+      }
+    }
+
+    .dot {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ci-text-muted);
+      background: var(--ci-surface);
+      border: 2px solid var(--ci-border);
+
+      mat-icon {
+        width: 16px;
+        height: 16px;
+        font-size: 16px;
+      }
+    }
+
+    .step.done .dot {
+      color: #fff;
+      border-color: var(--ci-navy-900);
+      background: var(--ci-navy-900);
+    }
+
+    .step.current .dot {
+      color: var(--st-color);
+      border-color: var(--st-color);
+      background: var(--st-bg);
+    }
+
+    .step-label {
+      font-size: 11.5px;
+      font-weight: 500;
+      line-height: 1.25;
+      color: var(--ci-text-muted);
+    }
+
+    .step.current .step-label {
+      font-weight: 600;
+      color: var(--st-color);
+    }
+
+    .pipeline.halted {
+      opacity: 0.6;
+      filter: grayscale(1);
     }
 
     .toolbar {
@@ -212,21 +341,37 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
 
     .assignee {
       width: 240px;
+      max-width: 100%;
     }
 
     .spacer {
       flex: 1;
     }
 
+    .secondary {
+      --mat-button-filled-container-color: var(--ci-navy-100);
+      --mat-button-filled-label-text-color: var(--ci-navy-900);
+    }
+
     .hint {
       margin: 12px 0 0;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
+    }
+
+    mat-tab-group {
+      min-width: 0;
+      padding: 4px 16px 16px;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     .tab {
       display: grid;
       gap: 16px;
+      min-width: 0;
       padding-top: 20px;
     }
 
@@ -239,17 +384,33 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
     .error {
       margin: 0;
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
     }
 
     .warning {
-      color: var(--mat-sys-on-tertiary-container);
-      background: var(--mat-sys-tertiary-container);
+      border-left: 3px solid var(--ci-warning);
+      color: #7a3e00;
+      background: var(--ci-warning-soft);
     }
 
     .error {
-      color: var(--mat-sys-on-error-container);
-      background: var(--mat-sys-error-container);
+      border-left: 3px solid var(--ci-danger);
+      color: #8a1621;
+      background: var(--ci-danger-soft);
+    }
+
+    @media (max-width: 600px) {
+      .card {
+        padding: 18px 16px;
+      }
+
+      mat-tab-group {
+        padding: 4px 8px 12px;
+      }
+
+      h1 {
+        font-size: 22px;
+      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -263,6 +424,26 @@ export class DossierDetailContainerComponent implements OnInit {
   protected readonly structure = DOSSIERS_STRUCTURE.detail;
   protected readonly listUrl = CabinetRouteContainerModel.DOSSIERS_ROUTE.url;
   protected readonly nameOf = displayName;
+  protected readonly statusLabels = DOSSIER_STATUS_LABELS;
+  /** Parcours nominal affiché dans l'en-tête (purement visuel). */
+  protected readonly pipeline: DossierStatus[] = [
+    'brouillon',
+    'complet',
+    'besoin_valide',
+    'tarification',
+    'comparaison',
+    'decision',
+    'proposition_envoyee',
+    'souscrit',
+  ];
+
+  protected stepIndex(status: DossierStatus): number {
+    return this.pipeline.indexOf(status);
+  }
+
+  protected isHalted(status: DossierStatus): boolean {
+    return status === 'refuse' || status === 'sans_suite';
+  }
 
   /** Le comparatif s'ouvre dès la tarification (les offres arrivent au fil de l'eau). */
   protected readonly comparisonEnabled = computed(() =>

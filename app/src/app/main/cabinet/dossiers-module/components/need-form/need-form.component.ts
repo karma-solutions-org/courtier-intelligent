@@ -144,9 +144,10 @@ const TEXT = {
   styles: `
     .card {
       padding: 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     h2 {
@@ -176,7 +177,7 @@ const TEXT = {
       gap: 8px;
       margin: 0 0 16px;
       padding: 10px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
       background: var(--mat-sys-surface-container);
 
       &.ok {
@@ -188,7 +189,7 @@ const TEXT = {
     .suggestions {
       margin-bottom: 20px;
       padding: 14px 16px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-tertiary-container);
       background: var(--mat-sys-tertiary-container);
 
@@ -201,7 +202,7 @@ const TEXT = {
     .hint {
       margin: 0;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .actions {

@@ -18,7 +18,7 @@ export interface AnswerChange {
   template: `
     @for (section of sections(); track section.title) {
       <section class="card">
-        <h2>{{ section.title }}</h2>
+        <h2><span class="section-index" aria-hidden="true">{{ $index + 1 }}</span>{{ section.title }}</h2>
         <div class="grid">
           @for (question of section.questions; track question.canonicalPath) {
             @if (isVisible(question)) {
@@ -44,9 +44,10 @@ export interface AnswerChange {
 
     .card {
       padding: 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     h2 {
@@ -68,6 +69,36 @@ export interface AnswerChange {
     @media (max-width: 700px) {
       .grid {
         grid-template-columns: 1fr;
+      }
+    }
+  
+    .card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+    }
+
+    .section-index {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ci-accent-ink);
+      background: var(--ci-accent-soft);
+    }
+
+    @media (max-width: 600px) {
+      .card {
+        padding: 18px 16px;
       }
     }
   `,

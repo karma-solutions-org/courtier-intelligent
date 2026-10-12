@@ -7,31 +7,25 @@ import { DOSSIER_STATUS_LABELS, DossierStatus } from '@shared';
   template: `<span class="chip" [attr.data-status]="status()">{{ label() }}</span>`,
   styles: `
     .chip {
-      display: inline-block;
-      padding: 3px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
       border-radius: 999px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
+      line-height: 1.5;
       white-space: nowrap;
-      color: var(--mat-sys-on-surface-variant);
-      background: var(--mat-sys-surface-container);
-    }
+      color: var(--st-color, var(--ci-text-muted));
+      background: var(--st-bg, var(--ci-surface-2));
 
-    [data-status='complet'],
-    [data-status='besoin_valide'] {
-      color: #1b5e8c;
-      background: #e1f0fa;
-    }
-
-    [data-status='souscrit'] {
-      color: #1e7d50;
-      background: #e3f5ec;
-    }
-
-    [data-status='refuse'],
-    [data-status='sans_suite'] {
-      color: var(--mat-sys-on-error-container);
-      background: var(--mat-sys-error-container);
+      &::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

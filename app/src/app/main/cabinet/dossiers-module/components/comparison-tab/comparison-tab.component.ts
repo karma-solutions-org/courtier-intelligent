@@ -60,13 +60,13 @@ import { COMPARISON_STRUCTURE } from './comparison-tab.structure';
 
     .hint {
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .decided,
     .error {
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
     }
 
     .decided {

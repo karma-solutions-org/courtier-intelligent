@@ -1,5 +1,6 @@
 import { DatePipe, PercentPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { Dossier, DOSSIER_STATUS_LABELS, DossierStatus } from '@shared';
 import { StatusChipComponent } from '../../../dossiers-module/components/status-chip/status-chip.component';
@@ -22,7 +23,7 @@ export interface ConversionRow extends ConversionRate {
 /** Tableau de bord : compteurs par statut, dossiers à traiter, relances et (admin) taux de conversion. */
 @Component({
   selector: 'app-dashboard-presentation',
-  imports: [DatePipe, PercentPipe, RouterLink, StatusChipComponent],
+  imports: [DatePipe, PercentPipe, RouterLink, MatIconModule, StatusChipComponent],
   template: `
     @if (!loaded()) {
       <p class="muted">{{ structure.loading }}</p>
@@ -33,6 +34,7 @@ export interface ConversionRow extends ConversionRate {
           @for (status of statuses; track status) {
             <a
               class="counter"
+              [attr.data-status]="status"
               [routerLink]="dossiersUrl()"
               [queryParams]="{ statut: status }"
               [attr.aria-label]="statusLabels[status] + ' : ' + counts()[status] + ' — ' + structure.counters.hint"
@@ -45,8 +47,8 @@ export interface ConversionRow extends ConversionRate {
       </section>
 
       <div class="columns">
-        <section class="card">
-          <h2>{{ structure.toProcess.title }}</h2>
+        <section class="card card--process">
+          <h2><mat-icon aria-hidden="true">assignment</mat-icon>{{ structure.toProcess.title }}</h2>
           @if (toProcess().length) {
             <ul class="rows">
               @for (row of toProcess(); track row.dossier.id) {
@@ -58,12 +60,12 @@ export interface ConversionRow extends ConversionRate {
               }
             </ul>
           } @else {
-            <p class="muted">{{ structure.toProcess.empty }}</p>
+            <div class="empty"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="muted">{{ structure.toProcess.empty }}</p></div>
           }
         </section>
 
-        <section class="card">
-          <h2>{{ structure.followUp.title }}</h2>
+        <section class="card card--follow">
+          <h2><mat-icon aria-hidden="true">schedule_send</mat-icon>{{ structure.followUp.title }}</h2>
           <p class="hint">{{ structure.followUp.hint }}</p>
           @if (toFollowUp().length) {
             <ul class="rows">
@@ -78,14 +80,14 @@ export interface ConversionRow extends ConversionRate {
               }
             </ul>
           } @else {
-            <p class="muted">{{ structure.followUp.empty }}</p>
+            <div class="empty"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="muted">{{ structure.followUp.empty }}</p></div>
           }
         </section>
       </div>
 
       @if (isAdmin()) {
-        <section class="card">
-          <h2>{{ structure.conversion.title }}</h2>
+        <section class="card card--conversion">
+          <h2><mat-icon aria-hidden="true">insights</mat-icon>{{ structure.conversion.title }}</h2>
           <p class="hint">{{ structure.conversion.hint }}</p>
           <div class="columns">
             @for (table of conversionTables(); track table.title) {
@@ -107,13 +109,20 @@ export interface ConversionRow extends ConversionRate {
                           <td>{{ row.name }}</td>
                           <td class="num">{{ row.closed }}</td>
                           <td class="num">{{ row.souscrit }}</td>
-                          <td class="num">{{ row.rate | percent: '1.0-0' }}</td>
+                          <td class="num">
+                            <span class="rate-cell">
+                              <span class="bar" aria-hidden="true"
+                                ><span [class]="rateClass(row.rate ?? 0)" [style.width.%]="(row.rate ?? 0) * 100"></span
+                              ></span>
+                              <span class="rate">{{ row.rate | percent: '1.0-0' }}</span>
+                            </span>
+                          </td>
                         </tr>
                       }
                     </tbody>
                   </table>
                 } @else {
-                  <p class="muted">{{ structure.conversion.empty }}</p>
+                  <div class="empty"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="muted">{{ structure.conversion.empty }}</p></div>
                 }
               </div>
             }
@@ -126,24 +135,36 @@ export interface ConversionRow extends ConversionRate {
     :host {
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 28px;
     }
 
     h2 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       margin: 0 0 12px;
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 600;
+
+      mat-icon {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+        font-size: 20px;
+        color: var(--ci-text-muted);
+      }
     }
 
     h3 {
-      margin: 0 0 8px;
-      font-size: 15px;
+      margin: 0 0 10px;
+      font-size: 13px;
       font-weight: 600;
+      color: var(--ci-text-muted);
     }
 
     .counters {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 12px;
     }
 
@@ -152,26 +173,50 @@ export interface ConversionRow extends ConversionRate {
       flex-direction: column;
       gap: 4px;
       padding: 14px 16px;
-      border-radius: 12px;
+      border-radius: 8px;
       text-decoration: none;
-      color: inherit;
-      background: var(--mat-sys-surface-container);
-      transition: background 0.15s;
+      color: var(--ci-text);
+      background: var(--ci-surface);
+      border: 1px solid var(--ci-border);
+      box-shadow: var(--ci-shadow-sm);
+      transition: border-color 0.15s;
     }
 
-    .counter:hover,
+    .counter:hover {
+      border-color: #cbd2dc;
+    }
+
     .counter:focus-visible {
-      background: var(--mat-sys-surface-container-high);
+      outline: 2px solid var(--ci-accent);
+      outline-offset: 2px;
     }
 
     .count {
-      font-size: 26px;
+      order: 2;
+      font-size: 24px;
       font-weight: 600;
+      line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+      color: var(--ci-text);
     }
 
     .label {
+      order: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      font-weight: 500;
+      color: var(--ci-text-muted);
+
+      &::before {
+        content: '';
+        flex-shrink: 0;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--st-dot);
+      }
     }
 
     .columns {
@@ -181,9 +226,12 @@ export interface ConversionRow extends ConversionRate {
     }
 
     .card {
-      padding: 16px 20px;
-      border-radius: 12px;
-      border: 1px solid var(--mat-sys-outline-variant);
+      min-width: 0;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--ci-border);
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     .rows {
@@ -194,32 +242,76 @@ export interface ConversionRow extends ConversionRate {
 
     .rows li {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 12px;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
+      gap: 6px 12px;
+      margin: 0 -8px;
+      padding: 10px 8px;
+      border-radius: 6px;
+      border-bottom: 1px solid var(--ci-border);
+      transition: background 0.15s;
+    }
+
+    .rows li:hover {
+      background: var(--ci-surface-2);
     }
 
     .rows li:last-child {
       border-bottom: none;
     }
 
+    .rows a {
+      font-weight: 500;
+      color: var(--ci-navy-900);
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
     .name {
       flex: 1;
+      min-width: 120px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    .date {
+      padding: 2px 8px;
+      border-radius: 999px;
+      color: var(--st-proposition_envoyee);
+      background: var(--st-proposition_envoyee-bg);
     }
 
     .date,
     .hint,
     .muted {
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+    }
+
+    .hint,
+    .muted {
+      color: var(--ci-text-muted);
     }
 
     .hint {
-      margin: -6px 0 12px;
+      margin: -6px 0 14px;
+    }
+
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 0;
+      text-align: center;
+    }
+
+    .empty-art {
+      width: 120px;
+      height: 80px;
     }
 
     table {
@@ -229,13 +321,63 @@ export interface ConversionRow extends ConversionRate {
 
     th,
     td {
-      padding: 6px 8px;
+      padding: 8px;
       text-align: left;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
+      border-bottom: 1px solid var(--ci-border);
+    }
+
+    th {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--ci-text-muted);
     }
 
     .num {
       text-align: right;
+    }
+
+    .rate-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bar {
+      width: 72px;
+      height: 6px;
+      overflow: hidden;
+      border-radius: 3px;
+      background: #eceef2;
+    }
+
+    .fill {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--ci-navy-900);
+    }
+
+    .rate {
+      min-width: 38px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 480px) {
+      .counters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      th,
+      td {
+        padding: 6px 4px;
+      }
+
+      .bar {
+        width: 40px;
+      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -253,6 +395,11 @@ export class DashboardPresentationComponent {
   protected readonly structure = DASHBOARD_STRUCTURE;
   protected readonly statuses = STATUS_ORDER;
   protected readonly statusLabels = DOSSIER_STATUS_LABELS;
+
+  /** Couleur de la barre selon le taux de conversion. */
+  protected rateClass(rate: number): string {
+    return rate >= 0.5 ? 'fill fill--high' : rate >= 0.25 ? 'fill fill--mid' : 'fill fill--low';
+  }
 
   protected conversionTables(): { title: string; rows: ConversionRow[] }[] {
     return [

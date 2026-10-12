@@ -41,7 +41,7 @@ export interface Option {
   ],
   template: `
     <header>
-      <h1>{{ structure.title }}</h1>
+      <h1><span class="h1-icon" aria-hidden="true"><mat-icon>folder_copy</mat-icon></span>{{ structure.title }}</h1>
       <a mat-flat-button [routerLink]="createUrl()">
         <mat-icon>add</mat-icon>
         {{ structure.create }}
@@ -124,7 +124,7 @@ export interface Option {
           </table>
         </div>
       } @else {
-        <p class="empty">{{ hasFilter() ? structure.noResult : structure.empty }}</p>
+        <div class="empty-wrap"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="empty">{{ hasFilter() ? structure.noResult : structure.empty }}</p></div>
       }
 
       <mat-paginator
@@ -152,15 +152,17 @@ export interface Option {
 
     h1 {
       margin: 0;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     .card {
       padding: 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     .filters {
@@ -188,7 +190,7 @@ export interface Option {
     td {
       padding: 12px 8px;
       text-align: left;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
+      border-bottom: 1px solid var(--ci-border);
     }
 
     th {
@@ -196,7 +198,7 @@ export interface Option {
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .resume {
@@ -207,7 +209,110 @@ export interface Option {
     .empty {
       padding: 32px 0;
       text-align: center;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
+    }
+  
+    h1 {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 600;
+    }
+
+    .h1-icon {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      color: var(--ci-navy-900);
+      background: var(--ci-navy-50);
+    }
+
+    header {
+      flex-wrap: wrap;
+    }
+
+    .card {
+      box-shadow: var(--ci-shadow-sm);
+    }
+
+    .filters {
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--ci-border);
+      background: var(--ci-surface-2);
+    }
+
+    th {
+      color: var(--ci-navy-800);
+      background: var(--ci-navy-50);
+
+      &:first-child {
+        border-radius: 10px 0 0 10px;
+      }
+
+      &:last-child {
+        border-radius: 0 10px 10px 0;
+      }
+    }
+
+    th,
+    td {
+      border-bottom-color: var(--ci-border);
+    }
+
+    tbody tr {
+      transition: background 0.15s;
+
+      &:hover {
+        background: var(--ci-navy-50);
+      }
+    }
+
+    td a:first-child {
+      font-weight: 600;
+      color: var(--ci-navy-700);
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    .resume {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      color: var(--ci-warning);
+      background: var(--ci-warning-soft);
+      text-decoration: none;
+    }
+
+    .empty-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 16px;
+    }
+
+    .empty-art {
+      width: 140px;
+      height: 92px;
+    }
+
+    .empty-wrap .empty {
+      padding-top: 8px;
+    }
+
+    @media (max-width: 600px) {
+      .card {
+        padding: 16px 12px;
+      }
+
+      .filters mat-form-field {
+        width: 100%;
+      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

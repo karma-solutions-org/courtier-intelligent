@@ -41,10 +41,12 @@ function render(state: PanelState): void {
     const { title, status, progress } = describeJob(state.job);
     $('job-title').textContent = title;
     $('job-status').textContent = status;
+    $('job-status').dataset['status'] = state.job.status;
     setText($('job-progress'), progress);
     setText($('job-error'), state.job.error);
   } else {
     $('job-title').textContent = 'Aucune tarification en cours';
+    delete $('job-status').dataset['status'];
     $('job-status').textContent = 'Lancez une tarification depuis un dossier dans l’application.';
     setText($('job-progress'), null);
     setText($('job-error'), null);
@@ -90,6 +92,12 @@ function renderRun(state: PanelState): void {
   const view = describeRun(state.run);
   setText($('run-step'), view.step ?? 'Extranet détecté');
   $('run-phase').textContent = view.phase;
+  // Habillage seulement : couleur selon la phase, barre de progression des étapes.
+  section.dataset['phase'] = state.run.phase;
+  const { current, total } = state.run.step;
+  const bar = $('run-progress');
+  bar.hidden = current === null || !total;
+  if (current !== null && total) bar.style.setProperty('--pct', `${Math.min(100, Math.round((current / total) * 100))}%`);
   $('run-summary').textContent = view.summary;
   setText($('run-message'), view.message);
   setText($('run-ai'), view.aiNote);

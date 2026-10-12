@@ -35,8 +35,8 @@ const ICONS: Record<string, string> = {
       @if (items().length) {
         <ol>
           @for (item of items(); track item.id) {
-            <li>
-              <mat-icon class="icon">{{ item.icon }}</mat-icon>
+            <li [attr.data-kind]="item.icon">
+              <span class="icon" aria-hidden="true"><mat-icon>{{ item.icon }}</mat-icon></span>
               <div>
                 <strong>{{ item.title }}</strong>
                 @if (item.detail) {
@@ -48,51 +48,106 @@ const ICONS: Record<string, string> = {
           }
         </ol>
       } @else {
-        <p class="empty">{{ structure.empty }}</p>
+        <div class="empty-wrap"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="empty">{{ structure.empty }}</p></div>
       }
     </section>
   `,
   styles: `
     .card {
       padding: 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     h2 {
       margin: 0 0 16px;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 600;
     }
 
     ol {
+      position: relative;
       margin: 0;
       padding: 0;
       list-style: none;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 17px;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        border-radius: 2px;
+        background: var(--ci-border);
+      }
     }
 
     li {
+      position: relative;
       display: flex;
       gap: 14px;
       padding: 10px 0;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
     }
 
+
     .icon {
+      position: relative;
+      z-index: 1;
+      display: grid;
       flex: none;
-      color: var(--mat-sys-primary);
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      color: var(--ci-text-muted);
+      background: var(--ci-surface);
+      border: 1px solid var(--ci-border);
+      box-sizing: border-box;
+
+      mat-icon {
+        width: 18px;
+        height: 18px;
+        font-size: 18px;
+      }
+    }
+
+    li > div {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: var(--ci-surface-2);
+      overflow-wrap: anywhere;
     }
 
     .detail,
     .meta {
       display: block;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
+    }
+
+    .meta {
+      margin-top: 2px;
+      font-size: 12px;
+    }
+
+    .empty-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .empty-art {
+      width: 120px;
+      height: 80px;
     }
 
     .empty {
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

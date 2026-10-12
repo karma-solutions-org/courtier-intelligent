@@ -188,7 +188,7 @@ const amount = (value: number | null | undefined): number | null =>
     .label,
     .hint {
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .file {
@@ -198,7 +198,7 @@ const amount = (value: number | null | undefined): number | null =>
     .error {
       margin: 16px 0 0;
       padding: 12px 14px 12px 30px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-error-container);
       background: var(--mat-sys-error-container);
     }

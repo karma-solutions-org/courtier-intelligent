@@ -1,8 +1,4 @@
-// Include theming for Angular Material with `mat.theme()`.
-// This Sass mixin will define CSS variables that are used for styling Angular Material
-// components according to the Material 3 design spec.
-// Learn more about theming and how to use it for your application's
-// custom components at https://material.angular.dev/guide/theming
+// Thème Angular Material (M3) + design system Courtier Intelligent.
 @use '@angular/material' as mat;
 
 html {
@@ -10,30 +6,336 @@ html {
   @include mat.theme(
     (
       color: (
-        primary: mat.$azure-palette,
-        tertiary: mat.$blue-palette,
+        primary: mat.$blue-palette,
+        tertiary: mat.$cyan-palette,
       ),
-      typography: Roboto,
+      typography: (
+        plain-family: 'Inter, Roboto, sans-serif',
+        brand-family: 'Inter, Roboto, sans-serif',
+      ),
       density: 0,
+    )
+  );
+
+  // Surcharge des rôles Material pour coller à la marque (navy).
+  @include mat.theme-overrides(
+    (
+      primary: #0b1f4d,
+      on-primary: #ffffff,
+      primary-container: #e3e9fb,
+      on-primary-container: #0b1f4d,
+      secondary-container: #d9f6f6,
+      on-secondary-container: #04484d,
+      tertiary: #0b7480,
+      tertiary-container: #d9f6f6,
+      on-tertiary-container: #04484d,
+      surface-tint: #0b1f4d,
     )
   );
 }
 
+:root {
+  /* ---- Marque ---- */
+  --ci-navy-900: #0b1f4d;
+  --ci-navy-800: #142c66;
+  --ci-navy-700: #1f3d85;
+  --ci-navy-100: #e3e9fb;
+  --ci-navy-50: #f1f4fd;
+
+  --ci-accent: #0b7480; /* teal, seul accent (focus, onglet actif, liens) — 5.3:1 sur blanc */
+  --ci-accent-soft: #d9f6f6;
+  --ci-accent-ink: #04484d;
+
+  /* ---- Sémantique ---- */
+  --ci-success: #116b3d;
+  --ci-success-soft: #dcf5e7;
+  --ci-warning: #8f5100;
+  --ci-warning-soft: #fff1d6;
+  --ci-danger: #b3262f;
+  --ci-danger-soft: #fde4e6;
+  --ci-info: #1a5cad;
+  --ci-info-soft: #e1edfc;
+
+  /* ---- Statuts de dossier (texte AA + fond doux ; le point sert aux indicateurs) ---- */
+  --st-brouillon: #5b6475;
+  --st-brouillon-bg: #eef0f4;
+  --st-brouillon-dot: #94a0b4;
+  --st-complet: #1d5fc2;
+  --st-complet-bg: #e2ecfd;
+  --st-complet-dot: #3b82f6;
+  --st-besoin_valide: #0b6f7a;
+  --st-besoin_valide-bg: #d9f4f4;
+  --st-besoin_valide-dot: #14b8c4;
+  --st-tarification: #4c3a9e;
+  --st-tarification-bg: #efecfa;
+  --st-tarification-dot: #8b6cf6;
+  --st-comparaison: #7d2f6f;
+  --st-comparaison-bg: #f8edf5;
+  --st-comparaison-dot: #d946b8;
+  --st-decision: #9a5300;
+  --st-decision-bg: #ffefd6;
+  --st-decision-dot: #f59e0b;
+  --st-proposition_envoyee: #b23c12;
+  --st-proposition_envoyee-bg: #ffe6da;
+  --st-proposition_envoyee-dot: #f97316;
+  --st-souscrit: #127443;
+  --st-souscrit-bg: #d9f5e5;
+  --st-souscrit-dot: #22c55e;
+  --st-refuse: #b4232f;
+  --st-refuse-bg: #fde2e4;
+  --st-refuse-dot: #ef4444;
+  --st-sans_suite: #4b5563;
+  --st-sans_suite-bg: #e9eaee;
+  --st-sans_suite-dot: #6b7280;
+
+  /* ---- Surfaces ---- */
+  --ci-bg: #f7f8fa;
+  --ci-surface: #ffffff;
+  --ci-surface-2: #f9fafb;
+  --ci-border: #e5e7eb;
+  --ci-text: #141b2d;
+  --ci-text-muted: #5a6478; /* 5.9:1 sur blanc */
+
+  /* ---- Formes / élévation ---- */
+  --ci-radius-sm: 8px;
+  --ci-radius: 8px;
+  --ci-radius-lg: 12px;
+  --ci-radius-pill: 999px;
+  --ci-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+
+  /* ---- Typographie ---- */
+  --ci-font: 'Inter', Roboto, system-ui, sans-serif;
+  --ci-fs-xs: 12px;
+}
+
+/* Mode sombre (opt-in) : contrastes texte AA conservés. */
+:root[data-theme='dark'] {
+  --ci-bg: #0b1120;
+  --ci-surface: #131b2e;
+  --ci-surface-2: #182238;
+  --ci-border: #26314a;
+  --ci-text: #e8ecf5;
+  --ci-text-muted: #a9b3c7;
+}
+
 body {
-  // Default the application to a light color theme. This can be changed to
-  // `dark` to enable the dark color theme, or to `light dark` to defer to the
-  // user's system settings.
   color-scheme: light;
-
-  // Set a default background, font and text colors for the application using
-  // Angular Material's system-level CSS variables. Learn more about these
-  // variables at https://material.angular.dev/guide/system-variables
-  background-color: var(--mat-sys-surface);
-  color: var(--mat-sys-on-surface);
+  background-color: var(--ci-bg);
+  color: var(--ci-text);
   font: var(--mat-sys-body-medium);
-
-  // Reset the user agent margin.
+  font-family: var(--ci-font);
   margin: 0;
   height: 100%;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
-/* You can add global styles to this file, and also import other style files */
+
+h1,
+h2,
+h3 {
+  font-family: var(--ci-font);
+  color: var(--ci-text);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: var(--ci-navy-700);
+}
+
+/* ---- Material : finitions globales ---- */
+.mat-mdc-card {
+  --mat-card-elevated-container-shape: var(--ci-radius);
+  --mat-card-outlined-container-shape: var(--ci-radius);
+  --mat-card-outlined-outline-color: var(--ci-border);
+  border-radius: var(--ci-radius) !important;
+}
+
+.mat-mdc-card.mat-mdc-card-outlined,
+.mat-mdc-card:not([class*='mat-elevation']) {
+  box-shadow: var(--ci-shadow-sm);
+}
+
+.mat-mdc-unelevated-button.mat-primary,
+.mat-mdc-flat-button,
+.mdc-button--unelevated {
+  border-radius: var(--ci-radius-sm) !important;
+}
+
+.mat-mdc-outlined-button,
+.mat-mdc-button {
+  border-radius: var(--ci-radius-sm) !important;
+}
+
+.mat-mdc-tab-group,
+.mat-mdc-tab-nav-bar {
+  --mat-tab-active-indicator-color: var(--ci-accent);
+  --mat-tab-active-label-text-color: var(--ci-navy-900);
+  --mat-tab-active-focus-label-text-color: var(--ci-navy-900);
+  --mat-tab-active-hover-label-text-color: var(--ci-navy-900);
+  --mat-tab-active-focus-indicator-color: var(--ci-accent);
+  --mat-tab-active-hover-indicator-color: var(--ci-accent);
+  --mat-tab-active-indicator-height: 2px;
+  --mat-tab-label-text-weight: 500;
+}
+
+.mat-mdc-tab .mdc-tab-indicator__content--underline {
+  border-radius: 3px 3px 0 0;
+}
+
+.mat-mdc-table {
+  background: var(--ci-surface) !important;
+  border-radius: var(--ci-radius);
+  overflow: hidden;
+}
+
+.mat-mdc-header-row {
+  background: var(--ci-surface-2) !important;
+}
+
+.mat-mdc-header-cell {
+  font-weight: 600 !important;
+  color: var(--ci-text-muted) !important;
+  font-size: var(--ci-fs-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mat-mdc-row:hover {
+  background: var(--ci-surface-2);
+}
+
+.mat-mdc-dialog-surface {
+  border-radius: var(--ci-radius-lg) !important;
+}
+
+.mat-mdc-dialog-title {
+  font-family: var(--ci-font) !important;
+  font-weight: 600 !important;
+}
+
+.mat-step-header .mat-step-icon-selected,
+.mat-step-header .mat-step-icon-state-edit,
+.mat-step-header .mat-step-icon-state-done {
+  background: var(--ci-navy-900) !important;
+  color: #fff !important;
+}
+
+.mat-mdc-progress-bar {
+  border-radius: 4px;
+  --mat-progress-bar-active-indicator-color: var(--ci-accent);
+}
+
+.mat-mdc-chip {
+  --mat-chip-container-shape-radius: var(--ci-radius-pill);
+}
+
+.mat-mdc-snack-bar-container {
+  --mat-snack-bar-container-shape: var(--ci-radius);
+}
+
+/* ---- Utilitaires du design system ---- */
+.ci-card {
+  background: var(--ci-surface);
+  border: 1px solid var(--ci-border);
+  border-radius: var(--ci-radius);
+  box-shadow: var(--ci-shadow-sm);
+}
+
+.ci-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--ci-radius-pill);
+  font-size: var(--ci-fs-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ci-badge--success {
+  color: var(--ci-success);
+  background: var(--ci-success-soft);
+}
+
+.ci-badge--warning {
+  color: var(--ci-warning);
+  background: var(--ci-warning-soft);
+}
+
+.ci-badge--danger {
+  color: var(--ci-danger);
+  background: var(--ci-danger-soft);
+}
+
+.ci-badge--info {
+  color: var(--ci-info);
+  background: var(--ci-info-soft);
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+/* ---- Couleurs par statut : tout élément [data-status] expose --st-color / --st-bg / --st-dot ---- */
+[data-status='brouillon'] {
+  --st-color: var(--st-brouillon);
+  --st-bg: var(--st-brouillon-bg);
+  --st-dot: var(--st-brouillon-dot);
+}
+
+[data-status='complet'] {
+  --st-color: var(--st-complet);
+  --st-bg: var(--st-complet-bg);
+  --st-dot: var(--st-complet-dot);
+}
+
+[data-status='besoin_valide'] {
+  --st-color: var(--st-besoin_valide);
+  --st-bg: var(--st-besoin_valide-bg);
+  --st-dot: var(--st-besoin_valide-dot);
+}
+
+[data-status='tarification'] {
+  --st-color: var(--st-tarification);
+  --st-bg: var(--st-tarification-bg);
+  --st-dot: var(--st-tarification-dot);
+}
+
+[data-status='comparaison'] {
+  --st-color: var(--st-comparaison);
+  --st-bg: var(--st-comparaison-bg);
+  --st-dot: var(--st-comparaison-dot);
+}
+
+[data-status='decision'] {
+  --st-color: var(--st-decision);
+  --st-bg: var(--st-decision-bg);
+  --st-dot: var(--st-decision-dot);
+}
+
+[data-status='proposition_envoyee'] {
+  --st-color: var(--st-proposition_envoyee);
+  --st-bg: var(--st-proposition_envoyee-bg);
+  --st-dot: var(--st-proposition_envoyee-dot);
+}
+
+[data-status='souscrit'] {
+  --st-color: var(--st-souscrit);
+  --st-bg: var(--st-souscrit-bg);
+  --st-dot: var(--st-souscrit-dot);
+}
+
+[data-status='refuse'] {
+  --st-color: var(--st-refuse);
+  --st-bg: var(--st-refuse-bg);
+  --st-dot: var(--st-refuse-dot);
+}
+
+[data-status='sans_suite'] {
+  --st-color: var(--st-sans_suite);
+  --st-bg: var(--st-sans_suite-bg);
+  --st-dot: var(--st-sans_suite-dot);
+}
+

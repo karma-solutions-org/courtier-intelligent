@@ -43,8 +43,17 @@ export interface SubscriptionDialogResult {
       min-width: min(400px, 80vw);
     }
 
+    .content {
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: var(--ci-surface);
+    }
+
     .problem {
-      color: var(--mat-sys-error);
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: var(--ci-danger);
+      background: var(--ci-danger-soft);
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

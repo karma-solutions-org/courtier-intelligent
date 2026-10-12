@@ -54,18 +54,20 @@ import { TopbarComponent } from '../topbar/topbar.component';
 
     .sidenav {
       width: 248px;
-      border-right: 1px solid var(--mat-sys-outline-variant);
+      border-right: none;
       border-radius: 0;
+      background: #0b1f4d;
     }
 
     .content {
       display: flex;
       flex-direction: column;
-      background: #f6f8fb;
+      background: var(--ci-bg);
     }
 
     .page {
       flex: 1;
+      min-width: 0;
       padding: 32px;
     }
 

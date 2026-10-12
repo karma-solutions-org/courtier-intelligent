@@ -74,8 +74,9 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
 
     h1 {
       margin: 0;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     .back {
@@ -84,9 +85,10 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
 
     .card {
       padding: 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     h2 {
@@ -104,7 +106,7 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
     td {
       padding: 10px 8px;
       text-align: left;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
+      border-bottom: 1px solid var(--ci-border);
     }
 
     th {
@@ -112,11 +114,11 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .empty {
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

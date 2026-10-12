@@ -15,7 +15,7 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
   imports: [RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatPaginatorModule],
   template: `
     <header>
-      <h1>{{ structure.title }}</h1>
+      <h1><span class="h1-icon" aria-hidden="true"><mat-icon>groups</mat-icon></span>{{ structure.title }}</h1>
       <a mat-flat-button [routerLink]="createUrl()">
         <mat-icon>add</mat-icon>
         {{ structure.create }}
@@ -47,13 +47,16 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
             <tbody>
               @for (assure of assures(); track assure.id) {
                 <tr>
-                  <td>
+                  <td class="who">
+                    <span class="avatar" [attr.data-hue]="hueOf(nameOf(assure))" aria-hidden="true">{{ initialsOf(nameOf(assure)) }}</span>
+                    <span class="who-text">
                     <a [routerLink]="[detailBaseUrl(), assure.id]">{{ nameOf(assure) }}</a>
                     @if (assure.type === 'pro') {
                       <span class="sub">{{ assure.firstName }} {{ assure.lastName }}</span>
                     }
+                    </span>
                   </td>
-                  <td>{{ typeLabels[assure.type] }}</td>
+                  <td><span class="type" [class.pro]="assure.type === 'pro'">{{ typeLabels[assure.type] }}</span></td>
                   <td>{{ assure.email || '—' }}</td>
                   <td>{{ assure.phone || '—' }}</td>
                   <td>{{ assure.address?.city || '—' }}</td>
@@ -92,15 +95,17 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
 
     h1 {
       margin: 0;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     .card {
       padding: 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     .search {
@@ -122,7 +127,7 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
     td {
       padding: 12px 8px;
       text-align: left;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
+      border-bottom: 1px solid var(--ci-border);
     }
 
     th {
@@ -130,19 +135,101 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .sub {
       display: block;
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .empty {
       padding: 32px 0;
       text-align: center;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
+    }
+  
+    .avatar {
+      display: inline-grid;
+      flex: none;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ci-navy-900);
+      background: var(--ci-navy-100);
+    }
+
+    h1 {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .h1-icon {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      color: var(--ci-navy-900);
+      background: var(--ci-navy-50);
+    }
+
+    header {
+      flex-wrap: wrap;
+    }
+
+    .who {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .who-text {
+      min-width: 0;
+    }
+
+    .who a {
+      font-weight: 600;
+      color: var(--ci-navy-700);
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    th {
+      color: var(--ci-navy-800);
+      background: var(--ci-navy-50);
+    }
+
+    tbody tr:hover {
+      background: var(--ci-navy-50);
+    }
+
+    .type {
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ci-info);
+      background: var(--ci-info-soft);
+
+      &.pro {
+        color: var(--st-tarification);
+        background: var(--st-tarification-bg);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .card {
+        padding: 16px 12px;
+      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -166,5 +253,21 @@ export class AssuresListComponent {
 
   protected nameOf(assure: Assure): string {
     return displayName(assure);
+  }
+
+  protected initialsOf(name: string): string {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(part => part[0]!.toUpperCase())
+      .join('');
+  }
+
+  /** Teinte stable (0-5) dérivée du nom, pour colorer l'avatar. */
+  protected hueOf(name: string): number {
+    let h = 0;
+    for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return h % 6;
   }
 }

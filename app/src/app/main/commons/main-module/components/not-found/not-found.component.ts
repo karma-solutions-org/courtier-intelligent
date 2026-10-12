@@ -29,7 +29,7 @@ import { LogoComponent } from '../../../../../core/components/logo/logo.componen
     .code {
       margin: 40px 0 0;
       font-size: 72px;
-      font-weight: 700;
+      font-weight: 600;
       line-height: 1;
       color: #00082b;
     }
@@ -41,7 +41,7 @@ import { LogoComponent } from '../../../../../core/components/logo/logo.componen
 
     .text {
       margin: 0 0 28px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

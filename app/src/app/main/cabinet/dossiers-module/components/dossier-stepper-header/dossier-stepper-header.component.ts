@@ -25,7 +25,7 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
   styles: `
     ol {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       margin: 0 0 24px;
       padding: 0;
       list-style: none;
@@ -34,24 +34,29 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
     li {
       display: flex;
       flex: 1;
+      min-width: 0;
       align-items: center;
-      gap: 8px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      color: var(--mat-sys-on-surface-variant);
-      background: var(--mat-sys-surface-container-low);
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--ci-border);
+      color: var(--ci-text-muted);
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
+      font-weight: 500;
     }
 
     .bullet {
       display: grid;
       flex: none;
       place-items: center;
-      width: 26px;
-      height: 26px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       font-size: 13px;
       font-weight: 600;
-      background: var(--mat-sys-surface-container-high);
+      color: var(--ci-text-muted);
+      background: var(--ci-surface-2);
 
       mat-icon {
         width: 18px;
@@ -61,18 +66,23 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
     }
 
     .current {
-      color: var(--mat-sys-on-primary-container);
-      background: var(--mat-sys-primary-container);
+      color: var(--ci-navy-900);
+      border-color: var(--ci-navy-900);
+      font-weight: 600;
 
       .bullet {
-        color: var(--mat-sys-on-primary);
-        background: var(--mat-sys-primary);
+        color: #fff;
+        background: var(--ci-navy-900);
       }
     }
 
-    .done .bullet {
-      color: #fff;
-      background: #1e7d50;
+    .done {
+      color: var(--ci-text);
+
+      .bullet {
+        color: var(--ci-success);
+        background: var(--ci-success-soft);
+      }
     }
 
     @media (max-width: 700px) {
@@ -82,6 +92,10 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 
       .current .label {
         display: inline;
+      }
+
+      li:not(.current) {
+        flex: none;
       }
     }
   `,

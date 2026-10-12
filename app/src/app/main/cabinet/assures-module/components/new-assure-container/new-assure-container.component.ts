@@ -26,8 +26,9 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
   styles: `
     h1 {
       margin: 0 0 20px;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

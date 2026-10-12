@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { GENERAL_DEDUCTIBLE, Guarantee, GuaranteeCoverage, guaranteeCoverage, Offer } from '@shared';
 import { COMPARISON_STRUCTURE } from '../comparison-tab/comparison-tab.structure';
 
@@ -11,9 +12,9 @@ export interface ComparisonColumn {
 }
 
 const COVERAGE_ICONS: Record<GuaranteeCoverage, string> = {
-  included: '✅',
-  limited: '⚠️',
-  absent: '❌',
+  included: 'check_circle',
+  limited: 'error',
+  absent: 'cancel',
 };
 
 const euros = new Intl.NumberFormat('fr-FR', {
@@ -28,7 +29,7 @@ export const money = (value: number | null | undefined): string => (value == nul
 /** Tableau comparatif des offres, côte à côte (défilement horizontal sur petit écran, première colonne fixe). */
 @Component({
   selector: 'app-comparison-table',
-  imports: [MatButtonModule],
+  imports: [MatButtonModule, MatIconModule],
   template: `
     <div class="scroll">
       <table>
@@ -36,8 +37,16 @@ export const money = (value: number | null | undefined): string => (value == nul
           <tr>
             <th scope="col" class="label">{{ text.insurer }}</th>
             @for (column of columns(); track column.insurerId) {
-              <th scope="col" [class.chosen]="column.insurerId === decidedInsurerId()">
-                {{ column.insurerName }}
+              <th
+                scope="col"
+                class="insurer"
+                [class.chosen]="column.insurerId === decidedInsurerId()"
+                [class.best]="column.insurerId === bestInsurerId()"
+              >
+                @if (column.insurerId === bestInsurerId()) {
+                  <span class="best-flag">Meilleur score</span>
+                }
+                <span class="insurer-name">{{ column.insurerName }}</span>
                 @if (column.insurerId === decidedInsurerId()) {
                   <span class="badge">{{ text.chosen }}</span>
                 }
@@ -51,8 +60,10 @@ export const money = (value: number | null | undefined): string => (value == nul
             @for (column of columns(); track column.insurerId) {
               <td>
                 @if (column.offer.score !== null && column.offer.score !== undefined) {
-                  <strong class="score" [class.low]="column.offer.score < 50">{{ column.offer.score }}</strong>
-                  / 100
+                  <span [class]="scoreClass(column.offer.score)">
+                    <strong class="score">{{ column.offer.score }}</strong>
+                  </span>
+                  <span class="out-of">/ 100</span>
                 } @else {
                   —
                 }
@@ -92,8 +103,8 @@ export const money = (value: number | null | undefined): string => (value == nul
               </th>
               @for (column of columns(); track column.insurerId) {
                 @let coverage = coverageOf(column.offer, guarantee.code);
-                <td [title]="text.coverage[coverage]">
-                  <span role="img" [attr.aria-label]="text.coverage[coverage]">{{ icons[coverage] }}</span>
+                <td [title]="text.coverage[coverage]" [class.best-col]="column.insurerId === bestInsurerId()">
+                  <span [class]="'pill pill--' + coverage"><mat-icon aria-hidden="true">{{ icons[coverage] }}</mat-icon>{{ text.coverage[coverage] }}</span>
                   @if (detailOf(column.offer, guarantee.code); as detail) {
                     <span class="detail">{{ detail }}</span>
                   }
@@ -106,7 +117,7 @@ export const money = (value: number | null | undefined): string => (value == nul
             @for (column of columns(); track column.insurerId) {
               <td class="gaps">
                 @for (gap of column.offer.gaps ?? []; track $index) {
-                  <p [class]="gap.severity">{{ gap.severity === 'ko' ? '❌' : '⚠️' }} {{ gap.message }}</p>
+                  <p [class]="gap.severity"><mat-icon aria-hidden="true">{{ gap.severity === 'ko' ? 'cancel' : 'error' }}</mat-icon>{{ gap.message }}</p>
                 } @empty {
                   <p>{{ text.noGap }}</p>
                 }
@@ -132,22 +143,24 @@ export const money = (value: number | null | undefined): string => (value == nul
   styles: `
     .scroll {
       overflow-x: auto;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     table {
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       min-width: 100%;
     }
 
     th,
     td {
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--ci-border);
       text-align: left;
-      vertical-align: top;
+      vertical-align: middle;
       min-width: 180px;
     }
 
@@ -156,16 +169,35 @@ export const money = (value: number | null | undefined): string => (value == nul
       left: 0;
       z-index: 1;
       min-width: 160px;
-      background: #fff;
+      background: var(--ci-surface);
       font-weight: 500;
+      color: var(--ci-text);
+      border-right: 1px solid var(--ci-border);
     }
 
     thead th {
+      padding-top: 14px;
       font-weight: 600;
+      font-size: 14px;
+      background: var(--ci-surface-2);
+      vertical-align: bottom;
     }
 
-    .chosen {
-      background: var(--mat-sys-primary-container);
+    .insurer-name {
+      display: block;
+    }
+
+    thead th.best,
+    td.best-col {
+      background: #f2f9f9;
+    }
+
+    .best-flag {
+      display: inline-block;
+      margin-bottom: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--ci-accent-ink);
     }
 
     .badge,
@@ -174,38 +206,132 @@ export const money = (value: number | null | undefined): string => (value == nul
       margin-left: 6px;
       padding: 1px 8px;
       border-radius: 999px;
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 500;
-      background: var(--mat-sys-secondary-container);
+    }
+
+    .badge {
+      color: var(--ci-success);
+      background: var(--ci-success-soft);
+    }
+
+    .tag {
+      color: var(--ci-warning);
+      background: var(--ci-warning-soft);
     }
 
     .tag.soft {
-      background: var(--mat-sys-surface-container);
+      color: var(--ci-text-muted);
+      background: var(--ci-surface-2);
     }
 
     .section th {
+      font-size: 12px;
       font-weight: 600;
-      background: var(--mat-sys-surface-container-low);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ci-text-muted);
+      background: var(--ci-surface-2);
     }
 
     .detail {
-      margin-left: 4px;
+      display: block;
+      margin-top: 4px;
       font-size: 12px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
+    }
+
+    .gauge {
+      display: inline-block;
+      min-width: 28px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      text-align: center;
+      color: var(--ci-success);
+      background: var(--ci-success-soft);
+    }
+
+    .gauge--mid {
+      color: var(--ci-warning);
+      background: var(--ci-warning-soft);
+    }
+
+    .gauge--low {
+      color: var(--ci-danger);
+      background: var(--ci-danger-soft);
     }
 
     .score {
-      font-size: 18px;
+      font-size: 14px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
     }
 
-    .score.low,
-    .gaps .ko {
-      color: var(--mat-sys-error);
+    .out-of {
+      margin-left: 4px;
+      font-size: 12px;
+      color: var(--ci-text-muted);
+    }
+
+    .pill,
+    .gaps p {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12.5px;
+      font-weight: 500;
+
+      mat-icon {
+        flex-shrink: 0;
+        width: 16px;
+        height: 16px;
+        font-size: 16px;
+      }
+    }
+
+    .pill {
+      padding: 2px 8px 2px 6px;
+      border-radius: 999px;
+    }
+
+    .pill--included {
+      color: var(--ci-success);
+      background: var(--ci-success-soft);
+    }
+
+    .pill--limited {
+      color: var(--ci-warning);
+      background: var(--ci-warning-soft);
+    }
+
+    .pill--absent {
+      color: var(--ci-danger);
+      background: var(--ci-danger-soft);
     }
 
     .gaps p {
-      margin: 0 0 4px;
-      font-size: 13px;
+      display: flex;
+      align-items: flex-start;
+      margin: 0 0 6px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      color: var(--ci-success);
+      background: var(--ci-success-soft);
+    }
+
+    .gaps p.warn {
+      color: var(--ci-warning);
+      background: var(--ci-warning-soft);
+    }
+
+    .gaps p.ko {
+      color: var(--ci-danger);
+      background: var(--ci-danger-soft);
+    }
+
+    tbody tr:last-child th,
+    tbody tr:last-child td {
+      border-bottom: none;
     }
 
     @media (max-width: 600px) {
@@ -237,6 +363,20 @@ export class ComparisonTableComponent {
   protected readonly general = GENERAL_DEDUCTIBLE;
   protected readonly coverageOf = guaranteeCoverage;
   protected readonly money = money;
+
+  /** Colonne au meilleur score (mise en avant visuelle uniquement). */
+  protected readonly bestInsurerId = computed(() => {
+    let best: ComparisonColumn | null = null;
+    for (const column of this.columns()) {
+      const score = column.offer.score;
+      if (score != null && (best === null || score > (best.offer.score ?? -1))) best = column;
+    }
+    return best?.insurerId ?? null;
+  });
+
+  protected scoreClass(score: number): string {
+    return score >= 75 ? 'gauge gauge--high' : score >= 50 ? 'gauge gauge--mid' : 'gauge gauge--low';
+  }
 
   /** Plafond et franchise de la garantie, s'ils sont connus. */
   protected detailOf(offer: Offer, code: string): string | null {

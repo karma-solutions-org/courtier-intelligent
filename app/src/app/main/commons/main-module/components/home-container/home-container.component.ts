@@ -17,14 +17,15 @@ import { AuthStore } from '../../../authentication-module/store/auth.store';
   styles: `
     h1 {
       margin: 0 0 16px;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     .notice {
       margin: 0;
       padding: 14px 16px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-tertiary-container);
       background: var(--mat-sys-tertiary-container);
     }

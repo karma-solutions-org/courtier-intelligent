@@ -112,8 +112,9 @@ import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/
 
     h1 {
       margin: 0;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     h2 {
@@ -129,7 +130,7 @@ import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/
 
     .save {
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
 
       &.error {
         color: var(--mat-sys-error);
@@ -138,7 +139,7 @@ import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/
 
     .progress {
       margin: 0 0 12px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .documents {
@@ -147,9 +148,10 @@ import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/
 
     .card {
       padding: 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     dl {
@@ -160,7 +162,7 @@ import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/
     }
 
     dt {
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     dd {
@@ -170,7 +172,7 @@ import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/
 
     .missing {
       padding: 14px 16px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-tertiary-container);
       background: var(--mat-sys-tertiary-container);
 
@@ -206,7 +208,7 @@ import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/
     .error {
       margin: 0 0 16px;
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-error-container);
       background: var(--mat-sys-error-container);
     }

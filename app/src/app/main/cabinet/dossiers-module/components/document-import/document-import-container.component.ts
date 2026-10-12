@@ -49,9 +49,11 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
   ],
   template: `
     <section class="card">
-      <h2>{{ text.title }}</h2>
+      <h2><mat-icon aria-hidden="true">upload_file</mat-icon>{{ text.title }}</h2>
 
       @if (editable()) {
+        <div class="dropzone">
+        <mat-icon class="dz-icon" aria-hidden="true">cloud_upload</mat-icon>
         <p class="hint">{{ text.importHint }}</p>
         <div class="import">
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -69,6 +71,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
           <button mat-flat-button type="button" [disabled]="!file() || busy()" (click)="importFile()">
             {{ analyzable() ? text.upload : text.uploadOnly }}
           </button>
+        </div>
         </div>
         @if (busy()) {
           <p class="status" role="status">{{ busy() === 'analyze' ? text.analyzing : text.uploading }}</p>
@@ -96,6 +99,9 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
                     {{ format(field.value) }}
                   </mat-checkbox>
                   <span class="meta">
+                    <span class="conf-bar" aria-hidden="true"
+                      ><span [class.low]="field.confidence < 0.8" [style.width.%]="field.confidence * 100"></span
+                    ></span>
                     {{ text.confidence }} {{ field.confidence * 100 | number: '1.0-0' }} %
                     @if (toConfirm(field)) {
                       <span class="flag">{{ text.toConfirm }}</span>
@@ -126,7 +132,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
         <ul class="documents">
           @for (document of documents(); track document.id) {
             <li>
-              <mat-icon>description</mat-icon>
+              <mat-icon class="doc-icon">description</mat-icon>
               <span class="name">
                 {{ text.types[document.type] ?? document.type }} · {{ document.fileName ?? '—' }}
                 <small>{{ text.statuses[document.status] ?? document.status }} · {{ document.createdAt?.toMillis() | date: 'd MMM y, HH:mm' }}</small>
@@ -156,9 +162,10 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
 
     .card {
       padding: 20px 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     h2 {
@@ -176,7 +183,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
     small,
     .meta,
     .status {
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
       font-size: 13px;
     }
 
@@ -196,7 +203,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
     .proposal {
       margin: 12px 0;
       padding: 14px 16px;
-      border-radius: 10px;
+      border-radius: 8px;
       background: var(--mat-sys-surface-container-low);
 
       ul {
@@ -216,7 +223,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
     .flag {
       margin-left: 4px;
       padding: 1px 8px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-tertiary-container);
       background: var(--mat-sys-tertiary-container);
     }
@@ -231,7 +238,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
         align-items: center;
         gap: 10px;
         padding: 6px 0;
-        border-top: 1px solid var(--mat-sys-outline-variant);
+        border-top: 1px solid var(--ci-border);
       }
 
       .name {
@@ -243,13 +250,131 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
 
     .error {
       padding: 10px 12px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-error-container);
       background: var(--mat-sys-error-container);
     }
 
     .success {
       color: #1e7d50;
+    }
+  
+    .card {
+      box-shadow: var(--ci-shadow-sm);
+    }
+
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+
+      mat-icon {
+        color: var(--ci-accent);
+      }
+    }
+
+    .dropzone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      margin: 8px 0 12px;
+      padding: 18px 16px;
+      border: 1px dashed #cbd2dc;
+      border-radius: 8px;
+      text-align: center;
+      background: var(--ci-surface-2);
+      transition: border-color 0.15s, background 0.15s;
+
+      &:hover {
+        border-color: var(--ci-accent);
+      }
+
+      .hint {
+        margin: 0;
+      }
+
+      .import {
+        justify-content: center;
+      }
+    }
+
+    .dz-icon {
+      width: 40px;
+      height: 40px;
+      font-size: 40px;
+      color: var(--ci-text-muted);
+    }
+
+    .proposal {
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface-2);
+
+      li {
+        padding: 8px 0;
+        border-bottom: 1px dashed var(--ci-border);
+      }
+    }
+
+    .meta {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .conf-bar {
+      display: inline-block;
+      width: 64px;
+      height: 6px;
+      overflow: hidden;
+      border-radius: 3px;
+      background: #eceef2;
+
+      span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--ci-success);
+      }
+
+      span.low {
+        background: #d08a1e;
+      }
+    }
+
+    .flag {
+      font-weight: 600;
+      color: var(--ci-warning);
+      background: var(--ci-warning-soft);
+    }
+
+    .documents li {
+      padding: 8px 4px;
+      border-radius: 8px;
+
+      &:hover {
+        background: var(--ci-navy-50);
+      }
+    }
+
+    .doc-icon {
+      display: grid;
+      place-items: center;
+      flex: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 20px;
+      color: var(--ci-navy-900);
+      background: var(--ci-navy-50);
+    }
+
+    .success {
+      font-weight: 600;
+      color: var(--ci-success);
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

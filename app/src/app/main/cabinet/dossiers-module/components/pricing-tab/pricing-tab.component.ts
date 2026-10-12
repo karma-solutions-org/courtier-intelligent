@@ -70,7 +70,7 @@ const TEXT = {
       gap: 8px;
       margin: 0;
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
     }
 
     .banner {
@@ -85,7 +85,7 @@ const TEXT = {
 
     .hint {
       margin: 0;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -36,17 +36,21 @@ import { NavSection } from '../navigation.structure';
       display: flex;
       flex-direction: column;
       height: 100%;
-      background: #fff;
+      color: #dbe4ff;
+      background: #0b1f4d;
     }
 
     .brand {
-      padding: 20px 20px 16px;
+      padding: 14px 16px;
+      margin: 12px;
+      border-radius: 8px;
+      background: var(--ci-surface);
     }
 
     nav {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 4px;
       padding: 8px 12px;
     }
 
@@ -56,33 +60,45 @@ import { NavSection } from '../navigation.structure';
       font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--mat-sys-on-surface-variant);
+      color: #9aa8c7;
     }
 
     .nav-item {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 10px 12px;
-      border-radius: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
       font-weight: 500;
-      color: var(--mat-sys-on-surface-variant);
+      color: #d5def5;
       text-decoration: none;
-      transition: background 0.15s;
+      transition: background 0.15s, color 0.15s;
 
       &:hover {
-        background: var(--mat-sys-surface-container);
+        color: #fff;
+        background: rgba(255, 255, 255, 0.08);
       }
 
-      &.active {
-        color: var(--mat-sys-on-primary-container);
-        background: var(--mat-sys-primary-container);
+      &:focus-visible {
+        outline: 2px solid #7fdde0;
+        outline-offset: 2px;
       }
 
       mat-icon {
-        width: 22px;
-        height: 22px;
-        font-size: 22px;
+        width: 20px;
+        height: 20px;
+        font-size: 20px;
+        color: #9aa8c7;
+      }
+
+      &.active {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.1);
+
+        mat-icon {
+          color: #fff;
+        }
       }
     }
   `,

@@ -69,8 +69,9 @@ import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
   styles: `
     h1 {
       margin: 0 0 16px;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     .tab {
@@ -80,7 +81,7 @@ import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
     .error {
       margin: 0 0 16px;
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-error-container);
       background: var(--mat-sys-error-container);
     }

@@ -89,10 +89,10 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
       flex: none;
       width: 88px;
       height: 88px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 12px;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
       overflow: hidden;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
       background: var(--mat-sys-surface-container-low);
 
       img {

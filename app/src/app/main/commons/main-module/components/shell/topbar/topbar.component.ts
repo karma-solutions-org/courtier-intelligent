@@ -46,8 +46,11 @@ import { ExtensionIndicatorComponent } from '../../../../extension-module/compon
       gap: 8px;
       height: 64px;
       padding: 0 16px 0 20px;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
-      background: #fff;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      border-bottom: 1px solid var(--ci-border);
+      background: var(--ci-surface);
     }
 
     .user {
@@ -56,14 +59,14 @@ import { ExtensionIndicatorComponent } from '../../../../extension-module/compon
       gap: 10px;
       padding: 6px 8px;
       border: none;
-      border-radius: 10px;
+      border-radius: 8px;
       font: inherit;
       color: inherit;
       background: none;
       cursor: pointer;
 
       &:hover {
-        background: var(--mat-sys-surface-container);
+        background: var(--ci-surface-2);
       }
     }
 
@@ -74,12 +77,13 @@ import { ExtensionIndicatorComponent } from '../../../../extension-module/compon
     .avatar {
       display: grid;
       place-items: center;
-      width: 36px;
-      height: 36px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       font-weight: 600;
-      color: #fff;
-      background: #00082b;
+      font-size: 13px;
+      color: var(--ci-navy-900);
+      background: var(--ci-navy-100);
     }
 
     .user-text {
@@ -95,7 +99,7 @@ import { ExtensionIndicatorComponent } from '../../../../extension-module/compon
 
     .user-role {
       font-size: 12px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .menu-header {
@@ -113,7 +117,7 @@ import { ExtensionIndicatorComponent } from '../../../../extension-module/compon
 
     .menu-email {
       font-size: 13px;
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     @media (max-width: 600px) {

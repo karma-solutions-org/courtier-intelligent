@@ -25,7 +25,7 @@ import { PROPOSAL_STRUCTURE } from './proposal-tab.structure';
 
     @if (dossier(); as dossier) {
       <section class="card">
-        <h2>{{ text.offerTitle }} : {{ insurerName() }}</h2>
+        <h2><mat-icon class="h-icon" aria-hidden="true">workspace_premium</mat-icon>{{ text.offerTitle }} : {{ insurerName() }}</h2>
         @if (store.chosenOffer(); as offer) {
           <dl>
             @if (offer.premiumAnnual !== null) {
@@ -108,7 +108,7 @@ import { PROPOSAL_STRUCTURE } from './proposal-tab.structure';
       }
 
       @if (dossier.outcome; as outcome) {
-        <section class="card outcome" role="status">
+        <section class="card outcome" role="status" [attr.data-status]="outcome.result">
           <h2>{{ text.outcome[outcome.result] }}</h2>
           @if (outcome.contractNumber) {
             <p>{{ text.contractNumber }} : <strong>{{ outcome.contractNumber }}</strong></p>
@@ -132,9 +132,10 @@ import { PROPOSAL_STRUCTURE } from './proposal-tab.structure';
 
     .card {
       padding: 20px 24px;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 14px;
-      background: #fff;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
     }
 
     .form {
@@ -162,7 +163,7 @@ import { PROPOSAL_STRUCTURE } from './proposal-tab.structure';
     }
 
     dt {
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     dd {
@@ -181,7 +182,7 @@ import { PROPOSAL_STRUCTURE } from './proposal-tab.structure';
     }
 
     .muted {
-      color: var(--mat-sys-on-surface-variant);
+      color: var(--ci-text-muted);
     }
 
     .actions {
@@ -202,7 +203,7 @@ import { PROPOSAL_STRUCTURE } from './proposal-tab.structure';
       gap: 8px;
       margin: 0;
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
     }
 
     .sent {
@@ -217,6 +218,79 @@ import { PROPOSAL_STRUCTURE } from './proposal-tab.structure';
     .error {
       color: var(--mat-sys-on-error-container);
       background: var(--mat-sys-error-container);
+    }
+  
+    .card {
+      box-shadow: var(--ci-shadow-sm);
+    }
+
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+    }
+
+    .h-icon {
+      color: var(--ci-text-muted);
+    }
+
+    dl {
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: var(--ci-surface-2);
+    }
+
+    dd {
+      font-weight: 600;
+      color: var(--ci-navy-900);
+    }
+
+    ul {
+      padding-left: 0;
+      list-style: none;
+
+      li {
+        position: relative;
+        padding: 4px 0 4px 26px;
+
+        &::before {
+          content: '✓';
+          position: absolute;
+          left: 0;
+          top: 4px;
+          display: grid;
+          place-items: center;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--ci-success);
+          background: var(--ci-success-soft);
+        }
+      }
+    }
+
+    .justification {
+      padding: 12px 14px;
+      border-left: 3px solid var(--ci-border);
+      border-radius: 0 8px 8px 0;
+      background: var(--ci-surface-2);
+    }
+
+    .sent {
+      color: var(--st-proposition_envoyee);
+      background: var(--st-proposition_envoyee-bg);
+      border-left: 3px solid var(--st-proposition_envoyee-dot);
+    }
+
+    .outcome {
+      background: var(--ci-surface);
+
+      h2 {
+        color: var(--st-color, var(--ci-text));
+      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
