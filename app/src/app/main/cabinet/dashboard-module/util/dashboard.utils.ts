@@ -14,7 +14,7 @@ export const TO_PROCESS_STATUSES: DossierStatus[] = [
 export const FOLLOW_UP_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Issues finales prises en compte dans le taux de conversion. */
-const CLOSED_STATUSES: DossierStatus[] = ['souscrit', 'refuse', 'sans_suite'];
+const CLOSED_STATUSES: DossierStatus[] = ['souscrit', 'refuse'];
 
 /** Nombre de dossiers par statut (tous les statuts présents, même à zéro). */
 export function countByStatus(dossiers: Dossier[]): Record<DossierStatus, number> {

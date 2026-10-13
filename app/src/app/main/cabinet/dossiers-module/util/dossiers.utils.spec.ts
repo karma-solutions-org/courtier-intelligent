@@ -53,14 +53,13 @@ describe('filterDossiers', () => {
 
 describe('manualTransitionsFrom', () => {
   it('propose ce que le courtier peut déclencher, parmi les transitions de la machine à états', () => {
-    expect(manualTransitionsFrom('brouillon')).toEqual(['complet', 'sans_suite']);
-    expect(manualTransitionsFrom('complet')).toEqual(['brouillon', 'sans_suite']);
+    expect(manualTransitionsFrom('brouillon')).toEqual(['complet']);
+    expect(manualTransitionsFrom('complet')).toEqual(['brouillon']);
   });
 
   it("ne propose rien pour un dossier terminé, ni les statuts poussés par d'autres étapes", () => {
-    expect(manualTransitionsFrom('sans_suite')).toEqual([]);
     expect(manualTransitionsFrom('souscrit')).toEqual([]);
-    expect(manualTransitionsFrom('tarification')).toEqual(['sans_suite']);
+    expect(manualTransitionsFrom('tarification')).toEqual([]);
   });
 });
 

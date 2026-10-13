@@ -15,13 +15,31 @@ const PRODUCT = {
     {
       title: 'Véhicule',
       questions: [
-        { canonicalPath: 'vehicle.registration', label: 'Immatriculation', type: 'text', required: true },
-        { canonicalPath: 'vehicle.fiscalPower', label: 'Puissance fiscale', type: 'number', required: true },
+        {
+          canonicalPath: 'vehicle.registration',
+          label: 'Immatriculation',
+          type: 'text',
+          required: true,
+        },
+        {
+          canonicalPath: 'vehicle.fiscalPower',
+          label: 'Puissance fiscale',
+          type: 'number',
+          required: true,
+        },
       ],
     },
     {
       title: 'Historique',
-      questions: [{ canonicalPath: 'insuranceHistory.claimsCount', label: 'Sinistres', type: 'number', required: false, withKnowledge: true }],
+      questions: [
+        {
+          canonicalPath: 'insuranceHistory.claimsCount',
+          label: 'Sinistres',
+          type: 'number',
+          required: false,
+          withKnowledge: true,
+        },
+      ],
     },
   ],
 } as Product;
@@ -94,6 +112,52 @@ describe('DossierStore', () => {
 
   afterEach(() => vi.useRealTimers());
 
+  describe('Sélection', () => {
+    it('resélectionner le même dossier conserve l’état (l’écoute ne réémettrait pas)', () => {
+      store.edit('vehicle.fiscalPower', 5);
+      store.select('d1');
+
+      expect(store.dossier()?.id).toBe('d1');
+      expect(store.answers()['vehicle.fiscalPower']).toBe(5);
+      expect(store.saveStatus()).toBe('dirty');
+    });
+
+    it('sélectionner un autre dossier repart d’un état vide', () => {
+      store.edit('vehicle.fiscalPower', 5);
+      dossier$.next(null);
+      store.select('d2');
+
+      expect(store.selectedId()).toBe('d2');
+      expect(store.answers()).toEqual({});
+      expect(store.pending()).toEqual({});
+      expect(store.saveStatus()).toBe('idle');
+      expect(store.hasPendingEdits()).toBe(false);
+    });
+
+    it('une erreur d’écoute est affichée, marque le chargement terminé et n’arrête pas l’écoute suivante', () => {
+      dossier$.error({ code: 'permission-denied', message: 'Accès refusé.' });
+      TestBed.tick();
+
+      expect(store.error()).toBeTruthy();
+      expect(store.loaded()).toBe(true);
+
+      dossier$ = new BehaviorSubject<Dossier | null>(dossier({ id: 'd2' }));
+      store.select('d2');
+      TestBed.tick();
+
+      expect(store.dossier()?.id).toBe('d2');
+      expect(store.error()).toBeNull();
+    });
+
+    it('un enregistrement mis en file part vers le dossier sélectionné à ce moment-là', () => {
+      store.edit('vehicle.fiscalPower', 5);
+      store.saveNow();
+      store.select('d2');
+
+      expect(service.save).toHaveBeenCalledExactlyOnceWith('d1', { 'vehicle.fiscalPower': 5 }, {});
+    });
+  });
+
   describe('Reprise du brouillon', () => {
     it('restaure les réponses et la section où le courtier s’était arrêté', () => {
       expect(store.answers()).toEqual({ 'vehicle.registration': 'AB-123-CD' });
@@ -112,7 +176,9 @@ describe('DossierStore', () => {
 
     it('les mises à jour du serveur n’écrasent pas la saisie en cours', () => {
       store.edit('vehicle.fiscalPower', 5);
-      dossier$.next(dossier({ status: 'brouillon', data: { 'vehicle.registration': 'AB-123-CD' } }));
+      dossier$.next(
+        dossier({ status: 'brouillon', data: { 'vehicle.registration': 'AB-123-CD' } }),
+      );
 
       expect(store.answers()['vehicle.fiscalPower']).toBe(5);
     });
@@ -141,7 +207,10 @@ describe('DossierStore', () => {
       await typingStops();
 
       expect(service.save).toHaveBeenCalledOnce();
-      expect(service.save.mock.calls[0][1]).toEqual({ 'vehicle.registration': 'AB', 'vehicle.fiscalPower': 7 });
+      expect(service.save.mock.calls[0][1]).toEqual({
+        'vehicle.registration': 'AB',
+        'vehicle.fiscalPower': 7,
+      });
     });
 
     it('conserve null et 0 (effacer ≠ répondre zéro)', async () => {
@@ -149,7 +218,10 @@ describe('DossierStore', () => {
       store.edit('vehicle.fiscalPower', 0);
       await typingStops();
 
-      expect(service.save.mock.calls[0][1]).toEqual({ 'vehicle.registration': null, 'vehicle.fiscalPower': 0 });
+      expect(service.save.mock.calls[0][1]).toEqual({
+        'vehicle.registration': null,
+        'vehicle.fiscalPower': 0,
+      });
     });
 
     it('en cas d’échec, garde les réponses et les renvoie à l’enregistrement suivant', async () => {
@@ -164,7 +236,10 @@ describe('DossierStore', () => {
       await typingStops();
 
       expect(service.save).toHaveBeenCalledTimes(2);
-      expect(service.save.mock.calls[1][1]).toEqual({ 'vehicle.fiscalPower': 5, 'vehicle.registration': 'ZZ' });
+      expect(service.save.mock.calls[1][1]).toEqual({
+        'vehicle.fiscalPower': 5,
+        'vehicle.registration': 'ZZ',
+      });
       expect(store.saveStatus()).toBe('saved');
     });
 
@@ -176,7 +251,11 @@ describe('DossierStore', () => {
       expect(service.save).not.toHaveBeenCalled();
 
       store.saveNow({ event: true });
-      expect(service.save).toHaveBeenCalledExactlyOnceWith('d1', { 'vehicle.fiscalPower': 5 }, { event: true });
+      expect(service.save).toHaveBeenCalledExactlyOnceWith(
+        'd1',
+        { 'vehicle.fiscalPower': 5 },
+        { event: true },
+      );
     });
 
     it('mémorise la section quand le courtier change de page, même sans nouvelle réponse', () => {
@@ -212,7 +291,9 @@ describe('DossierStore', () => {
 
       expect(service.save).toHaveBeenCalledOnce();
       expect(service.changeStatus).toHaveBeenCalledExactlyOnceWith('d1', 'complet');
-      expect(service.save.mock.invocationCallOrder[0]).toBeLessThan(service.changeStatus.mock.invocationCallOrder[0]);
+      expect(service.save.mock.invocationCallOrder[0]).toBeLessThan(
+        service.changeStatus.mock.invocationCallOrder[0],
+      );
     });
 
     it('ne change pas le statut si l’enregistrement des réponses a échoué', () => {
@@ -225,15 +306,19 @@ describe('DossierStore', () => {
     });
 
     it('affiche le refus du serveur (ex. dossier incomplet)', () => {
-      service.changeStatus.mockReturnValueOnce(throwError(() => ({ message: 'Le dossier est incomplet : 1 champ(s) obligatoire(s) manquant(s).' })));
+      service.changeStatus.mockReturnValueOnce(
+        throwError(() => ({
+          message: 'Le dossier est incomplet : 1 champ(s) obligatoire(s) manquant(s).',
+        })),
+      );
       store.changeStatus('complet');
 
       expect(store.error()).toContain('incomplet');
     });
 
     it('propose les transitions manuelles autorisées par la machine à états', () => {
-      expect(store.transitions()).toEqual(['complet', 'sans_suite']);
-      dossier$.next(dossier({ status: 'sans_suite' }));
+      expect(store.transitions()).toEqual(['complet']);
+      dossier$.next(dossier({ status: 'souscrit' }));
 
       expect(store.transitions()).toEqual([]);
       expect(store.editable()).toBe(false);
@@ -249,7 +334,9 @@ describe('DossierStore', () => {
     });
 
     it('affiche le refus du serveur', () => {
-      service.assign.mockReturnValueOnce(throwError(() => ({ message: 'Ce membre n’est pas actif dans le cabinet.' })));
+      service.assign.mockReturnValueOnce(
+        throwError(() => ({ message: 'Ce membre n’est pas actif dans le cabinet.' })),
+      );
       store.assign('u2');
 
       expect(store.error()).toBe('Ce membre n’est pas actif dans le cabinet.');
@@ -270,12 +357,22 @@ describe('DossierStore', () => {
 
     it('un champ jamais renseigné vaut null, pas une valeur inventée', () => {
       expect(store.quoteData()['vehicle.fiscalPower']).toBeNull();
-      expect(store.quoteData()['insuranceHistory.claimsCount']).toEqual({ value: null, knowledge: 'UNKNOWN' });
+      expect(store.quoteData()['insuranceHistory.claimsCount']).toEqual({
+        value: null,
+        knowledge: 'UNKNOWN',
+      });
     });
   });
 
   describe('Analyse du besoin', () => {
-    const need = { coverageLevel: 'tiers', budgetMax: 0, maxDeductible: null, mandatoryGuarantees: ['RC'], niceToHave: [], notes: null } as const;
+    const need = {
+      coverageLevel: 'tiers',
+      budgetMax: 0,
+      maxDeductible: null,
+      mandatoryGuarantees: ['RC'],
+      niceToHave: [],
+      notes: null,
+    } as const;
 
     it('n’est ouverte qu’à un dossier complet ou au besoin validé', () => {
       expect(store.needEditable()).toBe(false);
@@ -292,8 +389,10 @@ describe('DossierStore', () => {
       store.saveNeed({ ...need, mandatoryGuarantees: ['RC'], niceToHave: [] });
 
       expect(service.saveNeed).toHaveBeenCalledOnce();
-      expect(service.save.mock.invocationCallOrder[0]).toBeLessThan(service.saveNeed.mock.invocationCallOrder[0]);
-      expect(store.successMessage()).toBe('Besoin enregistré.');
+      expect(service.save.mock.invocationCallOrder[0]).toBeLessThan(
+        service.saveNeed.mock.invocationCallOrder[0],
+      );
+      expect(store.successMessage()).toBe('Couverture enregistrée.');
     });
 
     it('n’enregistre pas le besoin si les réponses en attente n’ont pas pu l’être', () => {
@@ -313,7 +412,9 @@ describe('DossierStore', () => {
     });
 
     it('affiche le refus du serveur', () => {
-      service.saveNeed.mockReturnValueOnce(throwError(() => ({ message: 'Niveau de couverture invalide.' })));
+      service.saveNeed.mockReturnValueOnce(
+        throwError(() => ({ message: 'Niveau de couverture invalide.' })),
+      );
       store.saveNeed({ ...need, mandatoryGuarantees: [], niceToHave: [] });
 
       expect(store.error()).toBe('Niveau de couverture invalide.');
@@ -323,11 +424,15 @@ describe('DossierStore', () => {
       store.validateNeed();
 
       expect(service.validateNeed).toHaveBeenCalledExactlyOnceWith('d1');
-      expect(store.successMessage()).toBe('Besoin validé.');
+      expect(store.successMessage()).toBe('Couverture validée.');
     });
 
     it('affiche le refus de validation du serveur', () => {
-      service.validateNeed.mockReturnValueOnce(throwError(() => ({ message: 'Choisissez et enregistrez un niveau de couverture avant de valider le besoin.' })));
+      service.validateNeed.mockReturnValueOnce(
+        throwError(() => ({
+          message: 'Choisissez et enregistrez un niveau de couverture avant de valider le besoin.',
+        })),
+      );
       store.validateNeed();
 
       expect(store.error()).toContain('niveau de couverture');

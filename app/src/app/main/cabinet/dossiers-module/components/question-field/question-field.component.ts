@@ -1,3 +1,4 @@
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -16,11 +17,20 @@ const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
 /** Un champ du questionnaire dynamique : le contrôle dépend du type de la question (texte, date, nombre, oui/non, choix). */
 @Component({
   selector: 'app-question-field',
-  imports: [MatButtonToggleModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [
+    MatButtonToggleModule,
+    MatDatepickerModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+  ],
   template: `
     <div class="field" [class.invalid]="invalid()">
       @if (question().withKnowledge) {
         <span class="label">{{ labelText() }}</span>
+        @if (question().mustBeKnown) {
+          <span class="hint">Exigé par les assureurs : un chiffre est nécessaire.</span>
+        } @else {
         <mat-button-toggle-group
           [value]="knowledgeMode()"
           [disabled]="readonly()"
@@ -32,7 +42,8 @@ const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
             <mat-button-toggle [value]="option.mode">{{ option.label }}</mat-button-toggle>
           }
         </mat-button-toggle-group>
-        @if (knowledgeMode() === 'known') {
+        }
+        @if (knowledgeMode() === 'known' || question().mustBeKnown) {
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="known-value">
             <mat-label>{{ question().label }}</mat-label>
             <input
@@ -63,7 +74,11 @@ const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
           @case ('choice') {
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-label>{{ labelText() }}</mat-label>
-              <mat-select [value]="value() ?? null" [disabled]="readonly()" (selectionChange)="changed.emit($event.value)">
+              <mat-select
+                [value]="value() ?? null"
+                [disabled]="readonly()"
+                (selectionChange)="changed.emit($event.value)"
+              >
                 @for (choice of question().choices ?? []; track choice.value) {
                   <mat-option [value]="choice.value">{{ choice.label }}</mat-option>
                 }
@@ -88,11 +103,18 @@ const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
               <mat-label>{{ labelText() }}</mat-label>
               <input
                 matInput
-                type="date"
-                [value]="value() ?? ''"
+                [matDatepicker]="datePicker"
+                [value]="value() ?? null"
                 [readonly]="readonly()"
-                (input)="changed.emit(toText($any($event.target).value))"
+                placeholder="jj/mm/aaaa"
+                (dateChange)="
+                  changed.emit($event.value && $event.value !== 'invalid' ? $event.value : null)
+                "
               />
+              @if (!readonly()) {
+                <mat-datepicker-toggle matIconSuffix [for]="datePicker" />
+              }
+              <mat-datepicker #datePicker />
             </mat-form-field>
           }
           @default {
@@ -155,8 +177,12 @@ export class QuestionFieldComponent {
   readonly changed = output<CanonicalValue | null>();
 
   protected readonly knowledgeOptions = KNOWLEDGE_OPTIONS;
-  protected readonly labelText = computed(() => (this.question().required ? `${this.question().label} *` : this.question().label));
-  protected readonly invalid = computed(() => this.showMissing() && this.question().required && !isAnswered(this.value()));
+  protected readonly labelText = computed(() =>
+    this.question().required ? `${this.question().label} *` : this.question().label,
+  );
+  protected readonly invalid = computed(
+    () => this.showMissing() && this.question().required && !isAnswered(this.value()),
+  );
 
   /**
    * Mode choisi pour un champ avec niveau de connaissance. Il peut précéder la valeur : « Valeur connue » sélectionné
@@ -190,7 +216,9 @@ export class QuestionFieldComponent {
   }
 
   protected setKnownNumber(valueAsNumber: number): void {
-    this.changed.emit(Number.isNaN(valueAsNumber) ? null : { value: valueAsNumber, knowledge: 'KNOWN' });
+    this.changed.emit(
+      Number.isNaN(valueAsNumber) ? null : { value: valueAsNumber, knowledge: 'KNOWN' },
+    );
   }
 
   protected toNumber(valueAsNumber: number): number | null {
@@ -202,4 +230,8 @@ export class QuestionFieldComponent {
   }
 }
 
-const MODE_OF: Record<Knowledge, KnowledgeMode> = { KNOWN: 'known', DECLARED_UNKNOWN: 'declared', UNKNOWN: 'unknown' };
+const MODE_OF: Record<Knowledge, KnowledgeMode> = {
+  KNOWN: 'known',
+  DECLARED_UNKNOWN: 'declared',
+  UNKNOWN: 'unknown',
+};

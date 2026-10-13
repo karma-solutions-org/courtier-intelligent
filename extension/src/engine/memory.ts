@@ -1,4 +1,4 @@
-import { CanonicalPath, FormMemoryField, isCanonicalPath } from '@shared';
+import { CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, type DiscoveredFieldInput, isRelevantField } from '@shared';
 import type { FormField } from './analyzer';
 import { isCompatible, Mapping } from './mapping';
 
@@ -94,6 +94,36 @@ export function safeLabel(label: string): string | null {
  * Ce que l'extension retient d'un formulaire : sa STRUCTURE (champs, types, libellés) et le chemin associé, jamais une valeur.
  * Un champ sans équivalent est conservé avec un chemin `null`, pour ne pas le soumettre à l'IA à chaque fois.
  */
+/**
+ * Champs du formulaire restés sans équivalent (ni synonyme, ni mémoire, ni IA, ni correction du courtier) et qui sont
+ * de vraies questions (ni captcha, ni CGU, ni champ caché…) : structure seulement, jamais de valeur saisie.
+ */
+export function toDiscoveredFields(fields: FormField[], mappings: Mapping[]): DiscoveredFieldInput[] {
+  const mapped = new Set(mappings.filter(m => m.status === 'mapped' && m.canonicalPath !== null).map(m => m.fieldKey));
+  return fields
+    .filter(field => !mapped.has(field.key) && isRelevantField(field))
+    .slice(0, DISCOVERED_MAX_FIELDS_PER_REPORT)
+    .map(field => ({
+      fieldKey: field.key,
+      label: field.label,
+      kind: field.kind,
+      inputType: field.inputType,
+      name: field.name,
+      section: field.section,
+      options: field.options.map(option => ({ value: option.value, label: option.label })),
+      required: field.required,
+    }));
+}
+
+/** Chemins des champs obligatoires de l'extranet qui ont un équivalent dans l'application. */
+export function toRequiredPaths(fields: FormField[], mappings: Mapping[]): string[] {
+  const requiredKeys = new Set(fields.filter(field => field.required).map(field => field.key));
+  const paths = mappings
+    .filter(m => requiredKeys.has(m.fieldKey) && m.status === 'mapped' && m.canonicalPath !== null)
+    .map(m => m.canonicalPath as string);
+  return [...new Set(paths)];
+}
+
 export function toMemoryFields(fields: FormField[], mappings: Mapping[]): FormMemoryField[] {
   const byKey = new Map(mappings.map(mapping => [mapping.fieldKey, mapping]));
   return fields.map(field => {

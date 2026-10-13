@@ -21,12 +21,12 @@ import {
 } from '@shared';
 
 const TEXT = {
-  title: 'Analyse du besoin',
-  validatedOn: 'Besoin validé le',
-  saved: 'Besoin enregistré : il reste à le valider pour passer à la tarification.',
-  notSaved: "Aucun besoin enregistré pour l'instant.",
-  reopenWarning: 'Modifier un besoin validé annule sa validation : le dossier repasse en « complet ».',
-  readonly: "Ce dossier n'est plus au stade de l'analyse du besoin : il est consultable seulement.",
+  title: 'Couverture souhaitée',
+  validatedOn: 'Validée le',
+  saved: 'Enregistrée : il reste à la valider pour passer à la tarification.',
+  notSaved: "Rien n'est encore enregistré.",
+  reopenWarning: 'La modifier annule sa validation : le dossier repasse en « complet ».',
+  readonly: 'Ce dossier a dépassé cette étape : elle est consultable seulement.',
   coverage: 'Niveau de couverture',
   budget: 'Budget maximum (€ par an)',
   deductible: 'Franchise maximum (€)',
@@ -37,9 +37,8 @@ const TEXT = {
   suggestionsTitle: 'Suggestions selon le questionnaire',
   suggestionsHint: 'Vous pouvez les modifier avant d’enregistrer.',
   apply: 'Appliquer les suggestions',
-  save: 'Enregistrer le besoin',
-  validate: 'Valider le besoin',
-  saveBeforeValidate: 'Enregistrez le besoin avant de le valider.',
+  save: 'Enregistrer les modifications',
+  validate: 'Valider la couverture',
   coverageBeforeValidate: 'Choisissez un niveau de couverture pour pouvoir valider.',
   none: 'Aucune',
 } as const;
@@ -129,13 +128,15 @@ const TEXT = {
         }
         @if (!readonly()) {
           <div class="actions">
+            <!-- Un seul bouton : à l'étape « Complet », valider enregistre aussi la saisie en cours. -->
             @if (status() === 'complet') {
               <span class="hint">{{ validateHint() }}</span>
-              <button mat-stroked-button type="button" [disabled]="!canValidate() || isPending()" (click)="validated.emit()">
+              <button mat-flat-button type="button" [disabled]="!canValidate() || isPending()" (click)="saveAndValidate()">
                 {{ text.validate }}
               </button>
+            } @else {
+              <button mat-flat-button type="submit" [disabled]="pristine() || isPending()">{{ text.save }}</button>
             }
-            <button mat-flat-button type="submit" [disabled]="pristine() || isPending()">{{ text.save }}</button>
           </div>
         }
       </form>
@@ -259,12 +260,12 @@ export class NeedFormComponent {
     const suggestion = this.suggestion();
     return !this.readonly() && !!suggestion && suggestion.reasons.length > 0;
   });
-  /** Validable quand le besoin enregistré a un niveau de couverture et que la saisie est enregistrée. */
-  protected readonly canValidate = computed(() => isNeedValidatable(this.need()) && this.pristine());
-  protected readonly validateHint = computed(() => {
-    if (!isNeedValidatable(this.need())) return this.text.coverageBeforeValidate;
-    return this.pristine() ? '' : this.text.saveBeforeValidate;
+  private readonly _coverage = toSignal(this.form.controls.coverageLevel.valueChanges, {
+    initialValue: this.form.controls.coverageLevel.value,
   });
+  /** Validable dès qu'un niveau de couverture est choisi dans le formulaire (la saisie est enregistrée au passage). */
+  protected readonly canValidate = computed(() => !!this._coverage());
+  protected readonly validateHint = computed(() => (this.canValidate() ? '' : this.text.coverageBeforeValidate));
 
   constructor() {
     // Remplit le formulaire avec le besoin enregistré, sans écraser une saisie en cours.
@@ -302,6 +303,16 @@ export class NeedFormComponent {
       niceToHave: suggestion.niceToHave,
     });
     this.form.markAsDirty();
+  }
+
+  /** Enregistre la saisie si elle a changé, puis valide : le store exécute les deux dans cet ordre. */
+  protected saveAndValidate(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    if (!this.form.pristine) this.submit();
+    this.validated.emit();
   }
 
   protected submit(): void {

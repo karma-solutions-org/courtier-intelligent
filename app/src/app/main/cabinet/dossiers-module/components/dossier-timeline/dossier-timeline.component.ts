@@ -1,7 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
-import { DOSSIER_STATUS_LABELS, DossierEvent, DossierStatus, NEED_FIELD_LABELS, NeedInput } from '@shared';
+import {
+  DOSSIER_STATUS_LABELS,
+  DossierEvent,
+  DossierStatus,
+  NEED_FIELD_LABELS,
+  NeedInput,
+} from '@shared';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 
 interface TimelineItem {
@@ -21,7 +27,6 @@ const ICONS: Record<string, string> = {
   need_updated: 'fact_check',
   note: 'sticky_note_2',
   proposal_sent: 'outgoing_mail',
-  proposal_reminder: 'notifications',
   outcome_recorded: 'task_alt',
 };
 
@@ -36,7 +41,9 @@ const ICONS: Record<string, string> = {
         <ol>
           @for (item of items(); track item.id) {
             <li [attr.data-kind]="item.icon">
-              <span class="icon" aria-hidden="true"><mat-icon>{{ item.icon }}</mat-icon></span>
+              <span class="icon" aria-hidden="true"
+                ><mat-icon>{{ item.icon }}</mat-icon></span
+              >
               <div>
                 <strong>{{ item.title }}</strong>
                 @if (item.detail) {
@@ -48,7 +55,24 @@ const ICONS: Record<string, string> = {
           }
         </ol>
       } @else {
-        <div class="empty-wrap"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="empty">{{ structure.empty }}</p></div>
+        <div class="empty-wrap">
+          <svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true">
+            <rect
+              x="30"
+              y="14"
+              width="60"
+              height="50"
+              rx="8"
+              fill="#fff"
+              stroke="#d1d5db"
+              stroke-width="2"
+            />
+            <rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db" />
+            <rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb" />
+            <rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb" />
+          </svg>
+          <p class="empty">{{ structure.empty }}</p>
+        </div>
       }
     </section>
   `,
@@ -91,7 +115,6 @@ const ICONS: Record<string, string> = {
       gap: 14px;
       padding: 10px 0;
     }
-
 
     .icon {
       position: relative;
@@ -162,7 +185,7 @@ export class DossierTimelineComponent {
   protected readonly structure = DOSSIERS_STRUCTURE.timeline;
 
   protected readonly items = computed<TimelineItem[]>(() =>
-    this.events().map(event => ({
+    this.events().map((event) => ({
       id: event.id,
       icon: ICONS[event.type] ?? 'history',
       ...this.describe(event),
@@ -184,23 +207,32 @@ export class DossierTimelineComponent {
     const data = event.data ?? {};
     switch (event.type) {
       case 'created':
-        return { title: this.structure.created, detail: typeof data['reference'] === 'string' ? data['reference'] : null };
+        return {
+          title: this.structure.created,
+          detail: typeof data['reference'] === 'string' ? data['reference'] : null,
+        };
       case 'data_updated': {
         const count = Array.isArray(data['fields']) ? data['fields'].length : 0;
         return { title: this.structure.dataUpdated, detail: count ? `${count} champ(s)` : null };
       }
       case 'status_changed': {
-        const label = (status: unknown) => DOSSIER_STATUS_LABELS[status as DossierStatus] ?? String(status);
+        const label = (status: unknown) =>
+          DOSSIER_STATUS_LABELS[status as DossierStatus] ?? (status === 'sans_suite' ? 'Sans suite' : String(status));
         return {
           title: `${this.structure.statusChanged} : ${label(data['from'])} → ${label(data['to'])}`,
           detail: data['automatic'] === true ? this.structure.automatic : null,
         };
       }
       case 'assigned':
-        return { title: `${this.structure.assigned} ${this.nameOf(data['to'] as string)}`, detail: null };
+        return {
+          title: `${this.structure.assigned} ${this.nameOf(data['to'] as string)}`,
+          detail: null,
+        };
       case 'need_updated': {
         const changes = (data['changes'] ?? {}) as Record<string, unknown>;
-        const fields = Object.keys(changes).map(key => NEED_FIELD_LABELS[key as keyof NeedInput] ?? key);
+        const fields = Object.keys(changes).map(
+          (key) => NEED_FIELD_LABELS[key as keyof NeedInput] ?? key,
+        );
         return { title: this.structure.needUpdated, detail: fields.join(', ') || null };
       }
       case 'pricing_requested': {
@@ -221,18 +253,22 @@ export class DossierTimelineComponent {
         };
       case 'proposal_sent':
         return {
-          title: data['resend'] === true ? this.structure.proposalResent : this.structure.proposalSent,
+          title:
+            data['resend'] === true ? this.structure.proposalResent : this.structure.proposalSent,
           detail: typeof data['to'] === 'string' ? data['to'] : null,
         };
-      case 'proposal_reminder':
-        return { title: this.structure.proposalReminder, detail: this.nameOf(data['to'] as string) };
       case 'outcome_recorded': {
         const result = data['result'] as string;
-        const detail = [data['contractNumber'], data['effectiveDate']].filter(v => typeof v === 'string' && v).join(' · ');
+        const detail = [data['contractNumber'], data['effectiveDate']]
+          .filter((v) => typeof v === 'string' && v)
+          .join(' · ');
         return { title: this.structure.outcome[result] ?? result, detail: detail || null };
       }
       case 'note':
-        return { title: this.structure.note, detail: typeof data['text'] === 'string' ? data['text'] : null };
+        return {
+          title: this.structure.note,
+          detail: typeof data['text'] === 'string' ? data['text'] : null,
+        };
       default:
         return { title: event.type, detail: null };
     }

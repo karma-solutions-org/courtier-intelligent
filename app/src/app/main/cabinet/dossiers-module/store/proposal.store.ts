@@ -13,13 +13,15 @@ import { DossierStore } from './dossier.store';
 interface ProposalState {
   offers: Offer[];
   busy: boolean;
+  /** Vrai une fois les offres reçues (ou l'écoute en échec). */
+  loaded: boolean;
   error: string | null;
   successMessage: string | null;
 }
 
 /** Store de l'onglet Proposition (fourni par le composant) : offre retenue, envoi et réponse de l'assuré. */
 export const ProposalStore = signalStore(
-  withState<ProposalState>({ offers: [], busy: false, error: null, successMessage: null }),
+  withState<ProposalState>({ offers: [], busy: false, loaded: false, error: null, successMessage: null }),
   withComputed((store, dossierStore = inject(DossierStore)) => ({
     chosenOffer: computed(() => {
       const insurerId = dossierStore.dossier()?.decision?.insurerId;
@@ -35,9 +37,12 @@ export const ProposalStore = signalStore(
       dossierStore = inject(DossierStore),
     ) => {
       /** Appel au serveur ; le dossier (suivi en temps réel) reflète le nouveau statut. */
-      const run = <T>(request: () => Observable<T>, message: string) => {
+      const run = <T>(request: (dossierId: string) => Observable<T>, message: string) => {
+        // Sans dossier sélectionné (navigation en cours), rien à envoyer.
+        const dossierId = dossierStore.selectedId();
+        if (!dossierId) return EMPTY;
         patchState(store, { busy: true, error: null });
-        return request().pipe(
+        return request(dossierId).pipe(
           tap(() => patchState(store, { successMessage: message })),
           catchError(error => {
             patchState(store, { error: toBackendErrorMessage(error) });
@@ -52,7 +57,7 @@ export const ProposalStore = signalStore(
         send: rxMethod<{ to: string; message: string }>(
           pipe(
             exhaustMap(({ to, message }) =>
-              run(() => service.send(dossierStore.selectedId()!, to, message), PROPOSAL_STRUCTURE.sentMessage),
+              run(id => service.send(id, to, message), PROPOSAL_STRUCTURE.sentMessage),
             ),
           ),
         ),
@@ -60,20 +65,23 @@ export const ProposalStore = signalStore(
         recordAnswer: rxMethod<ProposalAnswer>(
           pipe(
             exhaustMap(answer =>
-              run(() => service.recordAnswer(dossierStore.selectedId()!, answer), PROPOSAL_STRUCTURE.answerSaved),
+              run(id => service.recordAnswer(id, answer), PROPOSAL_STRUCTURE.answerSaved),
             ),
           ),
         ),
 
         _listen: rxMethod<string | null>(
           pipe(
-            tap(() => patchState(store, { offers: [] })),
+            tap(() => patchState(store, { offers: [], loaded: false })),
             switchMap(id => {
               const cabinetId = authStore.cabinetId();
               if (!id || !cabinetId) return EMPTY;
               return pricing.watchOffers(cabinetId, id).pipe(
-                tap(offers => patchState(store, { offers })),
-                catchError(() => EMPTY),
+                tap(offers => patchState(store, { offers, loaded: true })),
+                catchError(error => {
+                  patchState(store, { error: toBackendErrorMessage(error), loaded: true });
+                  return EMPTY;
+                }),
               );
             }),
           ),

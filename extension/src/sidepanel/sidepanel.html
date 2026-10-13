@@ -8,8 +8,8 @@
   </head>
   <body>
     <header class="header">
-      <span class="header-logo"><img src="../logo/logo-symbol.svg" alt="" width="20" height="24" /></span>
-      <span class="header-text"><span class="header-title">Courtier Intelligent</span><span class="header-sub">Assistant extranet</span></span>
+      <img class="header-logo" src="../logo/logo-symbol.svg" alt="" width="16" height="19" />
+      <span class="header-title">Courtier Intelligent</span>
     </header>
 
     <main>
@@ -30,14 +30,15 @@
 
       <!-- Courtier connecté -->
       <section id="connected" hidden>
-        <section class="card accent-green">
-          <p class="label">Courtier connecté</p>
-          <p id="account-name" class="value"></p>
-          <p id="account-meta" class="muted"></p>
-          <button id="sign-out" type="button" class="link">Se déconnecter</button>
+        <section class="account">
+          <div class="account-text">
+            <p id="account-name" class="value"></p>
+            <p id="account-meta" class="muted small"></p>
+          </div>
+          <button id="sign-out" type="button" class="link quiet">Déconnexion</button>
         </section>
 
-        <section class="card accent-blue">
+        <section class="card">
           <p class="label">Dossier et tarification en cours</p>
           <p id="job-title" class="value">—</p>
           <p id="job-status" class="muted status"></p>
@@ -46,7 +47,7 @@
         </section>
 
         <!-- Remplissage de l'extranet ouvert dans l'onglet actif -->
-        <section id="run" class="card accent-teal" hidden>
+        <section id="run" class="card" hidden>
           <p class="label">Remplissage de l'extranet</p>
           <p id="run-step" class="value"></p>
           <div id="run-progress" class="progress" hidden><span></span></div>
@@ -98,10 +99,12 @@
           <button id="refill" type="button" class="link">Remplir à nouveau</button>
         </section>
 
-        <section class="card accent-violet">
+        <section class="card">
           <p class="label">Page active</p>
           <p id="page-origin" class="value">—</p>
           <p id="page-fields" class="muted"></p>
+          <p id="access-note" class="muted small" hidden></p>
+          <button id="grant-access" type="button" hidden>Autoriser l’accès à l’extranet</button>
         </section>
       </section>
     </main>

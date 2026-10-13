@@ -1,18 +1,20 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CanonicalData, questionsOf } from '@shared';
 import { ExtensionStore } from '../../../../commons/extension-module/store/extension.store';
 import { DossierStore } from '../../store/dossier.store';
-import { ManualOfferSubmission, PricingCard, PricingStore } from '../../store/pricing.store';
-import { ManualOfferDialogComponent, ManualOfferDialogData } from '../manual-offer-dialog/manual-offer-dialog.component';
+import { PricingCard, PricingStore } from '../../store/pricing.store';
 import { QuoteCardComponent } from '../quote-card/quote-card.component';
 
 const TEXT = {
-  needNotValidated: 'Validez le besoin du client (onglet Besoin) pour lancer les tarifications.',
-  noExtension: 'Extension Chrome non détectée : installez-la et connectez-vous pour remplir les extranets automatiquement. La saisie manuelle reste possible.',
-  noInsurer: 'Aucun assureur ne tarifie ce produit pour votre cabinet. Un administrateur peut en activer dans Paramètres.',
+  needNotValidated: 'Validez la couverture souhaitée (étape Couverture) pour lancer les tarifications.',
+  closed: 'La tarification est terminée pour ce dossier : les offres reçues restent consultables.',
+  noExtension:
+    'Extension Chrome non détectée : installez-la et connectez-vous pour remplir les extranets automatiquement.',
+  loading: 'Chargement des tarifications…',
+  noInsurer:
+    'Aucun assureur ne tarifie ce produit pour votre cabinet. Un administrateur peut en activer dans Paramètres.',
 } as const;
 
 /** Onglet Tarification : une carte par assureur, avec le statut de son job en temps réel. */
@@ -22,7 +24,12 @@ const TEXT = {
   providers: [PricingStore],
   template: `
     @if (!store.canPrice()) {
-      <p class="banner" role="status"><mat-icon>lock</mat-icon>{{ text.needNotValidated }}</p>
+      <!-- Avant la validation : ce qu'il reste à faire. Après (décision, proposition, sans suite…) : simple lecture. -->
+      @if (awaitingCoverage()) {
+        <p class="banner" role="status"><mat-icon>lock</mat-icon>{{ text.needNotValidated }}</p>
+      } @else {
+        <p class="banner" role="status"><mat-icon>info</mat-icon>{{ text.closed }}</p>
+      }
     } @else if (extensionMissing()) {
       <p class="banner" role="status"><mat-icon>extension_off</mat-icon>{{ text.noExtension }}</p>
     }
@@ -30,7 +37,9 @@ const TEXT = {
       <p class="error" role="alert">{{ store.error() }}</p>
     }
 
-    @if (store.cards().length) {
+    @if (!store.loaded() && !store.error()) {
+      <p class="hint" role="status">{{ text.loading }}</p>
+    } @else if (store.cards().length) {
       <div class="cards">
         @for (card of store.cards(); track card.insurer.id) {
           <app-quote-card
@@ -42,7 +51,6 @@ const TEXT = {
             (launch)="launch(card)"
             (openExtranet)="openExtranet(card)"
             (answered)="complete(card, $event)"
-            (manualEntry)="openManualEntry(card)"
           />
         }
       </div>
@@ -94,19 +102,24 @@ export class PricingTabComponent {
   protected readonly store = inject(PricingStore);
   protected readonly dossierStore = inject(DossierStore);
   protected readonly extension = inject(ExtensionStore);
-  private readonly _dialog = inject(MatDialog);
   private readonly _snackBar = inject(MatSnackBar);
 
   protected readonly text = TEXT;
   protected readonly questions = computed(() => questionsOf(this.dossierStore.schema()));
-  protected readonly extensionMissing = computed(() => ['absent', 'unsupported'].includes(this.extension.status() ?? ''));
+  /** La couverture n'est pas encore validée : la tarification attend. */
+  protected readonly awaitingCoverage = computed(() =>
+    ['brouillon', 'complet'].includes(this.dossierStore.dossier()?.status ?? ''),
+  );
+  protected readonly extensionMissing = computed(() =>
+    ['absent', 'unsupported'].includes(this.extension.status() ?? ''),
+  );
 
   constructor() {
     effect(() => {
       const message = this.store.successMessage();
       if (message) {
         this._snackBar.open(message, undefined, { duration: 4000 });
-        this.store.clearMessages();
+        this.store.clearSuccess();
       }
     });
   }
@@ -126,20 +139,5 @@ export class PricingTabComponent {
 
   protected complete(card: PricingCard, answers: CanonicalData): void {
     this.store.complete(card.insurer.id, answers);
-  }
-
-  protected openManualEntry(card: PricingCard): void {
-    this._dialog
-      .open<ManualOfferDialogComponent, ManualOfferDialogData, ManualOfferSubmission>(ManualOfferDialogComponent, {
-        data: { insurerName: card.insurer.name, guarantees: this.dossierStore.guarantees(), offer: card.offer },
-        width: '760px',
-        maxWidth: '95vw',
-      })
-      .afterClosed()
-      .subscribe(submission => {
-        if (submission) {
-          this.store.saveManualOffer(card.insurer.id, submission);
-        }
-      });
   }
 }

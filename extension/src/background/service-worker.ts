@@ -1,6 +1,7 @@
 import { EXTENSION_REPORT_ISSUES, EXTENSION_REPORT_STEPS, ExtensionReportIssue, ExtensionReportStep } from '@shared';
 import { hasPremium, sanitizeOffer } from '../engine/offer';
 import {
+  AccessRequest,
   ActivePage,
   AskAiResponse,
   AuthState,
@@ -21,10 +22,14 @@ import {
 } from '../shared/messages';
 import { createAuthController, toUserMessage, UserFacingError } from './auth-controller';
 import { firebaseAuthPort, firebaseBackendPort, firestoreSessionPort } from './firebase-adapters';
-import { addExtensionReport, askAi, findJobForOrigin, listRecentJobs, updateJob, watchJob, watchRecentJobs, writeCapturedOffer } from './jobs-service';
+import { addExtensionReport, askAi, findJobForOrigin, listRecentJobs, loadInsurers, updateJob, watchJob, watchRecentJobs, writeCapturedOffer } from './jobs-service';
 import { startLiveWatch } from './live';
-import { invalidateMemory, loadMemory, saveMemory, touchMemory } from './memory-service';
-import { countRequested } from './origin-match';
+import { invalidateMemory, loadMemory, reportDiscoveredFields, saveMemory, touchMemory } from './memory-service';
+import { countRequested, extranetPatterns, insurerForOrigin } from './origin-match';
+import { checkSender, externalOriginsFromMatches, JOB_COMMANDS, jobMatches, MemoryKeyRegistry, sanitizeAiRequest } from './sender-guard';
+import { MAPPING_SYSTEM_PROMPT } from '../engine/ai-fallback';
+import { CAPTURE_SYSTEM_PROMPT } from '../engine/capture-ai';
+import { memoryKeyFor } from '../engine/memory';
 
 // Un clic sur l'icône de l'extension ouvre le side panel.
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(console.error);
@@ -44,6 +49,8 @@ let stopLive: (() => void) | null = null;
 const runByTab = new Map<number, RunState>();
 /** Suivi du dossier de chaque onglet qui remplit un extranet. */
 const jobWatchByTab = new Map<number, () => void>();
+/** Job (dossier, assureur) suivi par chaque onglet : seul celui-ci peut être mis à jour depuis cet onglet. */
+const jobByTab = new Map<number, { dossierId: string; insurerId: string }>();
 
 async function activeTabId(): Promise<number | undefined> {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -136,11 +143,13 @@ async function syncJobsWatch(): Promise<void> {
 function stopJobWatch(tabId: number): void {
   jobWatchByTab.get(tabId)?.();
   jobWatchByTab.delete(tabId);
+  jobByTab.delete(tabId);
 }
 
 /** Prévient le content script quand le courtier répond aux champs manquants dans l'app. */
 function startJobWatch(tabId: number, user: ExtensionUser, job: JobContext): void {
   stopJobWatch(tabId);
+  jobByTab.set(tabId, { dossierId: job.dossierId, insurerId: job.insurerId });
   jobWatchByTab.set(
     tabId,
     watchJob(user, job.dossierId, job.insurerId, changed => {
@@ -183,7 +192,9 @@ auth.onChange(state => {
     runByTab.clear();
     jobWatchByTab.forEach(stop => stop());
     jobWatchByTab.clear();
+    jobByTab.clear();
   }
+  void syncContentScripts();
   void syncLiveWatch().then(() => broadcast(state));
   void refreshBadge();
 });
@@ -204,14 +215,34 @@ chrome.runtime.onConnect.addListener(port => {
 // Un content script qui remplit un extranet garde le service worker éveillé tant que sa page est ouverte.
 chrome.runtime.onConnect.addListener(port => {
   if (port.name !== RUNNER_PORT) return;
-  port.onMessage.addListener(() => undefined);
+  const tabId = port.sender?.tab?.id;
+  let origin = '';
+  try {
+    origin = port.sender?.url ? new URL(port.sender.url).origin : '';
+  } catch {
+    origin = '';
+  }
+  // Seul le cadre principal d'un onglet (content script) ouvre ce port.
+  if (tabId === undefined || (port.sender?.frameId ?? 0) !== 0 || !origin) {
+    port.disconnect();
+    return;
+  }
+  port.onMessage.addListener((message: { type?: string; dossierId?: unknown; insurerId?: unknown }) => {
+    // Port rouvert après un redémarrage du service worker : le suivi du job est rétabli, après vérification
+    // (le job annoncé par la page doit être celui que le service worker trouve lui-même pour cette origine).
+    if (message?.type !== 'JOB' || jobByTab.has(tabId)) return;
+    void signedInUser()
+      .then(async user => {
+        if (!user) return;
+        const job = await findJobForOrigin(user, origin);
+        if (job && jobMatches(job, String(message.dossierId), String(message.insurerId)) && !jobByTab.has(tabId)) startJobWatch(tabId, user, job);
+      })
+      .catch(() => undefined);
+  });
   port.onDisconnect.addListener(() => {
-    const tabId = port.sender?.tab?.id;
-    if (tabId !== undefined) {
-      stopJobWatch(tabId);
-      runByTab.delete(tabId);
-      void broadcast();
-    }
+    stopJobWatch(tabId);
+    runByTab.delete(tabId);
+    void broadcast();
   });
 });
 
@@ -306,85 +337,272 @@ async function rejectCapture(): Promise<CaptureResponse> {
   return { ok: true };
 }
 
+// ── Injection à la demande du content script (extranets du catalogue seulement) ──
+const CONTENT_SCRIPT_ID = 'extranets';
+const CONTENT_SCRIPT_FILE = 'content/content-script.js';
+
+/** Motifs des extranets du catalogue (vide si personne n'est connecté ou si le catalogue est illisible). */
+async function catalogPatterns(): Promise<string[]> {
+  if (!(await signedInUser())) return [];
+  try {
+    return extranetPatterns((await loadInsurers()).flatMap(insurer => insurer.extranetDomains));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Enregistre le content script pour les extranets du catalogue auxquels le courtier a donné accès (permissions
+ * d'hôte optionnelles) ; le retire sinon. Appelé à la connexion, au réveil et quand une permission change.
+ */
+async function syncContentScripts(): Promise<void> {
+  try {
+    const patterns = await catalogPatterns();
+    const granted: string[] = [];
+    for (const pattern of patterns) {
+      if (await chrome.permissions.contains({ origins: [pattern] })) granted.push(pattern);
+    }
+    const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [CONTENT_SCRIPT_ID] });
+    if (registered.length) await chrome.scripting.unregisterContentScripts({ ids: [CONTENT_SCRIPT_ID] });
+    if (granted.length === 0) return;
+    await chrome.scripting.registerContentScripts([
+      { id: CONTENT_SCRIPT_ID, matches: granted, js: [CONTENT_SCRIPT_FILE], runAt: 'document_idle', allFrames: false, persistAcrossSessions: true },
+    ]);
+  } catch (error) {
+    console.error('Enregistrement du content script impossible', error);
+  }
+}
+
+/** L'onglet actif est-il l'extranet d'un assureur auquel l'extension n'a pas encore accès ? */
+async function accessRequest(): Promise<AccessRequest | null> {
+  if (!(await signedInUser())) return null;
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const origin = originOnly(tab?.url);
+  if (!origin) return null;
+  const insurer = insurerForOrigin(origin, await loadInsurers());
+  if (!insurer) return null;
+  const origins = extranetPatterns(insurer.extranetDomains);
+  if (origins.length === 0 || (await chrome.permissions.contains({ origins }))) return null;
+  return { insurerName: insurer.name, origins };
+}
+
+/** Accès accordé depuis le side panel : enregistrement, puis injection immédiate dans l'onglet actif (sans recharger). */
+async function onAccessGranted(): Promise<boolean> {
+  await syncContentScripts();
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const origin = originOnly(tab?.url);
+  if (tab?.id === undefined || !origin || !insurerForOrigin(origin, await loadInsurers())) return false;
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [CONTENT_SCRIPT_FILE] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+chrome.permissions.onAdded.addListener(() => void syncContentScripts());
+chrome.permissions.onRemoved.addListener(() => void syncContentScripts());
+void syncContentScripts();
+
+/**
+ * Filet de sécurité : un extranet du catalogue a fini de charger, l'accès est accordé, mais la page n'a pas signalé
+ * notre script (onglet ouvert avant un rechargement de l'extension, enregistrement perdu au réveil du service worker
+ * avant la connexion…). On réenregistre et on injecte directement ; le script ignore une seconde injection.
+ */
+async function ensureInjected(tabId: number, url: string | undefined): Promise<void> {
+  const origin = originOnly(url);
+  if (!origin || !(await signedInUser())) return;
+  const insurer = insurerForOrigin(origin, await loadInsurers().catch(() => []));
+  if (!insurer) return;
+  const origins = extranetPatterns(insurer.extranetDomains);
+  if (!origins.length || !(await chrome.permissions.contains({ origins }))) return;
+  // Laisse au script enregistré le temps de se signaler (PAGE_DETECTED) avant d'injecter nous-mêmes.
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  if (pagesByTab.has(tabId)) return;
+  const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [CONTENT_SCRIPT_ID] });
+  if (!registered.length) await syncContentScripts();
+  await chrome.scripting.executeScript({ target: { tabId }, files: [CONTENT_SCRIPT_FILE] }).catch(error => {
+    console.error('Injection du content script impossible', error);
+  });
+}
+
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  // Nouvelle page dans l'onglet : l'ancienne analyse ne vaut plus (le script de la nouvelle page se signalera).
+  if (info.status === 'loading') pagesByTab.delete(tabId);
+  if (info.status === 'complete') void ensureInjected(tabId, tab.url);
+});
+
+// ── Messages internes ───────────────────────────────────────────────────────
+const PANEL_URL_PREFIX = chrome.runtime.getURL('sidepanel/');
+
+/** Le job suivi par l'onglet (son remplissage en cours), d'après le service worker et jamais d'après la page. */
+function tabJob(tabId: number): { dossierId: string; insurerId: string } | undefined {
+  return jobByTab.get(tabId) ?? runByTab.get(tabId);
+}
+
+/** Prompts système fixes de l'IA, par usage : la page ne choisit que l'usage. */
+const AI_PROMPTS: Record<string, string> = { mapping: MAPPING_SYSTEM_PROMPT, capture: CAPTURE_SYSTEM_PROMPT };
+/** Clés de mémoire calculées par onglet (MEMORY_TOUCH/INVALIDATE n'acceptent que celles de l'origine de l'onglet). */
+const memoryKeys = new MemoryKeyRegistry();
+
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+  // Expéditeur vérifié : side panel pour ses commandes, cadre principal d'un onglet pour celles du content script.
+  const access = checkSender(message?.type, sender, PANEL_URL_PREFIX, chrome.runtime.id);
+  if (!access) return false;
+  // Origine de la page : celle de l'expéditeur, jamais celle annoncée dans le message.
+  const tab = access.kind === 'tab' ? access : null;
+  const job = tab ? tabJob(tab.tabId) : undefined;
+  if (tab && JOB_COMMANDS.has(message.type) && !job) {
+    sendResponse(message.type === 'MEMORY_LOAD' ? null : message.type === 'ASK_AI' ? ({ ok: false, message: 'Aucun remplissage en cours sur cet onglet.' } satisfies AskAiResponse) : false);
+    return false;
+  }
+
   switch (message.type) {
     case 'PAGE_DETECTED':
-      if (sender.tab?.id !== undefined) {
-        pagesByTab.set(sender.tab.id, { origin: message.origin, title: message.title, fieldCount: message.fieldCount });
-      }
+      pagesByTab.set(tab!.tabId, { origin: tab!.origin, title: String(message.title).slice(0, 200), fieldCount: Number(message.fieldCount) || 0 });
       return false;
 
     case 'GET_ACTIVE_PAGE':
-      chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-        sendResponse(tab?.id !== undefined ? (pagesByTab.get(tab.id) ?? null) : null);
-      });
+      chrome.tabs
+        .query({ active: true, currentWindow: true })
+        .then(([active]) => sendResponse(active?.id !== undefined ? (pagesByTab.get(active.id) ?? null) : null))
+        .catch(() => sendResponse(null));
       return true; // réponse asynchrone
 
     case 'GET_STATE':
-      panelState().then(sendResponse);
+      panelState()
+        .then(sendResponse)
+        .catch(() => sendResponse(null));
+      return true;
+
+    case 'GET_ACCESS_REQUEST':
+      accessRequest()
+        .then(sendResponse)
+        .catch(() => sendResponse(null));
+      return true;
+
+    case 'ACCESS_GRANTED':
+      onAccessGranted()
+        .then(sendResponse)
+        .catch(() => sendResponse(false));
       return true;
 
     case 'GET_JOB_FOR_ORIGIN': {
       // Le content script d'une page demande : y a-t-il une tarification à faire sur cet extranet ?
-      const tabId = sender.tab?.id;
+      const { tabId, origin } = tab!;
       signedInUser()
         .then(async user => {
-          const job = user ? await findJobForOrigin(user, message.origin) : null;
-          if (user && job && tabId !== undefined) startJobWatch(tabId, user, job);
-          sendResponse(job);
+          const found = user ? await findJobForOrigin(user, origin) : null;
+          if (user && found) startJobWatch(tabId, user, found);
+          sendResponse(found);
         })
         .catch(() => sendResponse(null));
       return true;
     }
 
     case 'UPDATE_JOB':
+      // Seul le job suivi par cet onglet peut être mis à jour.
+      if (!jobMatches(job, message.dossierId, message.insurerId)) {
+        sendResponse(false);
+        return false;
+      }
       signedInUser()
-        .then(user => (user ? updateJob(user, message.dossierId, message.insurerId, message.update) : undefined))
-        .then(() => sendResponse(true))
+        .then(async user => {
+          if (!user) return false;
+          await updateJob(user, message.dossierId, message.insurerId, message.update);
+          return true;
+        })
+        .then(sendResponse)
         .catch(() => sendResponse(false));
       return true;
 
     case 'RUN_STATE':
-      if (sender.tab?.id !== undefined) {
-        if (message.state) runByTab.set(sender.tab.id, message.state);
-        else runByTab.delete(sender.tab.id);
-        void broadcast();
-      }
+      if (!message.state) runByTab.delete(tab!.tabId);
+      // Un avancement n'est accepté que pour le job suivi par l'onglet.
+      else if (jobMatches(jobByTab.get(tab!.tabId), message.state.dossierId, message.state.insurerId)) runByTab.set(tab!.tabId, message.state);
+      else return false;
+      void broadcast();
       return false;
 
     case 'REPORT_ISSUE':
-      report(message.insurerId, message.origin, message.step, message.issue).then(() => sendResponse(true));
+      report(job!.insurerId, tab!.origin, message.step, message.issue)
+        .then(() => sendResponse(true))
+        .catch(() => sendResponse(false));
       return true;
 
     case 'CONFIRM_CAPTURE':
-      confirmCapture(message.edits).then(sendResponse);
+      confirmCapture(message.edits)
+        .then(sendResponse)
+        .catch(error => sendResponse({ ok: false, message: toUserMessage(error) } satisfies CaptureResponse));
       return true;
 
     case 'REJECT_CAPTURE':
-      rejectCapture().then(sendResponse);
+      rejectCapture()
+        .then(sendResponse)
+        .catch(error => sendResponse({ ok: false, message: toUserMessage(error) } satisfies CaptureResponse));
       return true;
 
-    case 'ASK_AI':
-      askAi({ system: message.system, messages: message.messages, maxTokens: message.maxTokens })
+    case 'ASK_AI': {
+      // Prompt système fixe (jamais celui de la page), tokens plafonnés, texte borné.
+      const request = sanitizeAiRequest(message, AI_PROMPTS);
+      if (!request) {
+        sendResponse({ ok: false, message: 'Requête d’IA invalide.' } satisfies AskAiResponse);
+        return false;
+      }
+      signedInUser()
+        .then(user => {
+          if (!user) throw new UserFacingError('Connectez-vous à l’extension pour utiliser l’assistance IA.');
+          return askAi(request);
+        })
         .then(text => sendResponse({ ok: true, text } satisfies AskAiResponse))
-        .catch(error => sendResponse({ ok: false, message: toUserMessage(error) } satisfies AskAiResponse));
+        .catch(error =>
+          sendResponse({ ok: false, message: error instanceof UserFacingError ? error.message : toUserMessage(error) } satisfies AskAiResponse),
+        );
       return true;
+    }
+
+    // Nouveaux champs d'un extranet : ajoutés au questionnaire côté serveur. Une panne ne gêne jamais le remplissage.
+    case 'FIELDS_DISCOVERED': {
+      const insurerId = tabJob(tab!.tabId)?.insurerId;
+      if (!insurerId || !Array.isArray(message.fields)) {
+        sendResponse(false);
+        return false;
+      }
+      signedInUser()
+        .then(user => (user ? reportDiscoveredFields(insurerId, tab!.origin, String(message.fingerprint), message.fields, Array.isArray(message.requiredPaths) ? message.requiredPaths : []) : undefined))
+        .then(() => sendResponse(true))
+        .catch(() => sendResponse(false));
+      return true;
+    }
 
     // Mémoire partagée des formulaires (E8) : une panne ne doit jamais empêcher le remplissage.
     case 'MEMORY_LOAD':
       signedInUser()
-        .then(user => (user ? loadMemory(message.origin, message.fingerprint) : null))
-        .then(sendResponse)
+        .then(user => (user ? loadMemory(tab!.origin, message.fingerprint) : null))
+        .then(async loaded => {
+          // La clé est calculée ici pour l'origine réelle de l'onglet : seule celle-ci pourra être utilisée/invalidée.
+          memoryKeys.remember(tab!.tabId, tab!.origin, await memoryKeyFor(tab!.origin, String(message.fingerprint)));
+          sendResponse(loaded);
+        })
         .catch(() => sendResponse(null));
       return true;
 
     case 'MEMORY_SAVE':
     case 'MEMORY_TOUCH':
     case 'MEMORY_INVALIDATE':
+      // Une clé ne s'utilise que sur l'origine de l'onglet qui l'a chargée (jamais la mémoire d'un autre extranet).
+      if (message.type !== 'MEMORY_SAVE' && !memoryKeys.allows(tab!.tabId, tab!.origin, message.key)) {
+        sendResponse(false);
+        return false;
+      }
       signedInUser()
-        .then(user => {
+        .then(async user => {
           if (!user) return;
-          if (message.type === 'MEMORY_SAVE') return saveMemory(message.origin, message.fingerprint, message.fields);
+          if (message.type === 'MEMORY_SAVE') {
+            await saveMemory(tab!.origin, message.fingerprint, message.fields);
+            memoryKeys.remember(tab!.tabId, tab!.origin, await memoryKeyFor(tab!.origin, String(message.fingerprint)));
+            return;
+          }
           return message.type === 'MEMORY_TOUCH' ? touchMemory(message.key) : invalidateMemory(message.key);
         })
         .then(() => sendResponse(true))
@@ -395,13 +613,16 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     case 'REFILL':
     case 'CAPTURE_NOW':
       // Depuis le side panel : transmis à la page de l'onglet actif.
-      activeTabId().then(tabId => {
-        if (tabId === undefined) return sendResponse(false);
-        chrome.tabs.sendMessage(tabId, message as TabMessage).then(
-          () => sendResponse(true),
-          () => sendResponse(false),
-        );
-      });
+      activeTabId()
+        .then(tabId => {
+          if (tabId === undefined) return false;
+          return chrome.tabs.sendMessage(tabId, message as TabMessage).then(
+            () => true,
+            () => false,
+          );
+        })
+        .then(sendResponse)
+        .catch(() => sendResponse(false));
       return true;
 
     case 'SIGN_IN':
@@ -410,6 +631,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         .then(async state => {
           const response: SignInResponse = { ok: true, state: await panelState(state) };
           sendResponse(response);
+          void syncContentScripts();
         })
         .catch(error => {
           const response: SignInResponse = { ok: false, message: error instanceof UserFacingError ? error.message : toUserMessage(error) };
@@ -421,14 +643,18 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
       auth
         .signOut()
         .then(state => panelState(state))
-        .then(sendResponse);
+        .then(sendResponse)
+        // Déconnexion en échec : le side panel reçoit l'état courant (il ne reste jamais sans réponse).
+        .catch(() => panelState().then(sendResponse, () => sendResponse(null)));
       return true;
   }
+  return false;
 });
 
 chrome.tabs.onRemoved.addListener(tabId => {
   pagesByTab.delete(tabId);
   runByTab.delete(tabId);
+  memoryKeys.forget(tabId);
   stopJobWatch(tabId);
 });
 // Le side panel montre l'avancement de l'onglet actif : il change avec lui.
@@ -436,10 +662,17 @@ chrome.tabs.onActivated.addListener(() => void broadcast());
 
 // Messages de l'app Angular (domaines autorisés dans manifest.json → externally_connectable).
 // L'app ne transmet aucun identifiant : l'extension a sa propre connexion Firebase.
-chrome.runtime.onMessageExternal.addListener((message: ExternalMessage, _sender, sendResponse) => {
-  switch (message.type) {
+const EXTERNAL_ORIGINS = externalOriginsFromMatches(chrome.runtime.getManifest().externally_connectable?.matches);
+
+chrome.runtime.onMessageExternal.addListener((message: ExternalMessage, sender, sendResponse) => {
+  // Seules les origines de l'app déclarées dans le manifest sont écoutées (jamais une autre extension).
+  const origin = sender.origin ?? originOnly(sender.url);
+  if (sender.id !== undefined && sender.id !== chrome.runtime.id) return false;
+  if (!origin || !EXTERNAL_ORIGINS.has(origin)) return false;
+  switch (message?.type) {
     case 'PING':
       sendResponse({ type: 'PONG', version: chrome.runtime.getManifest().version });
       return false;
   }
+  return false;
 });

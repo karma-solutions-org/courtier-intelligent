@@ -1,10 +1,23 @@
-import type { CanonicalPath } from '@shared';
+import { isFixedCanonicalPath, type CanonicalPath, type FixedCanonicalPath } from '@shared';
 import type { FieldKind } from './analyzer';
+
+/**
+ * Nom lisible d'un chemin : premier synonyme pour la liste fermée ; pour une question ajoutée depuis un extranet
+ * (`extra.kilometrage_annuel`), son code en clair (« kilometrage annuel »).
+ */
+export function pathExample(path: CanonicalPath): string {
+  return isFixedCanonicalPath(path) ? FIELD_SYNONYMS[path].labels[0] : path.slice('extra.'.length).replace(/_/g, ' ');
+}
+
+/** La valeur à écrire est-elle une date ? Connu pour la liste fermée ; déduit de la valeur (AAAA-MM-JJ) sinon. */
+export function expectsDate(path: CanonicalPath, value: unknown): boolean {
+  return isFixedCanonicalPath(path) ? PATH_EXPECTED[path] === 'date' : typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
 
 /** Type de réponse attendu pour un chemin canonique : détermine les champs HTML compatibles. */
 export type Expected = 'text' | 'date' | 'number' | 'boolean' | 'choice';
 
-export const PATH_EXPECTED: Record<CanonicalPath, Expected> = {
+export const PATH_EXPECTED: Record<FixedCanonicalPath, Expected> = {
   'client.firstName': 'text',
   'client.lastName': 'text',
   'client.nationalId': 'text',
@@ -25,6 +38,9 @@ export const PATH_EXPECTED: Record<CanonicalPath, Expected> = {
   'vehicle.vehicleType': 'choice',
   'vehicle.usage': 'choice',
   'vehicle.parkingType': 'choice',
+  'vehicle.energyType': 'choice',
+  'vehicle.parkingPostalCode': 'text',
+  'vehicle.parkingCity': 'text',
   'vehicle.purchaseDate': 'date',
   'driver.firstName': 'text',
   'driver.lastName': 'text',
@@ -32,6 +48,7 @@ export const PATH_EXPECTED: Record<CanonicalPath, Expected> = {
   'driver.licenseDate': 'date',
   'driver.licenseType': 'choice',
   'driver.profession': 'text',
+  'driver.socioProfessionalCategory': 'choice',
   'driver.phone': 'text',
   'insuranceHistory.currentlyInsured': 'boolean',
   'insuranceHistory.previousInsurer': 'text',
@@ -66,7 +83,7 @@ export interface FieldSynonyms {
   autocomplete?: string[];
 }
 
-export const FIELD_SYNONYMS: Record<CanonicalPath, FieldSynonyms> = {
+export const FIELD_SYNONYMS: Record<FixedCanonicalPath, FieldSynonyms> = {
   'client.firstName': { labels: ['prenom', 'votre prenom', 'prenom du souscripteur', 'prenom du titulaire'], names: ['prenom', 'firstname', 'givenname'], autocomplete: ['given-name'] },
   'client.lastName': { labels: ['nom', 'votre nom', 'nom de famille', 'nom du souscripteur', 'nom du titulaire', 'nom d usage'], names: ['nom', 'lastname', 'familyname', 'surname'], autocomplete: ['family-name'] },
   'client.nationalId': { labels: ['numero de securite sociale', 'n securite sociale', 'numero d identification', 'numero insee', 'piece d identite'], names: ['nir', 'secu', 'insee'] },
@@ -88,6 +105,9 @@ export const FIELD_SYNONYMS: Record<CanonicalPath, FieldSynonyms> = {
   'vehicle.vehicleType': { labels: ['type de vehicule', 'categorie du vehicule', 'type', 'categorie'], names: ['vehicletype', 'typevehicule', 'categorie'] },
   'vehicle.usage': { labels: ['usage du vehicule', 'usage', 'utilisation du vehicule', 'utilisation', 'type d usage', 'usage principal'], names: ['usage', 'utilisation'] },
   'vehicle.parkingType': { labels: ['stationnement', 'lieu de stationnement', 'stationnement de nuit', 'lieu de stationnement la nuit', 'garage', 'lieu de garage', 'ou stationne votre vehicule'], names: ['stationnement', 'parking', 'garage'] },
+  'vehicle.energyType': { labels: ['energie', 'type d energie', 'carburant', 'type de carburant', 'motorisation energie', 'source d energie'], names: ['energie', 'energy', 'carburant', 'fuel', 'fueltype'] },
+  'vehicle.parkingPostalCode': { labels: ['code postal de stationnement', 'code postal du lieu de stationnement', 'code postal de garage', 'code postal du lieu de garage', 'localisation du vehicule'], names: ['cpstationnement', 'cpgarage', 'parkingpostalcode', 'garagezip'] },
+  'vehicle.parkingCity': { labels: ['ville de stationnement', 'commune de stationnement', 'ville du lieu de garage', 'commune de garage'], names: ['villestationnement', 'villegarage', 'parkingcity'] },
   'vehicle.purchaseDate': { labels: ['date d achat', 'date d acquisition', 'achete le', 'date d achat du vehicule'], names: ['purchasedate', 'achat', 'acquisition'] },
 
   'driver.firstName': { labels: ['prenom du conducteur', 'prenom conducteur', 'prenom du conducteur principal'], names: ['driverfirstname', 'prenomconducteur'] },
@@ -95,7 +115,8 @@ export const FIELD_SYNONYMS: Record<CanonicalPath, FieldSynonyms> = {
   'driver.birthDate': { labels: ['date de naissance du conducteur', 'naissance du conducteur', 'date de naissance conducteur'], names: ['driverbirthdate', 'naissanceconducteur'] },
   'driver.licenseDate': { labels: ['date d obtention du permis', 'date du permis', 'obtention du permis', 'permis obtenu le', 'date d obtention du permis de conduire', 'date de permis'], names: ['licensedate', 'datepermis', 'obtentionpermis', 'permis'] },
   'driver.licenseType': { labels: ['type de permis', 'categorie de permis', 'permis', 'permis de conduire'], names: ['licensetype', 'typepermis', 'categoriepermis'] },
-  'driver.profession': { labels: ['profession', 'metier', 'situation professionnelle', 'categorie socio professionnelle', 'csp', 'activite professionnelle'], names: ['profession', 'metier', 'csp', 'job'], autocomplete: ['organization-title'] },
+  'driver.profession': { labels: ['profession', 'metier', 'activite professionnelle'], names: ['profession', 'metier', 'job'], autocomplete: ['organization-title'] },
+  'driver.socioProfessionalCategory': { labels: ['categorie socio professionnelle', 'categorie socioprofessionnelle', 'csp', 'situation professionnelle', 'statut professionnel'], names: ['csp', 'categoriesocioprofessionnelle', 'socioprofessional'] },
   'driver.phone': { labels: ['telephone du conducteur', 'telephone conducteur'], names: ['driverphone'] },
 
   'insuranceHistory.currentlyInsured': { labels: ['etes vous actuellement assure', 'actuellement assure', 'etes vous assure', 'deja assure', 'avez vous un contrat en cours', 'assure actuellement', 'avez vous deja ete assure'], names: ['currentlyinsured', 'dejaassure', 'assureactuellement'] },
@@ -125,7 +146,7 @@ export const PREFIX_KEYWORDS: Record<string, string[]> = {
  * Un champ « Nom » ou « Date de naissance » placé dans la section du conducteur est celui du conducteur :
  * ces chemins reprennent les libellés de leur équivalent côté souscripteur, mais seulement dans ce contexte.
  */
-export const INHERITED_LABELS: Partial<Record<CanonicalPath, CanonicalPath>> = {
+export const INHERITED_LABELS: Partial<Record<FixedCanonicalPath, FixedCanonicalPath>> = {
   'driver.firstName': 'client.firstName',
   'driver.lastName': 'client.lastName',
   'driver.birthDate': 'client.birthDate',

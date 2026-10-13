@@ -511,10 +511,12 @@ export class DocumentImportContainerComponent {
   protected download(document: DossierDocument): void {
     // Fenêtre ouverte tout de suite (sinon bloquée par le navigateur), puis dirigée vers le lien de téléchargement.
     const target = window.open('', '_blank');
+    // Coupe le lien vers l'application (équivalent de noopener, qui empêcherait de piloter l'onglet).
+    if (target) target.opener = null;
     this._service.downloadUrl(document.storagePath).subscribe({
       next: url => {
         if (target) target.location.href = url;
-        else window.open(url, '_blank');
+        else window.open(url, '_blank', 'noopener');
       },
       error: error => {
         target?.close();

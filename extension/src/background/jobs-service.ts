@@ -35,7 +35,7 @@ const INSURERS_CACHE_KEY = 'insurers';
  * Les assureurs sont gardés en mémoire de session : le service worker redémarre souvent et chaque page web
  * ouverte lui demande « est-ce un extranet ? » — on ne relit pas Firestore à chaque fois.
  */
-async function loadInsurers(): Promise<InsurerInfo[]> {
+export async function loadInsurers(): Promise<InsurerInfo[]> {
   const cached = (await chrome.storage.session.get(INSURERS_CACHE_KEY))[INSURERS_CACHE_KEY] as { at: number; value: InsurerInfo[] } | undefined;
   if (cached && Date.now() - cached.at < INSURERS_TTL_MS) return cached.value;
   const snapshot = await getDocs(collection(getFirebase().firestore, 'insurers'));

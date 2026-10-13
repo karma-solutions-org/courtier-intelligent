@@ -27,7 +27,7 @@ La reconnaissance par le vrai moteur est vérifiée par `src/engine/demo-extrane
 
 ## Démonstration pas à pas
 
-1. **Construire et charger l'extension** : dans `extension/`, `npm install` puis `npm run build`.
+1. **Construire et charger l'extension** : dans `extension/`, `npm install` puis `npm run build:demo` (vrai projet de test, localhost autorisé ; `npm run build` retire tout accès à localhost).
    Dans Chrome, `chrome://extensions` → activer le *Mode développeur* → **Charger l'extension non empaquetée** →
    choisir le dossier `extension/dist`.
 2. **Lancer l'application** : dans `app/`, `npm start` → <http://localhost:4200>, se connecter avec le compte courtier.

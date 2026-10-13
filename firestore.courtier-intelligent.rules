@@ -111,11 +111,50 @@
         && offer.capturedAt == request.time;
     }
 
+    // Statuts où l'extension travaille sur un job (RUNNABLE_STATUSES, extension/src/background/origin-match.ts).
+    function ciExtRunnableStatuses() {
+      return ['requested', 'analyzing', 'needs_info', 'filling', 'awaiting_submit'];
+    }
+
+    // Transitions écrites par l'extension (engine/runner.ts, background/service-worker.ts, jobs-service.ts) :
+    // 'analyzing' au démarrage, puis 'needs_info' / 'filling' / 'awaiting_submit' (l'échec du rapport 'analyzing'
+    // n'arrête pas le remplissage, d'où depuis 'requested'), 'captured' (writeCapturedOffer, possible dès l'ouverture
+    // d'une page de résultat) et 'failed' (rejectCapture). 'captured' et 'failed' sont terminaux pour l'extension :
+    // seule la function tarification-lancer relance un job (Admin SDK).
+    function ciExtJobTransitions() {
+      return {
+        'requested':       ['analyzing', 'needs_info', 'filling', 'awaiting_submit', 'captured', 'failed'],
+        'analyzing':       ['analyzing', 'needs_info', 'filling', 'awaiting_submit', 'captured', 'failed'],
+        'needs_info':      ['analyzing', 'needs_info', 'filling', 'awaiting_submit', 'captured', 'failed'],
+        'filling':         ['analyzing', 'needs_info', 'filling', 'awaiting_submit', 'captured', 'failed'],
+        'awaiting_submit': ['analyzing', 'needs_info', 'filling', 'awaiting_submit', 'captured', 'failed']
+      };
+    }
+
     function ciExtJobUpdate() {
-      return request.resource.data.ownerUid == resource.data.ownerUid
-        && request.resource.data.diff(resource.data).affectedKeys()
+      let next = request.resource.data;
+      return next.ownerUid == resource.data.ownerUid
+        && next.diff(resource.data).affectedKeys()
              .hasOnly(['status', 'currentStep', 'totalSteps', 'error', 'attempts', 'missingFields', 'updatedAt'])
-        && request.resource.data.status in ['analyzing', 'needs_info', 'filling', 'awaiting_submit', 'captured', 'failed'];
+        && resource.data.get('status', null) in ciExtRunnableStatuses()
+        && next.status in ciExtJobTransitions()[resource.data.status]
+        && (next.get('missingFields', null) == null
+            || (next.missingFields is list && next.missingFields.size() <= 200))
+        && (next.get('error', null) == null
+            || (next.error is string && next.error.size() <= 2000));
+    }
+
+    // Offre écrite par l'extension : get() lit le job AVANT le batch writeCapturedOffer (offre + job 'captured'),
+    // il est donc encore dans un statut de travail (une page de résultat peut être capturée dès 'requested').
+    function ciExtOfferWrite(t, dossierId, insurerId) {
+      let job = get(/databases/$(database)/documents/cabinets/$(t)/dossiers/$(dossierId)/quoteJobs/$(insurerId)).data;
+      return ciExtActive(t)
+        && job.ownerUid == request.auth.uid
+        && job.get('status', null) in ciExtRunnableStatuses()
+        && request.resource.data.source == 'auto'
+        && request.resource.data.keys().hasOnly(['quoteNumber', 'premiumAnnual', 'premiumMonthly', 'deductibles',
+                                                 'guarantees', 'exclusions', 'source', 'capturedAt'])
+        && ciExtOfferValid(request.resource.data);
     }
 
     // La requête du side panel : « mes jobs en cours », tous dossiers confondus.
@@ -170,11 +209,34 @@
 
       match /assures/{assureId} {
         allow read: if ciActive(cabinetId);
+        // Champs écrits par AssuresService.create (toAssureData + createdBy + createdAt), mêmes limites qu'à l'update.
         allow create: if ciActive(cabinetId) &&
-          request.resource.data.createdBy == request.auth.uid;
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.keys().hasOnly(['type', 'civilite', 'firstName', 'lastName', 'companyName', 'siret',
+            'birthDate', 'email', 'phone', 'address', 'createdBy', 'createdAt']) &&
+          (request.resource.data.get('address', null) == null ||
+            (request.resource.data.address is map && request.resource.data.address.size() <= 10)) &&
+          request.resource.data.get('firstName', '') is string &&
+          request.resource.data.get('firstName', '').size() <= 200 &&
+          request.resource.data.get('lastName', '') is string &&
+          request.resource.data.get('lastName', '').size() <= 200;
+        // Champs écrits par AssuresService.update (toAssureData + updatedAt).
         allow update: if ciActive(cabinetId) &&
-          ciKeysUnchanged(['createdBy', 'createdAt']);
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type', 'civilite', 'firstName',
+            'lastName', 'companyName', 'siret', 'birthDate', 'email', 'phone', 'address', 'updatedAt']) &&
+          (request.resource.data.get('address', null) == null ||
+            (request.resource.data.address is map && request.resource.data.address.size() <= 10)) &&
+          request.resource.data.get('firstName', '') is string &&
+          request.resource.data.get('firstName', '').size() <= 200 &&
+          request.resource.data.get('lastName', '') is string &&
+          request.resource.data.get('lastName', '').size() <= 200;
         allow delete: if ciActiveAdmin(cabinetId);
+
+        // Pièces du client (CNI, Kbis) : rattachées par la function assures-rattacherPiece.
+        match /documents/{documentId} {
+          allow read: if ciActive(cabinetId);
+          allow write: if false;
+        }
       }
 
       match /dossiers/{dossierId} {
@@ -182,8 +244,10 @@
         // Création, données, besoin, statut, assignation et référence passent par les functions dossiers-* :
         // elles appliquent la machine à états, la complétude et la numérotation.
         allow create: if false;
+        // Liste blanche (vide) : l'app n'écrit aucun champ du dossier directement — tout passe par les functions
+        // dossiers-*, tarification-*, propositions-*, documents-* (Admin SDK). decision, proposal, outcome… : serveur.
         allow update: if ciActive(cabinetId) &&
-          ciKeysUnchanged(['reference', 'completeness', 'createdAt', 'createdBy', 'status', 'assignedTo', 'data', 'draft', 'assureId', 'productId', 'needAnalysis']);
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([]);
         // Un dossier ne se supprime pas : on le passe en « sans_suite ».
         allow delete: if false;
 
@@ -200,7 +264,11 @@
         }
 
         match /documents/{documentId} {
-          allow read, create, update, delete: if ciActive(cabinetId);
+          allow read: if ciActive(cabinetId);
+          // Écrits uniquement par les functions documents-enregistrer / documents-analyser (statut, OCR, chemin).
+          allow create, update: if false;
+          allow delete: if ciActiveAdmin(cabinetId) ||
+            (ciActive(cabinetId) && resource.data.get('uploadedBy', null) == request.auth.uid);
         }
 
         // ── Extension : jobs et offres (voir ciExtActive). Écriture limitée au statut du job et aux offres automatiques.
@@ -210,12 +278,10 @@
         }
 
         match /offers/{insurerId} {
-          allow create, update: if ciExtActive(cabinetId)
-            && get(/databases/$(database)/documents/cabinets/$(cabinetId)/dossiers/$(dossierId)/quoteJobs/$(insurerId)).data.ownerUid == request.auth.uid
-            && request.resource.data.source == 'auto'
-            && request.resource.data.keys().hasOnly(['quoteNumber', 'premiumAnnual', 'premiumMonthly', 'deductibles',
-                                                     'guarantees', 'exclusions', 'source', 'capturedAt'])
-            && ciExtOfferValid(request.resource.data);
+          allow create: if ciExtOfferWrite(cabinetId, dossierId, insurerId);
+          // Jamais par-dessus une offre saisie à la main dans l'app.
+          allow update: if resource.data.get('source', null) == 'auto'
+            && ciExtOfferWrite(cabinetId, dossierId, insurerId);
         }
 
         // Historique non modifiable : création seule.
@@ -223,8 +289,12 @@
           allow read: if ciActive(cabinetId);
           // Les événements du dossier sont écrits par les functions ; seule une note est ajoutée depuis l'app.
           allow create: if ciActive(cabinetId) &&
+            request.resource.data.keys().hasOnly(['type', 'by', 'at', 'data']) &&
             request.resource.data.type == 'note' &&
-            request.resource.data.by == request.auth.uid;
+            request.resource.data.by == request.auth.uid &&
+            request.resource.data.at == request.time &&
+            (request.resource.data.get('data', null) == null ||
+              (request.resource.data.data is map && request.resource.data.data.size() <= 5));
           allow update, delete: if false;
         }
       }

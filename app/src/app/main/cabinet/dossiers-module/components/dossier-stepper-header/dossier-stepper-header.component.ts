@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 
-/** Les 4 étapes de « Nouveau dossier » : assuré → produit → questionnaire → récapitulatif. */
+/** Les 5 étapes de « Nouveau dossier » : client → produit → documents → questionnaire → récapitulatif. */
 @Component({
   selector: 'app-dossier-stepper-header',
   imports: [MatIconModule],

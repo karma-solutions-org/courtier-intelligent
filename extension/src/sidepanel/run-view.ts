@@ -1,10 +1,10 @@
 import type { CanonicalPath } from '@shared';
-import { FIELD_SYNONYMS } from '../engine/field-synonyms';
+import { pathExample } from '../engine/field-synonyms';
 import type { CapturedOffer, RunField, RunState } from '../shared/messages';
 
 /** Nom lisible d'un chemin canonique, pour la correction manuelle (« client.lastName » → « Nom »). */
 export function pathLabel(path: CanonicalPath): string {
-  const label = FIELD_SYNONYMS[path].labels[0];
+  const label = pathExample(path);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 

@@ -21,8 +21,7 @@ export const NAVIGATION: NavSection[] = [
     title: null,
     items: [
       { label: 'Tableau de bord', icon: 'space_dashboard', url: CabinetRouteContainerModel.DASHBOARD_ROUTE.url, roles: ALL },
-      { label: 'Dossiers', icon: 'folder_open', url: CabinetRouteContainerModel.DOSSIERS_ROUTE.url, roles: ALL },
-      { label: 'Assurés', icon: 'group', url: CabinetRouteContainerModel.ASSURES_ROUTE.url, roles: ALL },
+      { label: 'Clients', icon: 'group', url: CabinetRouteContainerModel.CLIENTS_ROUTE.url, roles: ALL },
     ],
   },
   {

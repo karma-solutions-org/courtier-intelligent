@@ -109,8 +109,8 @@ describe('AssureFormComponent', () => {
   it('signale les doublons trouvés et propose de créer quand même', async () => {
     tester.setInputs({ duplicates: [existing] });
 
-    await expect.element(tester.root.getByText('Cet assuré existe peut-être déjà')).toBeVisible();
-    await expect.element(tester.root.getByRole('link', { name: 'Ouvrir la fiche' })).toBeVisible();
+    await expect.element(tester.root.getByText('Ce client existe peut-être déjà')).toBeVisible();
+    await expect.element(tester.root.getByRole('link', { name: "Ouvrir l'espace client" })).toBeVisible();
 
     await tester.fillIdentity();
     await tester.root.getByRole('button', { name: 'Créer quand même' }).click();

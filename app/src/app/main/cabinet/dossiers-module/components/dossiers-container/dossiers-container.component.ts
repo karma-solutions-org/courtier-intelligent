@@ -4,13 +4,20 @@ import { DOSSIER_STATUSES, DossierStatus } from '@shared';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { DossiersStore, PAGE_SIZE_OPTIONS } from '../../store/dossiers.store';
 import { EMPTY_FILTER } from '../../util/dossiers.utils';
-import { DossierRow, DossiersListComponent, Option } from '../dossiers-list/dossiers-list.component';
+import {
+  DossierRow,
+  DossiersListComponent,
+  Option,
+} from '../dossiers-list/dossiers-list.component';
 
 /** Page « Dossiers » : liste avec filtres et pagination. */
 @Component({
   selector: 'app-dossiers-container',
   imports: [DossiersListComponent],
   template: `
+    @if (store.error()) {
+      <p class="error" role="alert">{{ store.error() }}</p>
+    }
     <app-dossiers-list
       [rows]="rows()"
       [total]="store.total()"
@@ -28,6 +35,16 @@ import { DossierRow, DossiersListComponent, Option } from '../dossiers-list/doss
       (pageChanged)="store.setPage($event.pageIndex, $event.pageSize)"
     />
   `,
+  styles: `
+    .error {
+      margin: 0 0 16px;
+      padding: 12px 14px;
+      border-left: 3px solid var(--ci-danger);
+      border-radius: 8px;
+      color: #8a1621;
+      background: var(--ci-danger-soft);
+    }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DossiersContainerComponent {
@@ -44,15 +61,17 @@ export class DossiersContainerComponent {
     }
   }
 
-  protected readonly productOptions = computed<Option[]>(() => this.store.products().map(p => ({ id: p.id, label: p.name })));
+  protected readonly productOptions = computed<Option[]>(() =>
+    this.store.products().map((p) => ({ id: p.id, label: p.name })),
+  );
   protected readonly courtierOptions = computed<Option[]>(() =>
-    this.store.members().map(m => ({ id: m.id, label: m.displayName || m.email || m.id })),
+    this.store.members().map((m) => ({ id: m.id, label: m.displayName || m.email || m.id })),
   );
 
   protected readonly rows = computed<DossierRow[]>(() => {
-    const products = new Map(this.store.products().map(p => [p.id, p.name]));
+    const products = new Map(this.store.products().map((p) => [p.id, p.name]));
     const members = this.store.memberNames();
-    return this.store.pageItems().map(dossier => ({
+    return this.store.pageItems().map((dossier) => ({
       dossier,
       assureName: this.store.assureName(dossier.assureId),
       productName: products.get(dossier.productId) ?? dossier.productId,

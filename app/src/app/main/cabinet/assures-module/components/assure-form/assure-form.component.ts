@@ -1,3 +1,4 @@
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -25,6 +26,7 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
 @Component({
   selector: 'app-assure-form',
   imports: [
+    MatDatepickerModule,
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
@@ -41,7 +43,11 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
 
       <section class="card">
         <h2>{{ structure.identity }}</h2>
-        <mat-button-toggle-group formControlName="type" [attr.aria-label]="structure.type" hideSingleSelectionIndicator>
+        <mat-button-toggle-group
+          formControlName="type"
+          [attr.aria-label]="structure.type"
+          hideSingleSelectionIndicator
+        >
           @for (type of types; track type.value) {
             <mat-button-toggle [value]="type.value">{{ type.label }}</mat-button-toggle>
           }
@@ -74,7 +80,14 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>{{ structure.birthDate }}</mat-label>
-              <input matInput type="date" formControlName="birthDate" />
+              <input
+                matInput
+                [matDatepicker]="birthPicker"
+                formControlName="birthDate"
+                placeholder="jj/mm/aaaa"
+              />
+              <mat-datepicker-toggle matIconSuffix [for]="birthPicker" />
+              <mat-datepicker #birthPicker />
               @if (form.controls.birthDate.hasError('birthDate')) {
                 <mat-error>{{ structure.errors.birthDate }}</mat-error>
               }
@@ -82,14 +95,24 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
           }
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.firstName }}</mat-label>
-            <input matInput formControlName="firstName" [maxlength]="maxLengths.firstName" autocomplete="off" />
+            <input
+              matInput
+              formControlName="firstName"
+              [maxlength]="maxLengths.firstName"
+              autocomplete="off"
+            />
             @if (form.controls.firstName.hasError('required')) {
               <mat-error>{{ structure.errors.required }}</mat-error>
             }
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.lastName }}</mat-label>
-            <input matInput formControlName="lastName" [maxlength]="maxLengths.lastName" autocomplete="off" />
+            <input
+              matInput
+              formControlName="lastName"
+              [maxlength]="maxLengths.lastName"
+              autocomplete="off"
+            />
             @if (form.controls.lastName.hasError('required')) {
               <mat-error>{{ structure.errors.required }}</mat-error>
             }
@@ -102,14 +125,26 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
         <div class="grid">
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.email }}</mat-label>
-            <input matInput type="email" formControlName="email" [maxlength]="maxLengths.email" autocomplete="off" />
+            <input
+              matInput
+              type="email"
+              formControlName="email"
+              [maxlength]="maxLengths.email"
+              autocomplete="off"
+            />
             @if (form.controls.email.hasError('pattern')) {
               <mat-error>{{ structure.errors.email }}</mat-error>
             }
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.phone }}</mat-label>
-            <input matInput type="tel" formControlName="phone" [maxlength]="maxLengths.phone" autocomplete="off" />
+            <input
+              matInput
+              type="tel"
+              formControlName="phone"
+              [maxlength]="maxLengths.phone"
+              autocomplete="off"
+            />
             @if (form.controls.phone.hasError('phone')) {
               <mat-error>{{ structure.errors.phone }}</mat-error>
             }
@@ -122,7 +157,12 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
         <div class="grid">
           <mat-form-field appearance="outline" class="wide">
             <mat-label>{{ structure.street }}</mat-label>
-            <input matInput formControlName="street" [maxlength]="maxLengths.street" autocomplete="off" />
+            <input
+              matInput
+              formControlName="street"
+              [maxlength]="maxLengths.street"
+              autocomplete="off"
+            />
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.postalCode }}</mat-label>
@@ -133,7 +173,12 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>{{ structure.city }}</mat-label>
-            <input matInput formControlName="city" [maxlength]="maxLengths.city" autocomplete="off" />
+            <input
+              matInput
+              formControlName="city"
+              [maxlength]="maxLengths.city"
+              autocomplete="off"
+            />
           </mat-form-field>
         </div>
       </section>
@@ -146,7 +191,9 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
               <li>
                 <strong>{{ nameOf(duplicate) }}</strong>
                 <span class="reason">({{ reasonOf(duplicate) }})</span>
-                <a [routerLink]="['/espace/assures', duplicate.id]" target="_blank">{{ duplicateStructure.open }}</a>
+                <a [routerLink]="['/espace/assures', duplicate.id]" target="_blank">{{
+                  duplicateStructure.open
+                }}</a>
               </li>
             }
           </ul>
@@ -155,7 +202,11 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
 
       <div class="actions">
         <button mat-button type="button" (click)="cancelled.emit()">{{ structure.cancel }}</button>
-        <button mat-flat-button type="submit" [disabled]="isPending() || (mode() === 'edit' && form.pristine)">
+        <button
+          mat-flat-button
+          type="submit"
+          [disabled]="isPending() || (mode() === 'edit' && form.pristine)"
+        >
           {{ submitLabel() }}
         </button>
       </div>
@@ -247,6 +298,8 @@ export class AssureFormComponent {
   readonly error = input<string | null>(null);
   /** Assurés existants qui ressemblent à la saisie. */
   readonly duplicates = input<Assure[]>([]);
+  /** Valeurs lues sur une pièce (CIN, Kbis) : elles remplissent les champs correspondants, modifiables ensuite. */
+  readonly prefill = input<Partial<AssureFormModel> | null>(null);
   readonly submitted = output<AssureFormModel>();
   readonly cancelled = output<void>();
   /** La saisie a changé : le conteneur recalcule les doublons. */
@@ -267,14 +320,22 @@ export class AssureFormComponent {
     companyName: new FormControl('', { nonNullable: true }),
     siret: new FormControl('', { nonNullable: true, validators: [siretValidator] }),
     birthDate: new FormControl('', { nonNullable: true, validators: [birthDateValidator] }),
-    email: new FormControl('', { nonNullable: true, validators: [Validators.pattern(EMAIL_PATTERN)] }),
+    email: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.pattern(EMAIL_PATTERN)],
+    }),
     phone: new FormControl('', { nonNullable: true, validators: [phoneValidator] }),
     street: new FormControl('', { nonNullable: true }),
-    postalCode: new FormControl('', { nonNullable: true, validators: [Validators.pattern(POSTAL_CODE_PATTERN)] }),
+    postalCode: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.pattern(POSTAL_CODE_PATTERN)],
+    }),
     city: new FormControl('', { nonNullable: true }),
   });
 
-  private readonly _value = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
+  private readonly _value = toSignal(this.form.valueChanges, {
+    initialValue: this.form.getRawValue(),
+  });
   protected readonly isPro = computed(() => this._value().type === 'pro');
 
   protected readonly submitLabel = computed(() => {
@@ -315,8 +376,20 @@ export class AssureFormComponent {
     });
 
     effect(() => {
+      const prefill = this.prefill();
+      if (!prefill) return;
+      this.form.patchValue(prefill);
+      this.form.markAsDirty();
+    });
+
+    effect(() => {
       const { email, firstName, lastName, birthDate, type } = this._value();
-      this.candidateChanged.emit({ email, firstName, lastName, birthDate: type === 'pro' ? null : birthDate });
+      this.candidateChanged.emit({
+        email,
+        firstName,
+        lastName,
+        birthDate: type === 'pro' ? null : birthDate,
+      });
     });
   }
 

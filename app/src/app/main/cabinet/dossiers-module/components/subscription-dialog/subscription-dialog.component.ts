@@ -1,3 +1,4 @@
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,7 +16,14 @@ export interface SubscriptionDialogResult {
 /** Souscription : numéro de contrat et date d'effet obligatoires (contrôlés aussi par le serveur). */
 @Component({
   selector: 'app-subscription-dialog',
-  imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule],
+  imports: [
+    ReactiveFormsModule,
+    MatDatepickerModule,
+    MatButtonModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+  ],
   template: `
     <h2 mat-dialog-title>{{ text.title }}</h2>
     <mat-dialog-content class="content">
@@ -25,7 +33,14 @@ export interface SubscriptionDialogResult {
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>{{ text.effectiveDate }}</mat-label>
-        <input matInput type="date" [formControl]="effectiveDate" />
+        <input
+          matInput
+          [matDatepicker]="effectivePicker"
+          [formControl]="effectiveDate"
+          placeholder="jj/mm/aaaa"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="effectivePicker" />
+        <mat-datepicker #effectivePicker />
         @if (effectiveDate.value && dateProblem()) {
           <mat-hint class="problem">{{ dateProblem() }}</mat-hint>
         }
@@ -33,7 +48,9 @@ export interface SubscriptionDialogResult {
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button type="button" mat-dialog-close>{{ text.cancel }}</button>
-      <button mat-flat-button type="button" [disabled]="!valid()" (click)="submit()">{{ text.confirm }}</button>
+      <button mat-flat-button type="button" [disabled]="!valid()" (click)="submit()">
+        {{ text.confirm }}
+      </button>
     </mat-dialog-actions>
   `,
   styles: `
@@ -59,7 +76,8 @@ export interface SubscriptionDialogResult {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SubscriptionDialogComponent {
-  private readonly _ref = inject<MatDialogRef<SubscriptionDialogComponent, SubscriptionDialogResult>>(MatDialogRef);
+  private readonly _ref =
+    inject<MatDialogRef<SubscriptionDialogComponent, SubscriptionDialogResult>>(MatDialogRef);
   protected readonly text = PROPOSAL_STRUCTURE.dialog;
   protected readonly max = CONTRACT_NUMBER_MAX;
   protected readonly contractNumber = new FormControl('', { nonNullable: true });
@@ -70,12 +88,17 @@ export class SubscriptionDialogComponent {
   }
 
   protected valid(): boolean {
-    return validateContractNumber(this.contractNumber.value) === null && this.dateProblem() === null;
+    return (
+      validateContractNumber(this.contractNumber.value) === null && this.dateProblem() === null
+    );
   }
 
   protected submit(): void {
     if (this.valid()) {
-      this._ref.close({ contractNumber: this.contractNumber.value.trim(), effectiveDate: this.effectiveDate.value });
+      this._ref.close({
+        contractNumber: this.contractNumber.value.trim(),
+        effectiveDate: this.effectiveDate.value,
+      });
     }
   }
 }

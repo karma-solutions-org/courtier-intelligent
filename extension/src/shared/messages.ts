@@ -1,4 +1,4 @@
-import type { CanonicalData, CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, MissingField, QuoteJobStatus } from '@shared';
+import type { CanonicalData, CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, DiscoveredFieldInput, MissingField, QuoteJobStatus } from '@shared';
 
 /** Utilisateur connecté dans l'extension (affiché dans le side panel). */
 export interface ExtensionUser {
@@ -132,11 +132,14 @@ export type ExtensionMessage =
   | { type: 'GET_STATE' }
   | { type: 'SIGN_IN'; email: string; password: string }
   | { type: 'SIGN_OUT' }
+  // Side panel → service worker : accès de l'extension à l'extranet de l'onglet actif (permission d'hôte)
+  | { type: 'GET_ACCESS_REQUEST' }
+  | { type: 'ACCESS_GRANTED' }
   // Content script → service worker
   | { type: 'GET_JOB_FOR_ORIGIN'; origin: string }
   | { type: 'UPDATE_JOB'; dossierId: string; insurerId: string; update: JobUpdate }
   | { type: 'RUN_STATE'; state: RunState | null }
-  | { type: 'ASK_AI'; system: string; messages: { role: 'user'; content: string }[]; maxTokens: number }
+  | { type: 'ASK_AI'; purpose: 'mapping' | 'capture'; messages: { role: 'user'; content: string }[]; maxTokens: number }
   | { type: 'REPORT_ISSUE'; insurerId: string; origin: string; step: ExtensionReportStep; issue: ExtensionReportIssue }
   // Side panel → service worker : capture du tarif de l'onglet actif
   | { type: 'CONFIRM_CAPTURE'; edits: CaptureEdits }
@@ -149,7 +152,16 @@ export type ExtensionMessage =
   | { type: 'MEMORY_LOAD'; origin: string; fingerprint: string }
   | { type: 'MEMORY_SAVE'; origin: string; fingerprint: string; fields: FormMemoryField[] }
   | { type: 'MEMORY_TOUCH'; key: string }
-  | { type: 'MEMORY_INVALIDATE'; key: string };
+  | { type: 'MEMORY_INVALIDATE'; key: string }
+  // Champs sans équivalent dans l'application : ajoutés au questionnaire par la function champs-signaler.
+  | { type: 'FIELDS_DISCOVERED'; fingerprint: string; fields: DiscoveredFieldInput[]; requiredPaths?: string[] };
+
+/** Réponse à GET_ACCESS_REQUEST : l'onglet actif est l'extranet d'un assureur auquel l'extension n'a pas accès. */
+export interface AccessRequest {
+  insurerName: string;
+  /** Motifs à demander via chrome.permissions.request (depuis le side panel, sur un clic). */
+  origins: string[];
+}
 
 /** Réponse à ASK_AI. */
 export type AskAiResponse = { ok: true; text: string } | { ok: false; message: string };

@@ -12,3 +12,5 @@ export * from './comparison';
 export * from './documents';
 export * from './proposal';
 export * from './assure-format';
+export * from './assure-documents';
+export * from './discovered-fields';

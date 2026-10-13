@@ -25,33 +25,74 @@ export interface JobRecord {
  */
 export const RUNNABLE_STATUSES: QuoteJobStatus[] = ['requested', 'analyzing', 'needs_info', 'filling', 'awaiting_submit'];
 
+/** Remplacé par esbuild : `npm run build:emulators` ou `npm run build:demo`. Absent (tests) : build de production. */
+declare const __ALLOW_LOCALHOST__: boolean;
+
+/** `http://localhost` (extranet de démonstration) n'est accepté que dans un build de développement (emulators ou démo). */
+export const DEV_BUILD: boolean = typeof __ALLOW_LOCALHOST__ !== 'undefined' && __ALLOW_LOCALHOST__;
+
+export interface MatchOptions {
+  /** Accepte `localhost` (http) : réservé aux builds de développement. */
+  allowLocalhost?: boolean;
+}
+
+/** Domaine du catalogue normalisé (`*.x.fr` → `x.fr`), ou null s'il est inacceptable (vide, sans point). */
+export function normalizeDomain(domain: string, { allowLocalhost = DEV_BUILD }: MatchOptions = {}): string | null {
+  const wanted = domain.trim().toLowerCase().replace(/^\*?\./, '').replace(/\.$/, '');
+  if (wanted === 'localhost') return allowLocalhost ? wanted : null;
+  // Un domaine sans point (« com », « fr », un nom d'hôte interne) couvrirait trop de sites : refusé.
+  if (!wanted.includes('.') || wanted.startsWith('.') || /[\s/:*]/.test(wanted)) return null;
+  return wanted;
+}
+
 /** Le domaine de la page est-il celui de l'extranet ? Le domaine exact ou l'un de ses sous-domaines (jamais un domaine voisin). */
-export function hostMatchesDomain(hostname: string, domain: string): boolean {
+export function hostMatchesDomain(hostname: string, domain: string, options: MatchOptions = {}): boolean {
   const host = hostname.toLowerCase().replace(/\.$/, '');
-  const wanted = domain.toLowerCase().replace(/^\*?\./, '');
-  return wanted !== '' && (host === wanted || host.endsWith(`.${wanted}`));
+  const wanted = normalizeDomain(domain, options);
+  return wanted !== null && (host === wanted || host.endsWith(`.${wanted}`));
+}
+
+/**
+ * Motifs d'URL (match patterns Chrome) des extranets du catalogue : ceux où le content script est injecté et pour
+ * lesquels l'accès est demandé au courtier. https uniquement ; `http://localhost/*` en développement seulement.
+ */
+export function extranetPatterns(domains: string[], options: MatchOptions = {}): string[] {
+  const patterns = new Set<string>();
+  for (const domain of domains) {
+    const wanted = normalizeDomain(domain, options);
+    if (!wanted) continue;
+    if (wanted === 'localhost') {
+      patterns.add('http://localhost/*');
+      continue;
+    }
+    patterns.add(`https://${wanted}/*`);
+    patterns.add(`https://*.${wanted}/*`);
+  }
+  return [...patterns];
 }
 
 /** L'assureur dont l'extranet est à cette adresse, s'il y en a un. */
-export function insurerForOrigin(origin: string, insurers: InsurerInfo[]): InsurerInfo | null {
+export function insurerForOrigin(origin: string, insurers: InsurerInfo[], options: MatchOptions = {}): InsurerInfo | null {
+  const allowLocalhost = options.allowLocalhost ?? DEV_BUILD;
   let hostname: string;
   try {
     const url = new URL(origin);
-    // L'extension ne remplit jamais une page non sécurisée.
-    if (url.protocol !== 'https:' && url.hostname !== 'localhost') return null;
+    // L'extension ne remplit jamais une page non sécurisée (sauf localhost dans un build de développement).
+    const devLocalhost = allowLocalhost && url.protocol === 'http:' && url.hostname === 'localhost';
+    if (url.protocol !== 'https:' && !devLocalhost) return null;
     hostname = url.hostname;
   } catch {
     return null;
   }
-  return insurers.find(insurer => insurer.extranetDomains.some(domain => hostMatchesDomain(hostname, domain))) ?? null;
+  return insurers.find(insurer => insurer.extranetDomains.some(domain => hostMatchesDomain(hostname, domain, { allowLocalhost }))) ?? null;
 }
 
 /**
  * Le job à exécuter sur cette page : le plus récent (la liste arrive du plus récent au plus ancien) qui est
  * encore à faire ET qui vise l'assureur de cet extranet. `null` si la page n'est pas un extranet connu ou s'il n'y a pas de job.
  */
-export function pickJobForOrigin(jobs: JobRecord[], insurers: InsurerInfo[], origin: string): JobContext | null {
-  const insurer = insurerForOrigin(origin, insurers);
+export function pickJobForOrigin(jobs: JobRecord[], insurers: InsurerInfo[], origin: string, options: MatchOptions = {}): JobContext | null {
+  const insurer = insurerForOrigin(origin, insurers, options);
   if (!insurer) return null;
   const job = jobs.find(j => j.insurerId === insurer.id && j.data.status !== undefined && RUNNABLE_STATUSES.includes(j.data.status));
   if (!job) return null;

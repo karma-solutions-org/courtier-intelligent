@@ -214,6 +214,13 @@ a {
   font-weight: 600 !important;
 }
 
+// Le contenu défile (overflow: auto) : le libellé flottant du premier champ « outline » dépasse
+// au-dessus du champ et serait rogné par le bord de la zone. Une marge sur le champ ne peut pas être
+// écrasée par le padding que Material (ou un composant) pose sur la zone.
+.mat-mdc-dialog-content > .mat-mdc-form-field:first-child {
+  margin-top: 8px;
+}
+
 .mat-step-header .mat-step-icon-selected,
 .mat-step-header .mat-step-icon-state-edit,
 .mat-step-header .mat-step-icon-state-done {

@@ -68,7 +68,7 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
       }
 
       <div class="actions">
-        <button mat-button type="button" (click)="back()">{{ step() === 1 ? structure.cancel : structure.back }}</button>
+        <button mat-button type="button" (click)="back()">{{ step() === 1 || assure() ? structure.cancel : structure.back }}</button>
         <button mat-flat-button type="button" [disabled]="!canContinue() || store.isPending()" (click)="next()">
           {{ store.isPending() ? structure.creating : structure.next }}
         </button>
@@ -169,7 +169,7 @@ export class NewDossierContainerComponent implements OnInit {
   protected readonly store = inject(DossiersStore);
   private readonly _router = inject(Router);
   protected readonly structure = DOSSIERS_STRUCTURE.newDossier;
-  protected readonly newAssureUrl = CabinetRouteContainerModel.ASSURE_NEW_ROUTE.url;
+  protected readonly newAssureUrl = CabinetRouteContainerModel.CLIENT_NEW_ROUTE.url;
   protected readonly nameOf = displayName;
 
   protected readonly step = signal<1 | 2>(1);
@@ -180,7 +180,9 @@ export class NewDossierContainerComponent implements OnInit {
     effect(() => {
       const preselected = this.assure();
       if (preselected) {
+        // Client déjà choisi depuis son espace : on passe directement au produit.
         this.assureId.set(preselected);
+        this.step.set(2);
       }
     });
     // Un seul produit disponible : il est présélectionné.
@@ -216,10 +218,13 @@ export class NewDossierContainerComponent implements OnInit {
   }
 
   protected back(): void {
-    if (this.step() === 2) {
+    if (this.step() === 2 && !this.assure()) {
       this.step.set(1);
     } else {
-      this._router.navigateByUrl(CabinetRouteContainerModel.DOSSIERS_ROUTE.url);
+      const preselected = this.assure();
+      this._router.navigateByUrl(
+        preselected ? CabinetRouteContainerModel.clientUrl(preselected) : CabinetRouteContainerModel.CLIENTS_ROUTE.url,
+      );
     }
   }
 }

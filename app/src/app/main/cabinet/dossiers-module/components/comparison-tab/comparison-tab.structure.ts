@@ -1,7 +1,10 @@
 export const COMPARISON_STRUCTURE = {
-  empty: 'Aucune offre pour l’instant : lancez une tarification ou saisissez une offre dans l’onglet Tarification.',
-  indicativeScore: 'Score indicatif d’adéquation au besoin (sur 100), calculé à partir des écarts : il ne remplace pas l’avis du courtier.',
-  noNeed: 'Aucun besoin enregistré : les écarts et le score ne sont pas calculés.',
+  loading: 'Chargement des offres…',
+  empty:
+    'Aucune offre pour l’instant : lancez une tarification ou saisissez une offre dans l’onglet Tarification.',
+  indicativeScore:
+    'Score indicatif d’adéquation à la couverture souhaitée (sur 100), calculé à partir des écarts : il ne remplace pas l’avis du courtier.',
+  noNeed: 'Aucune couverture souhaitée enregistrée : les écarts et le score ne sont pas calculés.',
   decided: 'Offre retenue',
   decisionSaved: 'Offre retenue : le dossier passe en « Décision ».',
   table: {
@@ -11,7 +14,7 @@ export const COMPARISON_STRUCTURE = {
     premiumMonthly: 'Prime mensuelle',
     generalDeductible: 'Franchise générale',
     guarantees: 'Garanties',
-    gaps: 'Écarts avec le besoin',
+    gaps: 'Écarts avec la demande',
     noGap: 'Aucun écart',
     choose: 'Choisir cette offre',
     chosen: 'Offre retenue',

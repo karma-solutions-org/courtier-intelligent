@@ -16,6 +16,9 @@ import {
   imports: [DashboardPresentationComponent],
   providers: [DashboardStore],
   template: `
+    @if (store.error()) {
+      <p class="error" role="alert">{{ store.error() }}</p>
+    }
     <app-dashboard-presentation
       [loaded]="store.loaded()"
       [isAdmin]="store.isAdmin()"
@@ -26,6 +29,16 @@ import {
       [conversionByProduct]="conversionByProduct()"
       [dossiersUrl]="dossiersUrl"
     />
+  `,
+  styles: `
+    .error {
+      margin: 0 0 16px;
+      padding: 12px 14px;
+      border-left: 3px solid var(--ci-danger);
+      border-radius: 8px;
+      color: #8a1621;
+      background: var(--ci-danger-soft);
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -45,7 +58,7 @@ export class DashboardContainerComponent {
   private toRows(dossiers: Dossier[]): DashboardDossierRow[] {
     const assures = this.store.assureById();
     const products = this.store.productNames();
-    return dossiers.map(dossier => {
+    return dossiers.map((dossier) => {
       const assure = assures.get(dossier.assureId);
       return {
         dossier,
@@ -56,6 +69,6 @@ export class DashboardContainerComponent {
   }
 
   private named(rates: ConversionRate[], names: Map<string, string>): ConversionRow[] {
-    return rates.map(rate => ({ ...rate, name: names.get(rate.key) ?? (rate.key || '—') }));
+    return rates.map((rate) => ({ ...rate, name: names.get(rate.key) ?? (rate.key || '—') }));
   }
 }

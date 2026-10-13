@@ -3,7 +3,13 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { ACTIVE_QUOTE_JOB_STATUSES, canLaunchQuoteJob, CanonicalData, QUOTE_JOB_STATUS_LABELS, Question } from '@shared';
+import {
+  ACTIVE_QUOTE_JOB_STATUSES,
+  canLaunchQuoteJob,
+  CanonicalData,
+  QUOTE_JOB_STATUS_LABELS,
+  Question,
+} from '@shared';
 import { PricingCard } from '../../store/pricing.store';
 import { MissingFieldsFormComponent } from '../missing-fields-form/missing-fields-form.component';
 
@@ -13,8 +19,6 @@ const TEXT = {
   price: 'Tarifer',
   retry: 'Relancer',
   openExtranet: 'Ouvrir l’extranet',
-  manualEntry: 'Saisir l’offre',
-  editOffer: 'Corriger l’offre',
   requested: 'Ouvrez l’extranet de l’assureur : l’extension prend le relais.',
   resuming: 'Informations enregistrées : l’extension reprend le remplissage.',
   awaitingSubmit: 'Formulaire rempli : vérifiez-le et validez-le vous-même sur l’extranet.',
@@ -30,13 +34,22 @@ const TEXT = {
 /** Carte d'un assureur dans l'onglet Tarification : statut du job en temps réel, actions et offre obtenue. */
 @Component({
   selector: 'app-quote-card',
-  imports: [CurrencyPipe, MatButtonModule, MatIconModule, MatProgressBarModule, MissingFieldsFormComponent],
+  imports: [
+    CurrencyPipe,
+    MatButtonModule,
+    MatIconModule,
+    MatProgressBarModule,
+    MissingFieldsFormComponent,
+  ],
   template: `
     @let job = card().job;
     @let offer = card().offer;
     <article class="card" [attr.data-tone]="tone()" [attr.aria-label]="card().insurer.name">
       <header>
-        <h3><span class="insurer-mark" aria-hidden="true">{{ card().insurer.name.charAt(0) }}</span>{{ card().insurer.name }}</h3>
+        <h3>
+          <span class="insurer-mark" aria-hidden="true">{{ card().insurer.name.charAt(0) }}</span
+          >{{ card().insurer.name }}
+        </h3>
         <span class="status" [class]="tone()">{{ statusLabel() }}</span>
       </header>
 
@@ -47,10 +60,16 @@ const TEXT = {
       @if (offer) {
         <div class="offer">
           @if (offer.premiumAnnual !== null) {
-            <strong>{{ offer.premiumAnnual | currency: 'EUR' : 'symbol' : '1.0-2' }} {{ text.perYear }}</strong>
+            <strong
+              >{{ offer.premiumAnnual | currency: 'EUR' : 'symbol' : '1.0-2' }}
+              {{ text.perYear }}</strong
+            >
           }
           @if (offer.premiumMonthly !== null) {
-            <span>{{ offer.premiumMonthly | currency: 'EUR' : 'symbol' : '1.0-2' }} {{ text.perMonth }}</span>
+            <span
+              >{{ offer.premiumMonthly | currency: 'EUR' : 'symbol' : '1.0-2' }}
+              {{ text.perMonth }}</span
+            >
           }
           @if (offer.quoteNumber) {
             <span class="meta">{{ text.quoteNumber }} {{ offer.quoteNumber }}</span>
@@ -86,7 +105,9 @@ const TEXT = {
         }
         @if (progress(); as progress) {
           <div class="steps">
-            <span class="meta">{{ text.step }} {{ progress.current }} {{ text.of }} {{ progress.total }}</span>
+            <span class="meta"
+              >{{ text.step }} {{ progress.current }} {{ text.of }} {{ progress.total }}</span
+            >
             <mat-progress-bar mode="determinate" [value]="progress.percent" />
           </div>
         } @else if (job.status === 'analyzing' || job.status === 'filling') {
@@ -96,7 +117,12 @@ const TEXT = {
 
       <footer>
         @if (!offer && canLaunch()) {
-          <button mat-flat-button type="button" [disabled]="!canPrice() || busy()" (click)="launch.emit()">
+          <button
+            mat-flat-button
+            type="button"
+            [disabled]="!canPrice() || busy()"
+            (click)="launch.emit()"
+          >
             {{ job ? text.retry : text.price }}
           </button>
         }
@@ -105,9 +131,6 @@ const TEXT = {
             <mat-icon>open_in_new</mat-icon>{{ text.openExtranet }}
           </button>
         }
-        <button mat-button type="button" [disabled]="!canPrice() || busy()" (click)="manualEntry.emit()">
-          {{ offer ? text.editOffer : text.manualEntry }}
-        </button>
       </footer>
     </article>
   `,
@@ -209,7 +232,7 @@ const TEXT = {
       flex-wrap: wrap;
       gap: 8px;
     }
-  
+
     .card {
       position: relative;
       overflow: hidden;
@@ -220,10 +243,6 @@ const TEXT = {
         border-color: #cbd2dc;
       }
     }
-
-
-
-
 
     h3 {
       display: flex;
@@ -293,7 +312,6 @@ export class QuoteCardComponent {
   readonly launch = output<void>();
   readonly openExtranet = output<void>();
   readonly answered = output<CanonicalData>();
-  readonly manualEntry = output<void>();
 
   protected readonly text = TEXT;
 
@@ -331,6 +349,10 @@ export class QuoteCardComponent {
   protected readonly progress = computed(() => {
     const job = this.card().job;
     if (!job || job.status !== 'filling' || !job.currentStep || !job.totalSteps) return null;
-    return { current: job.currentStep, total: job.totalSteps, percent: Math.round((job.currentStep / job.totalSteps) * 100) };
+    return {
+      current: job.currentStep,
+      total: job.totalSteps,
+      percent: Math.round((job.currentStep / job.totalSteps) * 100),
+    };
   });
 }

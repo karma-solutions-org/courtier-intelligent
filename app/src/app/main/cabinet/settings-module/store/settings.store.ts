@@ -1,12 +1,29 @@
 import { computed, inject } from '@angular/core';
 import { tapResponse } from '@ngrx/operators';
-import { patchState, signalStore, withComputed, withHooks, withMethods, withState } from '@ngrx/signals';
+import {
+  patchState,
+  signalStore,
+  withComputed,
+  withHooks,
+  withMethods,
+  withState,
+} from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import { AuditLogEntry, Cabinet, CabinetRole, Insurer, Invitation, Member, MemberStatus, Product } from '@shared';
-import { EMPTY, exhaustMap, merge, Observable, pipe, switchMap, tap } from 'rxjs';
+import {
+  AuditLogEntry,
+  Cabinet,
+  CabinetRole,
+  Insurer,
+  Invitation,
+  Member,
+  MemberStatus,
+  Product,
+} from '@shared';
+import { catchError, EMPTY, exhaustMap, merge, Observable, pipe, switchMap, tap } from 'rxjs';
 import {
   setError,
   setFulfilled,
+  resetRequestStatus,
   setPending,
   withRequestStatus,
 } from '../../../../core/store-features/with-request-status';
@@ -47,18 +64,25 @@ export const SettingsStore = signalStore(
     }),
   })),
   withMethods((store, service = inject(SettingsService), authStore = inject(AuthStore)) => {
-    const cabinetId = () => authStore.cabinetId()!;
+    /** Écriture sur le cabinet courant ; rien sans cabinet (session en cours de fermeture). */
+    const onCabinet = (write: (cabinetId: string) => Observable<unknown>): Observable<unknown> => {
+      const cabinetId = authStore.cabinetId();
+      if (cabinetId) return write(cabinetId);
+      // Écriture ignorée : on retire le statut « en cours » pour ne pas bloquer le formulaire.
+      patchState(store, resetRequestStatus());
+      return EMPTY;
+    };
 
     /** Exécute une action et met à jour le statut et le message de confirmation. */
     const runAction = <T>(action: (input: T) => Observable<unknown>, successMessage: string) =>
       rxMethod<T>(
         pipe(
           tap(() => patchState(store, setPending(), { successMessage: null })),
-          exhaustMap(input =>
+          exhaustMap((input) =>
             action(input).pipe(
               tapResponse({
                 next: () => patchState(store, setFulfilled(), { successMessage }),
-                error: error => patchState(store, setError(toBackendErrorMessage(error))),
+                error: (error) => patchState(store, setError(toBackendErrorMessage(error))),
               }),
             ),
           ),
@@ -66,35 +90,69 @@ export const SettingsStore = signalStore(
       );
 
     return {
-      saveCabinet: runAction<CabinetInfoModel>(info => service.updateCabinet(cabinetId(), info), 'Informations enregistrées.'),
-      uploadLogo: runAction<File>(file => service.uploadLogo(cabinetId(), file), 'Logo mis à jour.'),
+      saveCabinet: runAction<CabinetInfoModel>(
+        (info) => onCabinet((id) => service.updateCabinet(id, info)),
+        'Informations enregistrées.',
+      ),
+      uploadLogo: runAction<File>(
+        (file) => onCabinet((id) => service.uploadLogo(id, file)),
+        'Logo mis à jour.',
+      ),
       invite: runAction<{ email: string; role: CabinetRole }>(
         ({ email, role }) => service.invite(email, role),
         'Invitation envoyée.',
       ),
-      setRole: runAction<{ uid: string; role: CabinetRole }>(({ uid, role }) => service.setRole(uid, role), 'Rôle modifié.'),
-      cancelInvitation: runAction<string>(invitationId => service.cancelInvitation(invitationId), 'Invitation annulée.'),
+      setRole: runAction<{ uid: string; role: CabinetRole }>(
+        ({ uid, role }) => service.setRole(uid, role),
+        'Rôle modifié.',
+      ),
+      cancelInvitation: runAction<string>(
+        (invitationId) => service.cancelInvitation(invitationId),
+        'Invitation annulée.',
+      ),
       setStatus: runAction<{ uid: string; status: MemberStatus }>(
         ({ uid, status }) => service.setStatus(uid, status),
         'Statut du membre modifié.',
       ),
-      resetDevice: runAction<string>(uid => service.resetDevice(uid), 'Appareil réinitialisé : le membre peut se connecter depuis son nouvel appareil.'),
+      resetDevice: runAction<string>(
+        (uid) => service.resetDevice(uid),
+        'Appareil réinitialisé : le membre peut se connecter depuis son nouvel appareil.',
+      ),
       saveCatalogChoices: runAction<CatalogChoicesModel>(
-        choices => service.saveCatalogChoices(cabinetId(), choices),
+        (choices) => onCabinet((id) => service.saveCatalogChoices(id, choices)),
         'Assureurs et produits enregistrés.',
       ),
       clearMessage: () => patchState(store, { successMessage: null }),
       _listen: rxMethod<string | null>(
         pipe(
-          switchMap(id =>
+          switchMap((id) =>
             id
               ? merge(
-                  service.watchCabinet(id).pipe(tap(cabinet => patchState(store, { cabinet }))),
-                  service.watchMembers(id).pipe(tap(members => patchState(store, { members }))),
-                  service.watchPendingInvitations(id).pipe(tap(invitations => patchState(store, { invitations }))),
-                  service.watchAuditLog(id).pipe(tap(auditLog => patchState(store, { auditLog }))),
-                  service.watchProducts().pipe(tap(products => patchState(store, { products }))),
-                  service.watchInsurers().pipe(tap(insurers => patchState(store, { insurers }))),
+                  service.watchCabinet(id).pipe(tap((cabinet) => patchState(store, { cabinet }))),
+                  service.watchMembers(id).pipe(tap((members) => patchState(store, { members }))),
+                  // Une invitation expirée reste « pending » en base (aucune tâche planifiée ne la clôt) : on ne l'affiche plus.
+                  service
+                    .watchPendingInvitations(id)
+                    .pipe(
+                      tap((invitations) =>
+                        patchState(store, {
+                          invitations: invitations.filter(
+                            (invitation) => invitation.expiresAt.toMillis() > Date.now(),
+                          ),
+                        }),
+                      ),
+                    ),
+                  service
+                    .watchAuditLog(id)
+                    .pipe(tap((auditLog) => patchState(store, { auditLog }))),
+                  service.watchProducts().pipe(tap((products) => patchState(store, { products }))),
+                  service.watchInsurers().pipe(tap((insurers) => patchState(store, { insurers }))),
+                ).pipe(
+                  // Écoute en échec (droits, réseau) : on affiche l'erreur au lieu de l'avaler.
+                  catchError((error) => {
+                    patchState(store, setError(toBackendErrorMessage(error)));
+                    return EMPTY;
+                  }),
                 )
               : EMPTY,
           ),
@@ -103,7 +161,7 @@ export const SettingsStore = signalStore(
     };
   }),
   withHooks({
-    onInit: store => {
+    onInit: (store) => {
       const authStore = inject(AuthStore);
       store._listen(authStore.cabinetId);
     },

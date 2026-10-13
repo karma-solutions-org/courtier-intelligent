@@ -3,11 +3,12 @@ import { DossierDocumentStatus } from '@shared';
 /** Textes du panneau « Documents » d'un dossier (E12). */
 export const DOCUMENT_IMPORT_STRUCTURE = {
   title: 'Documents',
-  importHint: 'Importer un document (carte grise, permis, relevé d’information) : les valeurs lues vous sont proposées, rien n’est enregistré sans votre accord.',
+  importHint: 'Importer un document (carte grise, permis, CIN, relevé d’information) : les valeurs lues vous sont proposées, rien n’est enregistré sans votre accord.',
   type: 'Type de document',
   types: {
     carte_grise: 'Carte grise',
     permis: 'Permis de conduire',
+    cin: 'Carte d’identité (CIN)',
     releve_information: 'Relevé d’information',
     autre: 'Autre',
     devis: 'Devis',

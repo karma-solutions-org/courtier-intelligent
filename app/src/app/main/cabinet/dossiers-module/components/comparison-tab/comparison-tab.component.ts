@@ -4,8 +4,14 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ComparisonStore } from '../../store/comparison.store';
 import { DossierStore } from '../../store/dossier.store';
-import { ComparisonColumn, ComparisonTableComponent } from '../comparison-table/comparison-table.component';
-import { DecisionDialogComponent, DecisionDialogData } from '../decision-dialog/decision-dialog.component';
+import {
+  ComparisonColumn,
+  ComparisonTableComponent,
+} from '../comparison-table/comparison-table.component';
+import {
+  DecisionDialogComponent,
+  DecisionDialogData,
+} from '../decision-dialog/decision-dialog.component';
 import { COMPARISON_STRUCTURE } from './comparison-tab.structure';
 
 /** Onglet Comparatif : offres côte à côte (analysées par le serveur) et choix justifié de l'offre retenue. */
@@ -17,13 +23,22 @@ import { COMPARISON_STRUCTURE } from './comparison-tab.structure';
     @if (store.error()) {
       <p class="error" role="alert">{{ store.error() }}</p>
     }
-    @if (store.columns().length) {
-      <p class="hint"><mat-icon>info</mat-icon>{{ dossierStore.need() ? text.indicativeScore : text.noNeed }}</p>
+    @if (!store.loaded() && !store.error()) {
+      <p class="hint" role="status">{{ text.loading }}</p>
+    } @else if (store.columns().length) {
+      <p class="hint">
+        <mat-icon>info</mat-icon>{{ dossierStore.need() ? text.indicativeScore : text.noNeed }}
+      </p>
       @if (decision(); as decision) {
         <p class="decided" role="status">
           <mat-icon>check_circle</mat-icon>
           <span>
-            <strong>{{ text.decided }} : {{ dossierStore.insurerNames().get(decision.insurerId) ?? decision.insurerId }}</strong>
+            <strong
+              >{{ text.decided }} :
+              {{
+                dossierStore.insurerNames().get(decision.insurerId) ?? decision.insurerId
+              }}</strong
+            >
             — {{ decision.justification }}
           </span>
         </p>
@@ -38,7 +53,7 @@ import { COMPARISON_STRUCTURE } from './comparison-tab.structure';
         [busy]="store.busy()"
         (choose)="choose($event)"
       />
-    } @else {
+    } @else if (!store.error()) {
       <p class="hint">{{ text.empty }}</p>
     }
   `,
@@ -95,7 +110,7 @@ export class ComparisonTabComponent {
       const message = this.store.successMessage();
       if (message) {
         this._snackBar.open(message, undefined, { duration: 4000 });
-        this.store.clearMessages();
+        this.store.clearSuccess();
       }
     });
   }
@@ -111,7 +126,7 @@ export class ComparisonTabComponent {
         maxWidth: '95vw',
       })
       .afterClosed()
-      .subscribe(justification => {
+      .subscribe((justification) => {
         if (justification) {
           this.store.decide({ insurerId: column.insurerId, justification });
         }

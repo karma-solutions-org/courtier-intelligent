@@ -36,8 +36,8 @@ class NeedFormTester {
   readonly budget = this.root.getByRole('spinbutton', { name: 'Budget maximum (€ par an)' });
   readonly deductible = this.root.getByRole('spinbutton', { name: 'Franchise maximum (€)' });
   readonly notes = this.root.getByRole('textbox', { name: 'Notes' });
-  readonly save = this.root.getByRole('button', { name: 'Enregistrer le besoin' });
-  readonly validate = this.root.getByRole('button', { name: 'Valider le besoin' });
+  readonly save = this.root.getByRole('button', { name: 'Enregistrer les modifications' });
+  readonly validate = this.root.getByRole('button', { name: 'Valider la couverture' });
   readonly applySuggestion = this.root.getByRole('button', { name: 'Appliquer les suggestions' });
 
   readonly savedNeeds: NeedInput[] = [];
@@ -48,6 +48,7 @@ class NeedFormTester {
     component.saved.subscribe(need => this.savedNeeds.push(need));
     component.validated.subscribe(() => (this.validations += 1));
     this.fixture.componentRef.setInput('guarantees', GUARANTEES);
+    this.fixture.componentRef.setInput('status', 'besoin_valide');
   }
 
   setInputs(inputs: {
@@ -103,7 +104,7 @@ describe('NeedFormComponent', () => {
 
     await expect.element(tester.budget).toHaveValue(600);
     await expect.element(tester.notes).toHaveValue('RAS');
-    await expect.element(tester.root.getByText(/Besoin enregistré : il reste à le valider/)).toBeVisible();
+    await expect.element(tester.root.getByText(/Enregistrée : il reste à la valider/)).toBeVisible();
   });
 
   it('refuse un montant négatif', async () => {
@@ -166,7 +167,16 @@ describe('NeedFormComponent', () => {
   });
 
   describe('Validation du besoin', () => {
-    it("ne peut pas être validé sans besoin enregistré ni niveau de couverture", async () => {
+    beforeEach(() => tester.setInputs({ status: 'complet' }));
+
+    it('un seul bouton à l’étape « Complet » : Valider', async () => {
+      tester.setInputs({ need: savedNeed() });
+
+      await expect.element(tester.validate).toBeVisible();
+      await expect.element(tester.save).not.toBeInTheDocument();
+    });
+
+    it("ne peut pas être validé sans niveau de couverture", async () => {
       await expect.element(tester.validate).toBeDisabled();
       await expect.element(tester.root.getByText('Choisissez un niveau de couverture pour pouvoir valider.')).toBeVisible();
 
@@ -174,20 +184,24 @@ describe('NeedFormComponent', () => {
       await expect.element(tester.validate).toBeDisabled();
     });
 
-    it("se valide quand le besoin enregistré a une couverture et que la saisie est enregistrée", async () => {
+    it('valide directement un besoin déjà enregistré', async () => {
       tester.setInputs({ need: savedNeed() });
 
       await tester.validate.click();
 
+      expect(tester.savedNeeds).toEqual([]);
       expect(tester.validations).toBe(1);
     });
 
-    it("demande d'enregistrer avant de valider quand le formulaire a été modifié", async () => {
+    it('enregistre la saisie en cours puis valide, en un clic', async () => {
       tester.setInputs({ need: savedNeed() });
       await tester.budget.fill('900');
 
-      await expect.element(tester.validate).toBeDisabled();
-      await expect.element(tester.root.getByText('Enregistrez le besoin avant de le valider.')).toBeVisible();
+      await tester.validate.click();
+
+      expect(tester.savedNeeds).toHaveLength(1);
+      expect(tester.savedNeeds[0].budgetMax).toBe(900);
+      expect(tester.validations).toBe(1);
     });
 
     it('un besoin validé affiche sa date et prévient que le modifier annule la validation', async () => {
@@ -196,7 +210,7 @@ describe('NeedFormComponent', () => {
         status: 'besoin_valide',
       });
 
-      await expect.element(tester.root.getByText(/Besoin validé le/)).toBeVisible();
+      await expect.element(tester.root.getByText(/Validée le/)).toBeVisible();
       await expect.element(tester.root.getByText(/annule sa validation/)).toBeVisible();
       await expect.element(tester.validate).not.toBeInTheDocument();
     });

@@ -1,6 +1,6 @@
 import { describeJob } from '../background/jobs';
 import { CaptureView, describeRun, parseAmountInput, ProblemRow, RunView } from './run-view';
-import { ActivePage, CaptureResponse, ExtensionMessage, PanelState, PortMessage, SIDE_PANEL_PORT, SignInResponse } from '../shared/messages';
+import { AccessRequest, ActivePage, CaptureResponse, ExtensionMessage, PanelState, PortMessage, SIDE_PANEL_PORT, SignInResponse } from '../shared/messages';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -194,6 +194,7 @@ loginForm.addEventListener('submit', async event => {
       loginForm.reset();
       setText(loginNotice, null);
       render(response.state);
+      void refreshAccess();
     } else {
       setText(loginError, response.message);
     }
@@ -205,7 +206,11 @@ loginForm.addEventListener('submit', async event => {
   }
 });
 
-$('sign-out').addEventListener('click', async () => render(await send<PanelState>({ type: 'SIGN_OUT' })));
+$('sign-out').addEventListener('click', async () => {
+  const state = await send<PanelState | null>({ type: 'SIGN_OUT' });
+  if (state) render(state);
+  void refreshAccess();
+});
 
 // ── Page active ─────────────────────────────────────────────────────────────
 async function refreshActivePage(): Promise<void> {
@@ -214,7 +219,32 @@ async function refreshActivePage(): Promise<void> {
   $('page-fields').textContent = page
     ? `${page.fieldCount} champ${page.fieldCount > 1 ? 's' : ''} de formulaire détecté${page.fieldCount > 1 ? 's' : ''}`
     : 'Aucune page analysée sur cet onglet.';
+  await refreshAccess();
 }
+
+// ── Accès à l'extranet (permission d'hôte optionnelle) ──────────────────────
+// L'extension n'a accès à aucun site par défaut : sur l'extranet d'un assureur pas encore autorisé, le courtier
+// donne l'accès d'un clic (chrome.permissions.request exige un geste de l'utilisateur, d'où la demande ici).
+let pendingAccess: AccessRequest | null = null;
+
+async function refreshAccess(): Promise<void> {
+  pendingAccess = (await send<AccessRequest | null>({ type: 'GET_ACCESS_REQUEST' }).catch(() => null)) ?? null;
+  $('grant-access').hidden = !pendingAccess;
+  setText($('access-note'), pendingAccess ? `Extranet ${pendingAccess.insurerName} : l’extension n’y a pas encore accès.` : null);
+}
+
+$('grant-access').addEventListener('click', () => {
+  if (!pendingAccess) return;
+  // Appel direct dans le gestionnaire du clic : le geste de l'utilisateur est requis.
+  chrome.permissions.request({ origins: pendingAccess.origins }).then(
+    async granted => {
+      if (granted) await send<boolean>({ type: 'ACCESS_GRANTED' }).catch(() => false);
+      await refreshAccess();
+      setTimeout(() => void refreshActivePage(), 500);
+    },
+    () => void refreshAccess(),
+  );
+});
 
 // Mise à jour quand l'onglet actif change ou termine son chargement.
 chrome.tabs.onActivated.addListener(() => void refreshActivePage());
@@ -237,6 +267,6 @@ function connect(): void {
   });
 }
 
-void send<PanelState>({ type: 'GET_STATE' }).then(render);
+void send<PanelState | null>({ type: 'GET_STATE' }).then(state => state && render(state));
 void refreshActivePage();
 connect();

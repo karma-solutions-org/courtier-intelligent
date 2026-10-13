@@ -8,6 +8,9 @@ import { AssuresListComponent } from '../assures-list/assures-list.component';
   selector: 'app-assures-container',
   imports: [AssuresListComponent],
   template: `
+    @if (store.error()) {
+      <p class="error" role="alert">{{ store.error() }}</p>
+    }
     <app-assures-list
       [assures]="store.pageItems()"
       [total]="store.total()"
@@ -22,11 +25,21 @@ import { AssuresListComponent } from '../assures-list/assures-list.component';
       (pageChanged)="store.setPage($event.pageIndex, $event.pageSize)"
     />
   `,
+  styles: `
+    .error {
+      margin: 0 0 16px;
+      padding: 12px 14px;
+      border-left: 3px solid var(--ci-danger);
+      border-radius: 8px;
+      color: #8a1621;
+      background: var(--ci-danger-soft);
+    }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AssuresContainerComponent {
   protected readonly store = inject(AssuresStore);
   protected readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
-  protected readonly createUrl = CabinetRouteContainerModel.ASSURE_NEW_ROUTE.url;
-  protected readonly detailBaseUrl = CabinetRouteContainerModel.ASSURES_ROUTE.url;
+  protected readonly createUrl = CabinetRouteContainerModel.CLIENT_NEW_ROUTE.url;
+  protected readonly detailBaseUrl = CabinetRouteContainerModel.CLIENTS_ROUTE.url;
 }

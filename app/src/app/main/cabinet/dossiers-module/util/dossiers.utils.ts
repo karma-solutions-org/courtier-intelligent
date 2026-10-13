@@ -34,7 +34,7 @@ export function filterDossiers(dossiers: Dossier[], filter: DossierFilter, myUid
  * Statuts que le courtier déclenche à la main. Les suivants (besoin validé, tarification…) sont poussés
  * par leurs propres étapes ; la machine à états du serveur reste la seule référence des transitions permises.
  */
-const MANUAL_STATUSES: DossierStatus[] = ['brouillon', 'complet', 'sans_suite'];
+const MANUAL_STATUSES: DossierStatus[] = ['brouillon', 'complet'];
 
 export function manualTransitionsFrom(status: DossierStatus): DossierStatus[] {
   // Une fois la proposition envoyée, la réponse de l'assuré s'enregistre dans l'onglet Proposition.
@@ -66,5 +66,4 @@ export const STATUS_ORDER: DossierStatus[] = [
   'proposition_envoyee',
   'souscrit',
   'refuse',
-  'sans_suite',
 ];

@@ -7,6 +7,7 @@
   "scripts": {
     "build": "node build.js",
     "build:emulators": "node build.js --emulators",
+    "build:demo": "node build.js --demo",
     "watch": "node build.js --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

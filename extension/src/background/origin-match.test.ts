@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countRequested, hostMatchesDomain, insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin } from './origin-match';
+import { countRequested, extranetPatterns, hostMatchesDomain, insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin } from './origin-match';
 
 const INSURERS: InsurerInfo[] = [
   { id: 'assureur-a', name: 'Assureur A', extranetDomains: ['extranet.assureur-a.fr'] },
@@ -24,6 +24,10 @@ describe('hostMatchesDomain', () => {
     ['extranet.assureur-a.fr.evil.com', 'extranet.assureur-a.fr', false],
     ['extranet.assureur-a.frx', 'extranet.assureur-a.fr', false],
     ['anything.com', '', false],
+    // Domaine sans point : refusé (couvrirait tout un TLD ou un hôte interne).
+    ['evil.com', 'com', false],
+    ['intranet', 'intranet', false],
+    ['localhost', 'localhost', false],
   ])('%s ∈ %s : %s', (host, domain, expected) => {
     expect(hostMatchesDomain(host, domain)).toBe(expected);
   });
@@ -42,9 +46,33 @@ describe('insurerForOrigin', () => {
     expect(insurerForOrigin('not a url', INSURERS)).toBeNull();
   });
 
-  it('ne remplit jamais une page non sécurisée (http), sauf localhost pour les essais', () => {
+  it('ne remplit jamais une page non sécurisée (http), sauf localhost dans un build de développement', () => {
+    const local: InsurerInfo[] = [{ id: 'x', name: 'X', extranetDomains: ['localhost'] }];
     expect(insurerForOrigin('http://extranet.assureur-a.fr', INSURERS)).toBeNull();
-    expect(insurerForOrigin('http://localhost:8080', [{ id: 'x', name: 'X', extranetDomains: ['localhost'] }])?.id).toBe('x');
+    expect(insurerForOrigin('http://extranet.assureur-a.fr', INSURERS, { allowLocalhost: true })).toBeNull();
+    // Build de production (défaut dans les tests) : localhost refusé.
+    expect(insurerForOrigin('http://localhost:8080', local)).toBeNull();
+    expect(insurerForOrigin('http://localhost:8080', local, { allowLocalhost: true })?.id).toBe('x');
+  });
+
+  it('ignore un domaine du catalogue sans point', () => {
+    expect(insurerForOrigin('https://www.google.com', [{ id: 'x', name: 'X', extranetDomains: ['com'] }])).toBeNull();
+  });
+});
+
+describe('extranetPatterns', () => {
+  it('https seulement, domaine et sous-domaines', () => {
+    expect(extranetPatterns(['extranet.assureur-a.fr', '*.b.com'])).toEqual([
+      'https://extranet.assureur-a.fr/*',
+      'https://*.extranet.assureur-a.fr/*',
+      'https://b.com/*',
+      'https://*.b.com/*',
+    ]);
+  });
+
+  it('écarte les domaines invalides ; localhost seulement en développement', () => {
+    expect(extranetPatterns(['com', '', 'localhost', 'a b.fr'])).toEqual([]);
+    expect(extranetPatterns(['localhost'], { allowLocalhost: true })).toEqual(['http://localhost/*']);
   });
 });
 

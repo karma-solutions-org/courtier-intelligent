@@ -87,6 +87,7 @@
           "builder": "@angular/build:unit-test",
           "options": {
             "tsConfig": "tsconfig.spec.json",
+            "providersFile": "src/test-providers.ts",
             "browsers": [
               "chromium"
             ],

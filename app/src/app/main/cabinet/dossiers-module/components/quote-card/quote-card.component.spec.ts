@@ -46,14 +46,17 @@ class QuoteCardTester {
   readonly root = page.elementLocator(this.fixture.nativeElement);
   readonly launches: number[] = [];
   readonly answers: CanonicalData[] = [];
-  manualEntries = 0;
 
   constructor(card: Partial<PricingCard>, canPrice = true) {
     const component = this.fixture.componentInstance;
     component.launch.subscribe(() => this.launches.push(1));
-    component.answered.subscribe(answers => this.answers.push(answers));
-    component.manualEntry.subscribe(() => (this.manualEntries += 1));
-    this.fixture.componentRef.setInput('card', { insurer: INSURER, job: null, offer: null, ...card });
+    component.answered.subscribe((answers) => this.answers.push(answers));
+    this.fixture.componentRef.setInput('card', {
+      insurer: INSURER,
+      job: null,
+      offer: null,
+      ...card,
+    });
     this.fixture.componentRef.setInput('canPrice', canPrice);
   }
 
@@ -73,7 +76,6 @@ describe('QuoteCardComponent', () => {
     const blocked = new QuoteCardTester({}, false);
     await expect.element(blocked.root.getByText(/Non lancée/)).toBeVisible();
     await expect.element(blocked.button('Tarifer')).toBeDisabled();
-    await expect.element(blocked.button('Saisir l’offre')).toBeDisabled();
 
     const ready = new QuoteCardTester({});
     await ready.button('Tarifer').click();
@@ -81,7 +83,9 @@ describe('QuoteCardComponent', () => {
   });
 
   it('suit le job en temps réel : étape en cours, et ouverture de l’extranet au lieu d’un nouveau lancement', async () => {
-    const tester = new QuoteCardTester({ job: job({ status: 'filling', currentStep: 2, totalSteps: 3 }) });
+    const tester = new QuoteCardTester({
+      job: job({ status: 'filling', currentStep: 2, totalSteps: 3 }),
+    });
     await expect.element(tester.root.getByText(/Remplissage en cours/)).toBeVisible();
     await expect.element(tester.root.getByText(/Étape 2 sur 3/)).toBeVisible();
     await expect.element(tester.button('Ouvrir l’extranet')).toBeVisible();
@@ -89,7 +93,9 @@ describe('QuoteCardComponent', () => {
   });
 
   it('un job en échec affiche l’erreur et se relance', async () => {
-    const tester = new QuoteCardTester({ job: job({ status: 'failed', error: 'Page inconnue.', attempts: 2 }) });
+    const tester = new QuoteCardTester({
+      job: job({ status: 'failed', error: 'Page inconnue.', attempts: 2 }),
+    });
     await expect.element(tester.root.getByRole('alert').getByText(/Page inconnue./)).toBeVisible();
     await expect.element(tester.root.getByText(/2e tentative/)).toBeVisible();
     await tester.button('Relancer').click();
@@ -98,7 +104,10 @@ describe('QuoteCardComponent', () => {
 
   it('demande les champs manquants et envoie les réponses', async () => {
     const tester = new QuoteCardTester({
-      job: job({ status: 'needs_info', missingFields: [{ canonicalPath: 'driver.profession', label: 'Profession', type: 'text' }] }),
+      job: job({
+        status: 'needs_info',
+        missingFields: [{ canonicalPath: 'driver.profession', label: 'Profession', type: 'text' }],
+      }),
     });
     await tester.button('Envoyer à l’extension').click();
     expect(tester.answers).toHaveLength(0);
@@ -109,12 +118,10 @@ describe('QuoteCardComponent', () => {
     expect(tester.answers).toEqual([{ 'driver.profession': 'Infirmière' }]);
   });
 
-  it('affiche l’offre obtenue, signale une saisie manuelle et permet de la corriger', async () => {
+  it('affiche l’offre obtenue et signale une saisie manuelle', async () => {
     const tester = new QuoteCardTester({ job: job({ status: 'captured' }), offer: offer() });
     await expect.element(tester.root.getByText(/Tarif obtenu/)).toBeVisible();
     await expect.element(tester.root.getByText(/640/)).toBeVisible();
     await expect.element(tester.root.getByText(/Saisie manuelle/)).toBeVisible();
-    await tester.button('Corriger l’offre').click();
-    expect(tester.manualEntries).toBe(1);
   });
 });

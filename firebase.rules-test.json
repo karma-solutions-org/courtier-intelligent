@@ -1,0 +1,9 @@
+{
+  "firestore": {
+    "rules": "rules-tests/generated/firestore.rules"
+  },
+  "emulators": {
+    "firestore": { "port": 8085 },
+    "ui": { "enabled": false }
+  }
+}

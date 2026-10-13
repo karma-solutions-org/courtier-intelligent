@@ -1,4 +1,4 @@
-import { CANONICAL_PATHS, CanonicalPath, isCanonicalPath } from '@shared';
+import { CANONICAL_PATHS, CanonicalPath, isCanonicalPath, isExtraPath, isFixedCanonicalPath } from '@shared';
 import type { FormField } from './analyzer';
 import { COMPATIBLE_KINDS, FIELD_SYNONYMS, INHERITED_LABELS, PATH_EXPECTED, PREFIX_KEYWORDS } from './field-synonyms';
 import { containsPhrase, normalize, words } from './text';
@@ -37,11 +37,14 @@ const SELECTABLE_TEXT_PATHS: ReadonlySet<CanonicalPath> = new Set<CanonicalPath>
   'client.address.country',
   'client.address.city',
   'driver.profession',
+  'vehicle.parkingCity',
   'insuranceHistory.previousInsurer',
 ]);
 
 /** Compatibilité entre le type HTML du champ et ce que le chemin canonique attend. */
 export function isCompatible(field: FormField, path: CanonicalPath): boolean {
+  // Question ajoutée depuis un extranet : elle a été créée à partir de ce champ même (mémoire), son type lui correspond.
+  if (isExtraPath(path)) return true;
   if (!COMPATIBLE_KINDS[PATH_EXPECTED[path]].includes(field.kind)) return false;
   // Un champ e-mail ou téléphone ne reçoit que l'e-mail ou le téléphone, et inversement.
   // Une liste déroulante ne porte un texte que pour les valeurs qu'un extranet propose en liste.
@@ -75,7 +78,8 @@ function contextPrefixes(field: FormField): Set<string> {
  * `autocomplete`, noms techniques et texte d'aide, puis ajustement selon le contexte (section « Conducteur »…).
  */
 export function scoreCandidate(field: FormField, path: CanonicalPath): number {
-  if (!isCompatible(field, path)) return 0;
+  // Les questions ajoutées depuis un extranet n'ont pas de synonymes : seule la mémoire les associe à un champ.
+  if (!isFixedCanonicalPath(path) || !isCompatible(field, path)) return 0;
   const spec = FIELD_SYNONYMS[path];
   const label = normalize(field.label).replace(CONFIRMATION_WORDS, ' ').replace(/\s+/g, ' ').trim();
   const prefixes = contextPrefixes(field);

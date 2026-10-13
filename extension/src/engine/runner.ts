@@ -1,13 +1,13 @@
-import { CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, MissingField } from '@shared';
+import { CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, MissingField, type DiscoveredFieldInput } from '@shared';
 import type { CapturedOffer, CaptureState, JobContext, JobUpdate, RunField, RunState } from '../shared/messages';
 import { AskAi, resolveWithAi } from './ai-fallback';
 import { analyzeForm, FormAnalysis } from './analyzer';
 import { detectResultPage, extractFromDom, hasPremium, hasResultHeading, parseAmounts, visibleText } from './capture';
 import { captureWithAi, mergeOffers } from './capture-ai';
-import { PATH_EXPECTED } from './field-synonyms';
+import { expectsDate } from './field-synonyms';
 import { fillField, FillResult } from './filler';
 import { asCanonicalPath, isCompatible, Mapping, mapFields } from './mapping';
-import { applyMemory, MemoryPort, toMemoryFields } from './memory';
+import { applyMemory, MemoryPort, toDiscoveredFields, toMemoryFields, toRequiredPaths } from './memory';
 import { FillPlan, planFill } from './plan';
 import { detectStepHint, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
 
@@ -22,6 +22,8 @@ export interface RunnerPorts {
   reportIssue?(step: ExtensionReportStep, issue: ExtensionReportIssue): Promise<void>;
   /** Mémoire partagée des formulaires (E8) : sans elle, tout se fait par synonymes puis IA. */
   memory?: MemoryPort;
+  /** Champs sans équivalent d'un formulaire validé : le serveur les ajoute au questionnaire. */
+  reportDiscovered?(fingerprint: string, fields: DiscoveredFieldInput[], requiredPaths?: string[]): Promise<void>;
   /** Origine de l'extranet, clé de la mémoire (par défaut : celle de la page). */
   origin?: string;
   quietMs?: number;
@@ -64,6 +66,8 @@ export class FormRunner {
   /** L'étape qui vient d'être remplie : apprise quand le courtier la quitte ou la valide. */
   private snapshot: { fingerprint: string; fields: FormAnalysis['fields']; mappings: Mapping[]; results: Map<string, FillResult>; usedMemory: boolean } | null = null;
   private lastReported = '';
+  /** Empreintes dont les champs obligatoires ont déjà été signalés. */
+  private readonly requirementsReported = new Set<string>();
   private observer: MutationObserver | null = null;
   private pending: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> = Promise.resolve();
@@ -226,6 +230,14 @@ export class FormRunner {
     }
     if ([...results.values()].some(r => r.status === 'failed')) await this.reportIssue('fill', 'fill_failed');
     this.snapshot = { fingerprint: analysis.fingerprint, fields: analysis.fields, mappings: this.mappings, results, usedMemory: !!memory && this.fromMemory.size > 0 };
+    // Exigences de l'extranet (champs obligatoires) : signalées dès l'analyse, même si la page bloque ensuite sur un manque.
+    if (!this.requirementsReported.has(analysis.fingerprint)) {
+      const requiredPaths = toRequiredPaths(analysis.fields, this.mappings);
+      if (requiredPaths.length) {
+        this.requirementsReported.add(analysis.fingerprint);
+        void this.ports.reportDiscovered?.(analysis.fingerprint, [], requiredPaths).catch(() => this.requirementsReported.delete(analysis.fingerprint));
+      }
+    }
 
     // 4. Avancement du job : champs manquants, étape en cours ou prêt à soumettre.
     await this.reportProgress(plan, hint);
@@ -371,7 +383,11 @@ export class FormRunner {
       this.memoryStatus = 'learned';
     } catch {
       this.learned.delete(snapshot.fingerprint); // une panne réseau : on réessaiera
+      return;
     }
+    // Après la mémoire (le serveur y rattache les nouvelles questions) : les champs restés sans équivalent.
+    const discovered = toDiscoveredFields(snapshot.fields, snapshot.mappings);
+    if (discovered.length) await this.ports.reportDiscovered?.(snapshot.fingerprint, discovered).catch(() => undefined);
   }
 
   private applyManual(mappings: Mapping[]): Mapping[] {
@@ -396,7 +412,7 @@ export class FormRunner {
         results.set(field.key, { fieldKey: field.key, status: 'filled' });
         continue;
       }
-      const result = await fillField(field, analysis.elements.get(field.key) ?? [], value, { date: PATH_EXPECTED[path] === 'date' });
+      const result = await fillField(field, analysis.elements.get(field.key) ?? [], value, { date: expectsDate(path, value) });
       results.set(field.key, result);
       if (result.status === 'filled') this.written.set(field.key, signature);
     }

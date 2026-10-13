@@ -19,7 +19,7 @@ export interface AssureFormModel {
 /** Champs de l'assuré écrits en base (sans createdBy / createdAt / updatedAt, ajoutés par le service). */
 export type AssureData = Omit<Assure, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>;
 
-const orNull = (text: string): string | null => text.trim() || null;
+const orNull = (text: string | null): string | null => text?.trim() || null;
 
 export function toAssureData(form: AssureFormModel): AssureData {
   const isPro = form.type === 'pro';

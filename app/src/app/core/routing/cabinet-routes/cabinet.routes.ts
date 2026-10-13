@@ -4,6 +4,7 @@ import { DossierStore } from '../../../main/cabinet/dossiers-module/store/dossie
 import { DossiersStore } from '../../../main/cabinet/dossiers-module/store/dossiers.store';
 import { AssuresStore } from '../../../main/cabinet/assures-module/store/assures.store';
 import { roleGuard } from '../guards/auth.guards';
+import { unsavedChangesGuard } from '../guards/unsaved-changes.guard';
 import { CabinetRouteContainerModel } from './cabinet-route-container.model';
 
 /** Pages affichées dans le layout de l'espace connecté. */
@@ -14,7 +15,7 @@ export const CABINET_ROUTES: Routes = [
     title: 'Tableau de bord — Courtier Intelligent',
     loadComponent: () =>
       import('../../../main/commons/main-module/components/home-container/home-container.component').then(
-        c => c.HomeContainerComponent,
+        (c) => c.HomeContainerComponent,
       ),
   },
   {
@@ -25,70 +26,76 @@ export const CABINET_ROUTES: Routes = [
       {
         path: '',
         pathMatch: 'full',
+        // Vue transverse (compteurs du tableau de bord) ; la gestion courante passe par l'espace client.
         title: 'Dossiers — Courtier Intelligent',
         loadComponent: () =>
           import('../../../main/cabinet/dossiers-module/components/dossiers-container/dossiers-container.component').then(
-            c => c.DossiersContainerComponent,
+            (c) => c.DossiersContainerComponent,
           ),
       },
       {
         path: CabinetRouteContainerModel.DOSSIER_NEW_ROUTE.path,
         title: 'Nouveau dossier — Courtier Intelligent',
         loadComponent: () =>
-          import(
-            '../../../main/cabinet/dossiers-module/components/new-dossier-container/new-dossier-container.component'
-          ).then(c => c.NewDossierContainerComponent),
+          import('../../../main/cabinet/dossiers-module/components/new-dossier-container/new-dossier-container.component').then(
+            (c) => c.NewDossierContainerComponent,
+          ),
       },
       {
         // Étapes 3 et 4 de « Nouveau dossier » : questionnaire et récapitulatif (reprise d'un brouillon).
         path: ':id/brouillon',
         title: 'Brouillon — Courtier Intelligent',
         providers: [DossierStore],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
-          import(
-            '../../../main/cabinet/dossiers-module/components/dossier-draft-container/dossier-draft-container.component'
-          ).then(c => c.DossierDraftContainerComponent),
+          import('../../../main/cabinet/dossiers-module/components/dossier-draft-container/dossier-draft-container.component').then(
+            (c) => c.DossierDraftContainerComponent,
+          ),
       },
       {
         path: ':id',
         title: 'Dossier — Courtier Intelligent',
         providers: [DossierStore],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
-          import(
-            '../../../main/cabinet/dossiers-module/components/dossier-detail-container/dossier-detail-container.component'
-          ).then(c => c.DossierDetailContainerComponent),
+          import('../../../main/cabinet/dossiers-module/components/dossier-detail-container/dossier-detail-container.component').then(
+            (c) => c.DossierDetailContainerComponent,
+          ),
       },
     ],
   },
+  // Ancienne adresse de la liste des assurés.
+  { path: 'assures', redirectTo: CabinetRouteContainerModel.CLIENTS_ROUTE.path },
+  { path: 'assures/:id', redirectTo: `${CabinetRouteContainerModel.CLIENTS_ROUTE.path}/:id` },
   {
-    path: CabinetRouteContainerModel.ASSURES_ROUTE.path,
+    path: CabinetRouteContainerModel.CLIENTS_ROUTE.path,
     canMatch: [roleGuard('admin', 'courtier')],
     providers: [AssuresStore],
     children: [
       {
         path: '',
         pathMatch: 'full',
-        title: 'Assurés — Courtier Intelligent',
+        title: 'Clients — Courtier Intelligent',
         loadComponent: () =>
           import('../../../main/cabinet/assures-module/components/assures-container/assures-container.component').then(
-            c => c.AssuresContainerComponent,
+            (c) => c.AssuresContainerComponent,
           ),
       },
       {
-        path: CabinetRouteContainerModel.ASSURE_NEW_ROUTE.path,
-        title: 'Nouvel assuré — Courtier Intelligent',
+        path: CabinetRouteContainerModel.CLIENT_NEW_ROUTE.path,
+        title: 'Nouveau client — Courtier Intelligent',
         loadComponent: () =>
-          import(
-            '../../../main/cabinet/assures-module/components/new-assure-container/new-assure-container.component'
-          ).then(c => c.NewAssureContainerComponent),
+          import('../../../main/cabinet/assures-module/components/new-assure-container/new-assure-container.component').then(
+            (c) => c.NewAssureContainerComponent,
+          ),
       },
       {
         path: ':id',
-        title: 'Fiche assuré — Courtier Intelligent',
+        title: 'Espace client — Courtier Intelligent',
         loadComponent: () =>
-          import(
-            '../../../main/cabinet/assures-module/components/assure-detail-container/assure-detail-container.component'
-          ).then(c => c.AssureDetailContainerComponent),
+          import('../../../main/cabinet/assures-module/components/assure-detail-container/assure-detail-container.component').then(
+            (c) => c.AssureDetailContainerComponent,
+          ),
       },
     ],
   },
@@ -99,7 +106,7 @@ export const CABINET_ROUTES: Routes = [
     providers: [SettingsStore],
     loadComponent: () =>
       import('../../../main/cabinet/settings-module/components/settings-container/settings-container.component').then(
-        c => c.SettingsContainerComponent,
+        (c) => c.SettingsContainerComponent,
       ),
   },
 ];

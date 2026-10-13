@@ -1,15 +1,20 @@
 import type { CanonicalPath } from '@shared';
 import type { FormField } from './analyzer';
-import { FIELD_SYNONYMS } from './field-synonyms';
+import { pathExample } from './field-synonyms';
 import { asCanonicalPath, isCompatible, Mapping } from './mapping';
 import { normalize } from './text';
 
 /** Requête envoyée à `ia-proxy` (le modèle et la clé sont choisis par le serveur). */
 export interface AiRequest {
+  /** Prompt système choisi par le service worker d'après `purpose` : jamais transmis par la page. */
+  purpose: AiPurpose;
   system: string;
   messages: { role: 'user'; content: string }[];
   maxTokens: number;
 }
+
+/** Usage de l'IA : chacun a son prompt système fixe. */
+export type AiPurpose = 'mapping' | 'capture';
 
 /** Envoie la requête au proxy d'IA et renvoie le texte de la réponse. */
 export type AskAi = (request: AiRequest) => Promise<string>;
@@ -21,7 +26,7 @@ const MAX_OPTIONS = 20;
 const MIN_AI_CONFIDENCE = 0.6;
 const MAX_AI_CONFIDENCE = 0.85;
 
-const SYSTEM_PROMPT =
+export const MAPPING_SYSTEM_PROMPT =
   "Tu associes des champs d'un formulaire d'assurance auto (extranet d'assureur) à une LISTE FERMÉE de chemins canoniques. " +
   'Réponds UNIQUEMENT par un objet JSON de la forme {"mappings":[{"key":"<clé du champ>","canonicalPath":"<chemin de la liste>"|null,"confidence":<nombre de 0 à 1>}]}. ' +
   "Un chemin absent de la liste est interdit : si aucun chemin ne convient, mets canonicalPath à null. " +
@@ -33,7 +38,7 @@ const SYSTEM_PROMPT =
  */
 export function buildAiRequest(fields: FormField[], allowedPaths: readonly CanonicalPath[]): AiRequest {
   const payload = {
-    allowedPaths: allowedPaths.map(path => ({ path, exampleLabel: FIELD_SYNONYMS[path].labels[0] })),
+    allowedPaths: allowedPaths.map(path => ({ path, exampleLabel: pathExample(path) })),
     fields: fields.slice(0, MAX_FIELDS).map(field => ({
       key: field.key,
       label: field.label,
@@ -43,7 +48,7 @@ export function buildAiRequest(fields: FormField[], allowedPaths: readonly Canon
       options: field.options.slice(0, MAX_OPTIONS).map(option => option.label),
     })),
   };
-  return { system: SYSTEM_PROMPT, messages: [{ role: 'user', content: JSON.stringify(payload) }], maxTokens: 1500 };
+  return { purpose: 'mapping', system: MAPPING_SYSTEM_PROMPT, messages: [{ role: 'user', content: JSON.stringify(payload) }], maxTokens: 1500 };
 }
 
 export interface AiMapping {

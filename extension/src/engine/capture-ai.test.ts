@@ -1,7 +1,7 @@
 import type { CanonicalData } from '@shared';
 import { describe, expect, it, vi } from 'vitest';
 import { AskAi } from './ai-fallback';
-import { buildCaptureRequest, captureWithAi, mergeOffers, parseCaptureResponse, redactClientData } from './capture-ai';
+import { amountRegions, buildCaptureRequest, captureWithAi, mergeOffers, parseCaptureResponse, redactClientData } from './capture-ai';
 
 const QUOTE_DATA: CanonicalData = {
   'client.lastName': 'Dupont',
@@ -36,6 +36,44 @@ describe('redactClientData', () => {
     const request = buildCaptureRequest(PAGE, QUOTE_DATA);
     expect(request.messages[0].content).not.toContain('Dupont');
     expect(request.system).toContain('N\'invente rien');
+  });
+});
+
+describe('redactClientData : formats et variantes', () => {
+  it('masque les valeurs du dossier sans casse ni accents', () => {
+    const data: CanonicalData = { 'client.lastName': 'Lefèvre', 'client.address.city': 'Saint-Étienne', 'vehicle.registration': 'AB-123-CD' };
+    const redacted = redactClientData('M. LEFEVRE de saint etienne, plaque ab 123 cd. Prime 500 €.', data);
+    expect(redacted).not.toMatch(/lefevre|etienne|ab 123 cd/i);
+    expect(redacted).toContain('500 €');
+  });
+
+  it('masque email, téléphone, IBAN, NIR, plaques, dates de naissance, code postal + ville', () => {
+    const page =
+      'Mail : marie.durand@mail.fr ; tél +33 6 12 34 56 78 ou 01.23.45.67.89 ; IBAN FR76 3000 6000 0112 3456 7890 189 ; ' +
+      'NIR 1 85 03 75 123 456 78 ; plaque EF-456-GH ou 1234 AB 75 ; née le 5/3/1990, le 1990-03-05 ou le 5 mars 1990 ; ' +
+      'domicile 75008 Paris. Prime annuelle 712,40 € ; plafond 15000 EUR.';
+    const redacted = redactClientData(page, {});
+    for (const secret of ['marie.durand', '6 12 34 56 78', '01.23.45.67.89', 'FR76', '85 03 75', 'EF-456-GH', '1234 AB 75', '5/3/1990', '1990-03-05', '5 mars 1990', '75008', 'Paris']) {
+      expect(redacted).not.toContain(secret);
+    }
+    expect(redacted).toContain('712,40 €');
+    expect(redacted).toContain('15000 EUR');
+  });
+});
+
+describe('amountRegions', () => {
+  it('ne garde que les passages autour des montants, plafonnés', () => {
+    const page = `${'intro '.repeat(200)}Prime annuelle 712 € TTC${' blabla'.repeat(200)}`;
+    const regions = amountRegions(page, 20);
+    expect(regions).toContain('712 €');
+    expect(regions.length).toBeLessThan(60);
+    expect(amountRegions('x'.repeat(50_000)).length).toBeLessThanOrEqual(12_000);
+  });
+
+  it('la requête porte l’usage « capture » et un texte plafonné', () => {
+    const request = buildCaptureRequest(`${PAGE} ${'z'.repeat(50_000)}`, QUOTE_DATA);
+    expect(request.purpose).toBe('capture');
+    expect(request.messages[0].content.length).toBeLessThanOrEqual(12_000);
   });
 });
 

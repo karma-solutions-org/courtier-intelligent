@@ -1,13 +1,23 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, effect, inject, input, OnInit, computed } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  HostListener,
+  inject,
+  input,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink } from '@angular/router';
-import { DOSSIER_STATUS_LABELS, DossierStatus, PROPOSAL_DOSSIER_STATUSES } from '@shared';
+import { DossierStatus, PROPOSAL_DOSSIER_STATUSES } from '@shared';
+import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { displayName } from '../../../assures-module/util/assures.utils';
 import { DossierStore } from '../../store/dossier.store';
@@ -18,10 +28,28 @@ import { DossierTimelineComponent } from '../dossier-timeline/dossier-timeline.c
 import { NeedFormComponent } from '../need-form/need-form.component';
 import { PricingTabComponent } from '../pricing-tab/pricing-tab.component';
 import { ProposalTabComponent } from '../proposal-tab/proposal-tab.component';
-import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/questionnaire-form.component';
+import {
+  AnswerChange,
+  QuestionnaireFormComponent,
+} from '../questionnaire-form/questionnaire-form.component';
 import { StatusChipComponent } from '../status-chip/status-chip.component';
 
-/** Détail d'un dossier : en-tête (statut, courtier en charge, actions) et onglets Infos (modifiable), Historique, Besoin et Tarification. */
+type Stage = 'infos' | 'need' | 'pricing' | 'comparison' | 'proposal';
+
+/** Étape de travail correspondant à chaque statut : c'est elle qui s'ouvre à l'arrivée sur le dossier. */
+const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
+  brouillon: 'infos',
+  complet: 'need',
+  besoin_valide: 'pricing',
+  tarification: 'pricing',
+  comparaison: 'comparison',
+  decision: 'proposal',
+  proposition_envoyee: 'proposal',
+  souscrit: 'proposal',
+  refuse: 'proposal',
+};
+
+/** Détail d'un dossier : en-tête (statut, courtier en charge, actions) et une seule navigation par étapes. */
 @Component({
   selector: 'app-dossier-detail-container',
   imports: [
@@ -31,7 +59,6 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
     MatFormFieldModule,
     MatIconModule,
     MatSelectModule,
-    MatTabsModule,
     ComparisonTabComponent,
     DocumentImportContainerComponent,
     DossierTimelineComponent,
@@ -42,7 +69,9 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
     StatusChipComponent,
   ],
   template: `
-    <a mat-button [routerLink]="listUrl" class="back"><mat-icon>arrow_back</mat-icon>{{ structure.back }}</a>
+    <a mat-button [routerLink]="backUrl()" class="back"
+      ><mat-icon>arrow_back</mat-icon>{{ structure.back }}</a
+    >
 
     @if (store.dossier(); as dossier) {
       <header class="card header" [attr.data-status]="dossier.status">
@@ -52,27 +81,35 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
           <app-status-chip [status]="dossier.status" />
         </div>
         <p class="sub">
-          {{ store.assure() ? nameOf(store.assure()!) : '—' }} · {{ store.product()?.name ?? dossier.productId }} ·
+          {{ store.assure() ? nameOf(store.assure()!) : '—' }} ·
+          {{ store.product()?.name ?? dossier.productId }} ·
           {{ dossier.createdAt?.toMillis() | date: 'd MMM y' }}
         </p>
 
-        <ol class="pipeline" [class.halted]="isHalted(dossier.status)" aria-label="Progression du dossier">
-          @for (step of pipeline; track step; let i = $index) {
+        <ol class="pipeline" [class.halted]="isHalted(dossier.status)" aria-label="Étapes du dossier">
+          @for (stage of stages; track stage.key; let i = $index) {
             <li
               class="step"
-              [attr.data-status]="step"
-              [class.done]="stepIndex(dossier.status) > i"
-              [class.current]="stepIndex(dossier.status) === i"
-              [attr.aria-current]="stepIndex(dossier.status) === i ? 'step' : null"
+              [class.done]="stageState(stage.key) === 'done'"
+              [class.current]="stageState(stage.key) === 'current'"
+              [class.selected]="selected() === stage.key"
             >
-              <span class="dot" aria-hidden="true">
-                @if (stepIndex(dossier.status) > i) {
-                  <mat-icon>check</mat-icon>
-                } @else {
-                  {{ i + 1 }}
-                }
-              </span>
-              <span class="step-label">{{ statusLabels[step] }}</span>
+              <button
+                type="button"
+                class="step-button"
+                [disabled]="!stageEnabled(stage.key)"
+                [attr.aria-current]="selected() === stage.key ? 'step' : null"
+                (click)="selected.set(stage.key)"
+              >
+                <span class="dot" aria-hidden="true">
+                  @if (stageState(stage.key) === 'done') {
+                    <mat-icon>check</mat-icon>
+                  } @else {
+                    {{ i + 1 }}
+                  }
+                </span>
+                <span class="step-label">{{ stage.label }}</span>
+              </button>
             </li>
           }
         </ol>
@@ -82,26 +119,28 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
             <mat-label>{{ structure.assignedTo }}</mat-label>
             <mat-select [value]="dossier.assignedTo" (selectionChange)="store.assign($event.value)">
               @for (member of store.activeMembers(); track member.id) {
-                <mat-option [value]="member.id">{{ member.displayName || member.email }}</mat-option>
+                <mat-option [value]="member.id">{{
+                  member.displayName || member.email
+                }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
 
           <span class="spacer"></span>
 
+          <button
+            mat-button
+            type="button"
+            [class.active]="selected() === 'history'"
+            (click)="selected.set(selected() === 'history' ? currentStage() : 'history')"
+          >
+            <mat-icon>history</mat-icon>{{ structure.tabs.history }}
+          </button>
+
           @if (dossier.status === 'brouillon') {
-            <a mat-stroked-button [routerLink]="[listUrl, dossier.id, 'brouillon']">{{ structure.resume }}</a>
-          }
-          @for (target of store.transitions(); track target) {
-            <button
-              mat-flat-button
-              type="button"
-              [class.secondary]="target !== 'complet'"
-              [disabled]="target === 'complet' && !store.isComplete()"
-              (click)="changeStatus(target)"
-            >
-              {{ structure.statusActions[target] }}
-            </button>
+            <a mat-stroked-button [routerLink]="[listUrl, dossier.id, 'brouillon']">{{
+              structure.resume
+            }}</a>
           }
         </div>
         @if (dossier.status === 'brouillon' && !store.isComplete() && store.schema().length) {
@@ -112,81 +151,87 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
       @if (store.error()) {
         <p class="error" role="alert">{{ store.error() }}</p>
       }
-
-      <mat-tab-group animationDuration="0ms">
-        <mat-tab [label]="structure.tabs.infos">
-          <div class="tab">
-            @if (store.missing().length && store.editable()) {
-              <p class="warning" role="status">
-                {{ structure.missingBanner }}
-                {{ missingLabels() }}
-              </p>
-            }
-            @if (!store.editable()) {
-              <p class="hint">{{ structure.readonlyNote }}</p>
-            }
-            <app-document-import-container class="documents" [editable]="store.editable()" />
-            <app-questionnaire-form
-              [sections]="store.schema()"
-              [data]="store.answers()"
-              [readonly]="!store.editable()"
-              [showMissing]="true"
-              (answerChanged)="onAnswer($event)"
-            />
-            @if (store.editable()) {
-              <div class="actions">
-                <button
-                  mat-flat-button
-                  type="button"
-                  [disabled]="store.saveStatus() !== 'dirty' && store.saveStatus() !== 'error'"
-                  (click)="store.saveNow({ event: true })"
-                >
-                  {{ structure.save }}
-                </button>
-              </div>
-            }
-          </div>
-        </mat-tab>
-        <mat-tab [label]="structure.tabs.history">
-          <div class="tab">
-            <app-dossier-timeline [events]="store.events()" [memberNames]="store.memberNames()" [insurerNames]="store.insurerNames()" />
-          </div>
-        </mat-tab>
-        <mat-tab [label]="structure.tabs.need" [disabled]="dossier.status === 'brouillon'">
-          <div class="tab">
-            <app-need-form
-              [need]="store.need()"
-              [guarantees]="store.guarantees()"
-              [suggestion]="store.needSuggestion()"
-              [status]="dossier.status"
-              [readonly]="!store.needEditable()"
-              (saved)="store.saveNeed($event)"
-              (validated)="store.validateNeed()"
-            />
-          </div>
-        </mat-tab>
-        <mat-tab [label]="structure.tabs.pricing" [disabled]="dossier.status === 'brouillon' || dossier.status === 'complet'">
-          <ng-template matTabContent>
+      <section class="panel">
+        @switch (selected()) {
+          @case ('infos') {
             <div class="tab">
-              <app-pricing-tab />
+              @if (store.missing().length && store.editable()) {
+                <p class="warning" role="status">
+                  {{ structure.missingBanner }}
+                  {{ missingLabels() }}
+                </p>
+              }
+              @if (!store.editable()) {
+                <p class="hint">{{ structure.readonlyNote }}</p>
+              }
+              <app-document-import-container class="documents" [editable]="store.editable()" />
+              <app-questionnaire-form
+                [sections]="store.schema()"
+                [data]="store.answers()"
+                [readonly]="!store.editable()"
+                [showMissing]="true"
+                (answerChanged)="onAnswer($event)"
+              />
+              @if (store.editable()) {
+                <div class="actions">
+                  <button
+                    mat-flat-button
+                    type="button"
+                    [disabled]="store.saveStatus() !== 'dirty' && store.saveStatus() !== 'error'"
+                    (click)="store.saveNow({ event: true })"
+                  >
+                    {{ structure.save }}
+                  </button>
+                </div>
+              }
             </div>
-          </ng-template>
-        </mat-tab>
-        <mat-tab [label]="structure.tabs.comparison" [disabled]="!comparisonEnabled()">
-          <ng-template matTabContent>
+          }
+          @case ('need') {
             <div class="tab">
-              <app-comparison-tab />
+              <app-need-form
+                [need]="store.need()"
+                [guarantees]="store.guarantees()"
+                [suggestion]="store.needSuggestion()"
+                [status]="dossier.status"
+                [readonly]="!store.needEditable()"
+                [isPending]="store.needPending() > 0"
+                (saved)="store.saveNeed($event)"
+                (validated)="store.validateNeed()"
+              />
             </div>
-          </ng-template>
-        </mat-tab>
-        <mat-tab [label]="structure.tabs.proposal" [disabled]="!proposalEnabled()">
-          <ng-template matTabContent>
-            <div class="tab">
-              <app-proposal-tab />
+          }
+          @case ('pricing') {
+            <div class="tab"><app-pricing-tab /></div>
+          }
+          @case ('comparison') {
+            <div class="tab"><app-comparison-tab /></div>
+          }
+          @case ('proposal') {
+            <div class="tab"><app-proposal-tab /></div>
+          }
+          @case ('history') {
+            <div class="tab history">
+              <!-- Le titre « Historique » est celui de la carte de la frise : ici seulement la fermeture. -->
+              <button
+                mat-icon-button
+                type="button"
+                class="close"
+                [attr.aria-label]="structure.closeHistory"
+                (click)="selected.set(currentStage())"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+              <app-dossier-timeline
+                [events]="store.events()"
+                [memberNames]="store.memberNames()"
+                [insurerNames]="store.insurerNames()"
+              />
             </div>
-          </ng-template>
-        </mat-tab>
-      </mat-tab-group>
+          }
+        }
+      </section>
+    } @else if (store.error()) {
+      <p class="error" role="alert">{{ store.error() }}</p>
     } @else if (store.loaded()) {
       <p>{{ structure.notFound }}</p>
     }
@@ -256,6 +301,53 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
       scrollbar-width: thin;
     }
 
+    .step-button {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      padding: 0 4px 8px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      font: inherit;
+      background: none;
+      cursor: pointer;
+
+      &:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      &:not(:disabled):hover .step-label {
+        color: var(--ci-navy-900);
+      }
+    }
+
+    .step.selected .step-button {
+      border-bottom-color: var(--ci-navy-900);
+    }
+
+    .step.selected .step-label {
+      font-weight: 600;
+      color: var(--ci-navy-900);
+    }
+
+    .active {
+      background: var(--ci-navy-50);
+    }
+
+    .history {
+      position: relative;
+
+      .close {
+        position: absolute;
+        top: 28px;
+        right: 12px;
+        z-index: 1;
+      }
+    }
+
     .step {
       position: relative;
       display: flex;
@@ -310,13 +402,13 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
     }
 
     .step.current .dot {
-      color: var(--st-color);
-      border-color: var(--st-color);
-      background: var(--st-bg);
+      color: var(--ci-navy-900);
+      border-color: var(--ci-navy-900);
+      background: var(--ci-navy-50);
     }
 
     .step-label {
-      font-size: 11.5px;
+      font-size: 13px;
       font-weight: 500;
       line-height: 1.25;
       color: var(--ci-text-muted);
@@ -324,7 +416,6 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
 
     .step.current .step-label {
       font-weight: 600;
-      color: var(--st-color);
     }
 
     .pipeline.halted {
@@ -359,7 +450,7 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
       color: var(--ci-text-muted);
     }
 
-    mat-tab-group {
+    .panel {
       min-width: 0;
       padding: 4px 16px 16px;
       border: 1px solid var(--ci-border);
@@ -404,7 +495,7 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
         padding: 18px 16px;
       }
 
-      mat-tab-group {
+      .panel {
         padding: 4px 8px 12px;
       }
 
@@ -415,7 +506,7 @@ import { StatusChipComponent } from '../status-chip/status-chip.component';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DossierDetailContainerComponent implements OnInit {
+export class DossierDetailContainerComponent implements OnInit, HasUnsavedChanges {
   /** Lié au paramètre « :id » de la route (withComponentInputBinding). */
   readonly id = input.required<string>();
 
@@ -423,31 +514,69 @@ export class DossierDetailContainerComponent implements OnInit {
   private readonly _snackBar = inject(MatSnackBar);
   protected readonly structure = DOSSIERS_STRUCTURE.detail;
   protected readonly listUrl = CabinetRouteContainerModel.DOSSIERS_ROUTE.url;
+
+  /** Le dossier se gère depuis l'espace de son client. */
+  protected backUrl(): string {
+    const assureId = this.store.dossier()?.assureId;
+    return assureId ? CabinetRouteContainerModel.clientUrl(assureId) : CabinetRouteContainerModel.CLIENTS_ROUTE.url;
+  }
   protected readonly nameOf = displayName;
-  protected readonly statusLabels = DOSSIER_STATUS_LABELS;
-  /** Parcours nominal affiché dans l'en-tête (purement visuel). */
-  protected readonly pipeline: DossierStatus[] = [
-    'brouillon',
-    'complet',
-    'besoin_valide',
-    'tarification',
-    'comparaison',
-    'decision',
-    'proposition_envoyee',
-    'souscrit',
+  /** Les étapes du dossier : chacune ouvre son espace de travail (une seule navigation). */
+  protected readonly stages: { key: Stage; label: string }[] = [
+    { key: 'infos', label: 'Informations' },
+    { key: 'need', label: 'Couverture' },
+    { key: 'pricing', label: 'Tarification' },
+    { key: 'comparison', label: 'Comparatif' },
+    { key: 'proposal', label: 'Proposition' },
   ];
 
-  protected stepIndex(status: DossierStatus): number {
-    return this.pipeline.indexOf(status);
+  /** Étape où se trouve le dossier, d'après son statut (sans suite : la dernière étape atteinte). */
+  protected readonly currentStage = computed<Stage>(() => {
+    const status = this.store.dossier()?.status;
+    if (!status) return 'infos';
+    return STAGE_OF_STATUS[status];
+  });
+
+  /** Étape affichée (ou l'historique) : suit l'avancement du dossier, le courtier peut revenir sur une étape passée. */
+  protected readonly selected = signal<Stage | 'history'>('infos');
+
+  protected stageEnabled(stage: Stage): boolean {
+    const status = this.store.dossier()?.status;
+    switch (stage) {
+      case 'infos':
+        return true;
+      case 'need':
+        return !!status && status !== 'brouillon';
+      case 'pricing':
+        return !!status && status !== 'brouillon' && status !== 'complet';
+      case 'comparison':
+        return this.comparisonEnabled();
+      case 'proposal':
+        return this.proposalEnabled();
+    }
+  }
+
+  protected stageState(stage: Stage): 'done' | 'current' | 'todo' {
+    if (this.store.dossier()?.status === 'souscrit') return 'done';
+    const order = this.stages.findIndex((s) => s.key === stage);
+    const current = this.stages.findIndex((s) => s.key === this.currentStage());
+    return order < current ? 'done' : order === current ? 'current' : 'todo';
   }
 
   protected isHalted(status: DossierStatus): boolean {
-    return status === 'refuse' || status === 'sans_suite';
+    return status === 'refuse';
   }
 
   /** Le comparatif s'ouvre dès la tarification (les offres arrivent au fil de l'eau). */
   protected readonly comparisonEnabled = computed(() =>
-    ['tarification', 'comparaison', 'decision', 'proposition_envoyee', 'souscrit', 'refuse'].includes(this.store.dossier()?.status ?? ''),
+    [
+      'tarification',
+      'comparaison',
+      'decision',
+      'proposition_envoyee',
+      'souscrit',
+      'refuse',
+    ].includes(this.store.dossier()?.status ?? ''),
   );
 
   /** La proposition s'ouvre dès qu'une offre est retenue (sans suite : seulement si une décision existe). */
@@ -459,17 +588,18 @@ export class DossierDetailContainerComponent implements OnInit {
   protected readonly missingLabels = computed(() =>
     this.store
       .missing()
-      .map(path => this.store.labels().get(path) ?? path)
+      .map((path) => this.store.labels().get(path) ?? 'Champ sans libellé')
       .join(', '),
   );
 
   constructor() {
     effect(() => this.store.select(this.id()));
+    effect(() => this.selected.set(this.currentStage()));
     effect(() => {
       const message = this.store.successMessage();
       if (message) {
         this._snackBar.open(message, undefined, { duration: 3000 });
-        this.store.clearMessages();
+        this.store.clearSuccess();
       }
     });
   }
@@ -480,14 +610,21 @@ export class DossierDetailContainerComponent implements OnInit {
     this.store.clearMessages();
   }
 
+  /** Garde de sortie de route : des modifications ne sont pas enregistrées. */
+  hasUnsavedChanges(): boolean {
+    return this.store.hasPendingEdits();
+  }
+
+  /** Fermeture ou rechargement de l'onglet pendant une saisie ou un enregistrement. */
+  @HostListener('window:beforeunload', ['$event'])
+  protected onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.store.hasPendingEdits() || this.store.saveStatus() === 'saving') {
+      event.preventDefault();
+    }
+  }
+
   protected onAnswer({ path, value }: AnswerChange): void {
     this.store.edit(path, value);
   }
 
-  protected changeStatus(status: DossierStatus): void {
-    if (status === 'sans_suite' && !confirm(this.structure.confirmSansSuite)) {
-      return;
-    }
-    this.store.changeStatus(status);
-  }
 }
