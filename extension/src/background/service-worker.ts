@@ -81,7 +81,7 @@ async function signedInUser(): Promise<ExtensionUser | null> {
 async function setBadge(count: number): Promise<void> {
   try {
     await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
-    await chrome.action.setBadgeBackgroundColor({ color: '#00082b' });
+    await chrome.action.setBadgeBackgroundColor({ color: '#0b63ff' });
   } catch {
     // Le badge est un confort : une erreur ne doit rien casser.
   }

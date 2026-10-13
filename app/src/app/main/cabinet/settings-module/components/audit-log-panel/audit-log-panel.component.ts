@@ -1,12 +1,13 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { AuditLogEntry, Member } from '@shared';
+import { InfiniteScrollDirective } from '../../../../../core/directives/infinite-scroll.directive';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
 
 /** Journal des connexions et des appareils du cabinet (lecture seule, réservé aux admins). */
 @Component({
   selector: 'app-audit-log-panel',
-  imports: [DatePipe],
+  imports: [DatePipe, InfiniteScrollDirective],
   template: `
     <section class="card">
       <h2>{{ structure.title }}</h2>
@@ -37,9 +38,20 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
             </tbody>
           </table>
         </div>
-      } @else {
+      } @else if (!hasMore()) {
         <p class="hint">{{ structure.empty }}</p>
       }
+      <div
+        class="more"
+        appInfiniteScroll
+        [appInfiniteScrollDisabled]="!hasMore() || loadingMore()"
+        [appInfiniteScrollCount]="entries().length"
+        (reached)="loadMore.emit()"
+      >
+        @if (hasMore()) {
+          <span>Chargement de la suite…</span>
+        }
+      </div>
     </section>
   `,
   styleUrl: '../settings.scss',
@@ -74,6 +86,14 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       color: var(--ci-text-muted);
     }
 
+    .more {
+      min-height: 1px;
+      padding: 8px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--ci-text-muted);
+    }
+
     .refused td:last-child {
       color: var(--mat-sys-error);
     }
@@ -83,6 +103,9 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
 export class AuditLogPanelComponent {
   readonly entries = input<AuditLogEntry[]>([]);
   readonly members = input<Member[]>([]);
+  readonly hasMore = input(false);
+  readonly loadingMore = input(false);
+  readonly loadMore = output<void>();
 
   protected readonly structure = SETTINGS_STRUCTURE.audit;
 

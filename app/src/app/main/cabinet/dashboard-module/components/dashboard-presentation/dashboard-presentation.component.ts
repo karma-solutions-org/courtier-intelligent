@@ -183,7 +183,7 @@ export interface ConversionRow extends ConversionRate {
     }
 
     .counter:hover {
-      border-color: #cbd2dc;
+      border-color: var(--border-strong);
     }
 
     .counter:focus-visible {
@@ -349,7 +349,7 @@ export interface ConversionRow extends ConversionRate {
       height: 6px;
       overflow: hidden;
       border-radius: 3px;
-      background: #eceef2;
+      background: var(--surface-3);
     }
 
     .fill {

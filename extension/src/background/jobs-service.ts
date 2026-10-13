@@ -31,20 +31,41 @@ export const RECENT_JOBS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 const INSURERS_CACHE_KEY = 'insurers';
 
+/** Cabinet du compte connecté (claim `ci_cabinet_id`), ou null sans connexion. */
+async function currentCabinetId(): Promise<string | null> {
+  const user = getFirebase().auth.currentUser;
+  if (!user) return null;
+  const claim = (await user.getIdTokenResult()).claims['ci_cabinet_id'];
+  return typeof claim === 'string' ? claim : null;
+}
+
+const toInsurerInfo = (d: DocumentSnapshot): InsurerInfo => ({
+  id: d.id,
+  name: String(d.get('name') ?? d.id),
+  extranetDomains: (d.get('extranetDomains') as string[] | undefined) ?? [],
+});
+
 /**
- * Les assureurs sont gardés en mémoire de session : le service worker redémarre souvent et chaque page web
- * ouverte lui demande « est-ce un extranet ? » — on ne relit pas Firestore à chaque fois.
+ * Assureurs reconnus : catalogue global et assureurs ajoutés par le cabinet (hors archivés).
+ * Gardés en mémoire de session : le service worker redémarre souvent et chaque page web ouverte lui demande
+ * « est-ce un extranet ? » — on ne relit pas Firestore à chaque fois. Le cache est propre au cabinet connecté.
  */
 export async function loadInsurers(): Promise<InsurerInfo[]> {
-  const cached = (await chrome.storage.session.get(INSURERS_CACHE_KEY))[INSURERS_CACHE_KEY] as { at: number; value: InsurerInfo[] } | undefined;
-  if (cached && Date.now() - cached.at < INSURERS_TTL_MS) return cached.value;
-  const snapshot = await getDocs(collection(getFirebase().firestore, 'insurers'));
-  const value = snapshot.docs.map(d => ({
-    id: d.id,
-    name: String(d.get('name') ?? d.id),
-    extranetDomains: (d.get('extranetDomains') as string[] | undefined) ?? [],
-  }));
-  await chrome.storage.session.set({ [INSURERS_CACHE_KEY]: { at: Date.now(), value } });
+  const cabinetId = await currentCabinetId();
+  const cached = (await chrome.storage.session.get(INSURERS_CACHE_KEY))[INSURERS_CACHE_KEY] as
+    | { at: number; cabinetId: string | null; value: InsurerInfo[] }
+    | undefined;
+  if (cached && cached.cabinetId === cabinetId && Date.now() - cached.at < INSURERS_TTL_MS) return cached.value;
+  const { firestore } = getFirebase();
+  const [global, cabinet] = await Promise.all([
+    getDocs(collection(firestore, 'ci_insurers')),
+    cabinetId ? getDocs(collection(firestore, `ci_cabinets/${cabinetId}/ci_insurers`)).catch(() => null) : Promise.resolve(null),
+  ]);
+  const value = [
+    ...global.docs.map(toInsurerInfo),
+    ...(cabinet?.docs.filter(d => d.get('archived') !== true).map(toInsurerInfo) ?? []),
+  ];
+  await chrome.storage.session.set({ [INSURERS_CACHE_KEY]: { at: Date.now(), cabinetId, value } });
   return value;
 }
 
@@ -55,7 +76,7 @@ export async function loadInsurers(): Promise<InsurerInfo[]> {
 function recentJobsQuery(user: ExtensionUser) {
   const since = Timestamp.fromMillis(Date.now() - RECENT_JOBS_WINDOW_MS);
   return query(
-    collectionGroup(getFirebase().firestore, 'quoteJobs'),
+    collectionGroup(getFirebase().firestore, 'ci_quoteJobs'),
     where('ownerUid', '==', user.uid),
     where('updatedAt', '>=', since),
     orderBy('updatedAt', 'desc'),
@@ -102,7 +123,7 @@ export async function listRecentJobs(user: ExtensionUser): Promise<JobRecord[]> 
  */
 export async function updateJob(user: ExtensionUser, dossierId: string, insurerId: string, update: JobUpdate): Promise<void> {
   const { firestore } = getFirebase();
-  await updateDoc(doc(firestore, `cabinets/${user.cabinetId}/dossiers/${dossierId}/quoteJobs/${insurerId}`), {
+  await updateDoc(doc(firestore, `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}/ci_quoteJobs/${insurerId}`), {
     status: update.status,
     currentStep: update.currentStep ?? null,
     totalSteps: update.totalSteps ?? null,
@@ -119,7 +140,7 @@ export async function updateJob(user: ExtensionUser, dossierId: string, insurerI
 export function watchJob(user: ExtensionUser, dossierId: string, insurerId: string, onChange: (job: JobContext) => void): () => void {
   const { firestore } = getFirebase();
   let lastQuoteData = '';
-  return onSnapshot(doc(firestore, `cabinets/${user.cabinetId}/dossiers/${dossierId}/quoteJobs/${insurerId}`), snapshot => {
+  return onSnapshot(doc(firestore, `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}/ci_quoteJobs/${insurerId}`), snapshot => {
     const data = snapshot.data();
     if (!data) return;
     // Nos propres écritures de statut ne relancent pas le remplissage : seul un changement des données le fait.
@@ -145,9 +166,9 @@ export function watchJob(user: ExtensionUser, dossierId: string, insurerId: stri
  */
 export async function writeCapturedOffer(user: ExtensionUser, dossierId: string, insurerId: string, offer: CapturedOffer): Promise<void> {
   const { firestore } = getFirebase();
-  const base = `cabinets/${user.cabinetId}/dossiers/${dossierId}`;
+  const base = `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}`;
   const batch = writeBatch(firestore);
-  batch.set(doc(firestore, `${base}/offers/${insurerId}`), {
+  batch.set(doc(firestore, `${base}/ci_offers/${insurerId}`), {
     quoteNumber: offer.quoteNumber,
     premiumAnnual: offer.premiumAnnual,
     premiumMonthly: offer.premiumMonthly,
@@ -157,7 +178,7 @@ export async function writeCapturedOffer(user: ExtensionUser, dossierId: string,
     source: 'auto',
     capturedAt: serverTimestamp(),
   });
-  batch.update(doc(firestore, `${base}/quoteJobs/${insurerId}`), {
+  batch.update(doc(firestore, `${base}/ci_quoteJobs/${insurerId}`), {
     status: 'captured',
     missingFields: [],
     error: null,
@@ -168,7 +189,7 @@ export async function writeCapturedOffer(user: ExtensionUser, dossierId: string,
 
 /** Signalement d'un échec (E10-4) : assureur, origine de l'extranet, étape et code. AUCUNE donnée client. */
 export async function addExtensionReport(report: { insurerId: string; origin: string; step: ExtensionReportStep; issue: ExtensionReportIssue }): Promise<void> {
-  await addDoc(collection(getFirebase().firestore, 'extensionReports'), { ...report, at: serverTimestamp() });
+  await addDoc(collection(getFirebase().firestore, 'ci_extensionReports'), { ...report, at: serverTimestamp() });
 }
 
 /** Appel à `ia-proxy` : la clé d'IA reste côté serveur. */

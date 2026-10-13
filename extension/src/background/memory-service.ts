@@ -10,7 +10,7 @@ import { getFirebase } from '../shared/firebase';
  */
 export async function loadMemory(origin: string, fingerprint: string): Promise<LoadedMemory | null> {
   const key = await memoryKeyFor(origin, fingerprint);
-  const snapshot = await getDoc(doc(getFirebase().firestore, 'formMemories', key));
+  const snapshot = await getDoc(doc(getFirebase().firestore, 'ci_formMemories', key));
   if (!snapshot.exists() || snapshot.get('invalidatedAt')) return null;
   const fields = snapshot.get('fields');
   return Array.isArray(fields) ? { key, fields: fields as FormMemoryField[] } : null;

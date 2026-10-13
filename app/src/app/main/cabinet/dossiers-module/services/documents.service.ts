@@ -13,7 +13,7 @@ export class DocumentsService {
   private readonly _storage = inject(StorageProvider);
 
   watchDocuments(cabinetId: string, dossierId: string): Observable<DossierDocument[]> {
-    return this._database.watchCollection<DossierDocument>(`cabinets/${cabinetId}/dossiers/${dossierId}/documents`);
+    return this._database.watchCollection<DossierDocument>(`ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_documents`);
   }
 
   upload(storagePath: string, file: Blob): Observable<string> {

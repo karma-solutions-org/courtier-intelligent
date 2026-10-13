@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import {
   DOSSIER_STATUS_LABELS,
@@ -8,6 +8,7 @@ import {
   NEED_FIELD_LABELS,
   NeedInput,
 } from '@shared';
+import { InfiniteScrollDirective } from '../../../../../core/directives/infinite-scroll.directive';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 
 interface TimelineItem {
@@ -33,7 +34,7 @@ const ICONS: Record<string, string> = {
 /** Historique d'un dossier (frise chronologique), du plus récent au plus ancien. */
 @Component({
   selector: 'app-dossier-timeline',
-  imports: [DatePipe, MatIconModule],
+  imports: [DatePipe, MatIconModule, InfiniteScrollDirective],
   template: `
     <section class="card">
       <h2>{{ structure.title }}</h2>
@@ -54,6 +55,17 @@ const ICONS: Record<string, string> = {
             </li>
           }
         </ol>
+        <div
+          class="more"
+          appInfiniteScroll
+          [appInfiniteScrollDisabled]="!hasMore() || loadingMore()"
+          [appInfiniteScrollCount]="events().length"
+          (reached)="loadMore.emit()"
+        >
+          @if (hasMore()) {
+            <span>Chargement de la suite…</span>
+          }
+        </div>
       } @else {
         <div class="empty-wrap">
           <svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true">
@@ -172,6 +184,14 @@ const ICONS: Record<string, string> = {
     .empty {
       color: var(--ci-text-muted);
     }
+
+    .more {
+      min-height: 1px;
+      padding: 8px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--ci-text-muted);
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -181,6 +201,9 @@ export class DossierTimelineComponent {
   readonly memberNames = input<Map<string, string>>(new Map());
   /** Nom des assureurs, par identifiant (événements de tarification). */
   readonly insurerNames = input<Map<string, string>>(new Map());
+  readonly hasMore = input(false);
+  readonly loadingMore = input(false);
+  readonly loadMore = output<void>();
 
   protected readonly structure = DOSSIERS_STRUCTURE.timeline;
 

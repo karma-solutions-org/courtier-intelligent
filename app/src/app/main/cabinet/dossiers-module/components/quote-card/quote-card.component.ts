@@ -180,8 +180,8 @@ const TEXT = {
     }
 
     .status.ok {
-      color: #0b5d1e;
-      background: #d7f5dd;
+      color: var(--ci-success);
+      background: var(--ci-success-soft);
     }
 
     .status.ko {
@@ -240,7 +240,7 @@ const TEXT = {
       transition: border-color 0.15s;
 
       &:hover {
-        border-color: #cbd2dc;
+        border-color: var(--border-strong);
       }
     }
 

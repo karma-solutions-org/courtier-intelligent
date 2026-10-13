@@ -22,7 +22,7 @@
           <mat-icon>login</mat-icon>
           {{ structure.signin }}
         </a>
-        <a mat-flat-button [routerLink]="signupUrl()">{{ structure.signup }}</a>
+        <a mat-flat-button class="ci-cta" [routerLink]="signupUrl()">{{ structure.signup }}</a>
       </div>
     }
   </div>
@@ -40,7 +40,7 @@
         </h1>
         <p class="lead">{{ structure.hero.subtitle }}</p>
         <div class="hero-actions">
-          <a mat-flat-button class="cta-large" [routerLink]="isAuthenticated() ? homeUrl() : signinUrl()">
+          <a mat-flat-button class="cta-large ci-cta" [routerLink]="isAuthenticated() ? homeUrl() : signinUrl()">
             {{ isAuthenticated() ? structure.mySpace : structure.hero.primaryCta }}
           </a>
           <a mat-stroked-button class="cta-large" routerLink="/" fragment="fonctionnement">

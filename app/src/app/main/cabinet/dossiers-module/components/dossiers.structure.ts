@@ -24,7 +24,7 @@ export const DOSSIERS_STRUCTURE = {
     noResult: 'Aucun dossier ne correspond à ces filtres.',
     loading: 'Chargement des dossiers…',
     resume: 'Reprendre',
-    pageSize: 'Dossiers par page',
+    loadingMore: 'Chargement de la suite…',
   },
   stepper: {
     steps: ['Client', 'Produit', 'Documents', 'Questionnaire', 'Récapitulatif'],

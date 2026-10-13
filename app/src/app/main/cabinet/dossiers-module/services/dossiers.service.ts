@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { Assure, CanonicalPath, NeedInput, CanonicalValue, Dossier, DossierEvent, DossierStatus, Insurer, Member, Product } from '@shared';
-import { Observable } from 'rxjs';
+import { combineLatest, map, Observable } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
 
@@ -18,40 +18,72 @@ export class DossiersService {
   private readonly _database = inject(DatabaseProvider);
   private readonly _backend = inject(BackendProvider);
 
-  /** Tous les dossiers du cabinet, du plus récent au plus ancien : filtres et pagination se font côté app. */
+  /** Dossiers du cabinet hors corbeille, du plus récent au plus ancien : filtres et pagination se font côté app. */
   watchDossiers(cabinetId: string): Observable<Dossier[]> {
-    return this._database.watchCollection<Dossier>(`cabinets/${cabinetId}/dossiers`, {
-      orderBy: [{ field: 'createdAt', direction: 'desc' }],
-    });
+    return this._database
+      .watchCollection<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers`, {
+        orderBy: [{ field: 'createdAt', direction: 'desc' }],
+      })
+      .pipe(map((dossiers) => dossiers.filter((dossier) => !dossier.deletedAt)));
+  }
+
+  /** Une tranche de la liste : les `limit` dossiers les plus récents (défilement infini). */
+  watchDossiersPage(cabinetId: string, limit: number): Observable<{ dossiers: Dossier[]; hasMore: boolean }> {
+    return this._database
+      .watchCollection<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers`, {
+        orderBy: [{ field: 'createdAt', direction: 'desc' }],
+        limit,
+      })
+      .pipe(map((dossiers) => ({ dossiers: dossiers.filter((dossier) => !dossier.deletedAt), hasMore: dossiers.length >= limit })));
+  }
+
+  /** Met le dossier dans la corbeille (admin). */
+  remove(dossierId: string): Observable<{ ok: boolean }> {
+    return this._backend.call('corbeille-supprimer', { kind: 'dossier', id: dossierId });
   }
 
   watchDossier(cabinetId: string, dossierId: string): Observable<Dossier | null> {
-    return this._database.watchDocument<Dossier>(`cabinets/${cabinetId}/dossiers/${dossierId}`);
+    return this._database.watchDocument<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}`);
   }
 
   watchAssure(cabinetId: string, assureId: string): Observable<Assure | null> {
-    return this._database.watchDocument<Assure>(`cabinets/${cabinetId}/assures/${assureId}`);
+    return this._database.watchDocument<Assure>(`ci_cabinets/${cabinetId}/ci_assures/${assureId}`);
   }
 
-  /** Historique du dossier, du plus récent au plus ancien. */
-  watchEvents(cabinetId: string, dossierId: string): Observable<DossierEvent[]> {
-    return this._database.watchCollection<DossierEvent>(`cabinets/${cabinetId}/dossiers/${dossierId}/events`, {
-      orderBy: [{ field: 'at', direction: 'desc' }],
-    });
+  /** Historique du dossier, du plus récent au plus ancien : les `limit` derniers événements (défilement infini). */
+  watchEvents(cabinetId: string, dossierId: string, limit: number): Observable<{ events: DossierEvent[]; hasMore: boolean }> {
+    return this._database
+      .watchCollection<DossierEvent>(`ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_events`, {
+        orderBy: [{ field: 'at', direction: 'desc' }],
+        limit,
+      })
+      .pipe(map((events) => ({ events, hasMore: events.length >= limit })));
   }
 
-  /** Catalogue des produits (questionnaire compris). */
-  watchProducts(): Observable<Product[]> {
-    return this._database.watchCollection<Product>('products');
+  /**
+   * Produits vus par le cabinet (questionnaire compris) : catalogue global et produits du cabinet,
+   * archivés compris pour que leurs dossiers restent lisibles (un nouveau dossier les écarte).
+   */
+  watchProducts(cabinetId: string): Observable<Product[]> {
+    return combineLatest([
+      this._database.watchCollection<Product>('ci_products'),
+      this._database.watchCollection<Product>(`ci_cabinets/${cabinetId}/ci_products`),
+    ]).pipe(map(([global, cabinet]) => [...global, ...cabinet]));
   }
 
-  /** Catalogue des assureurs (tarification, historique). */
-  watchInsurers(): Observable<Insurer[]> {
-    return this._database.watchCollection<Insurer>('insurers');
+  /**
+   * Assureurs vus par le cabinet (tarification, historique) : catalogue global et assureurs du cabinet,
+   * archivés compris pour que l'historique garde leur nom (la tarification les écarte).
+   */
+  watchInsurers(cabinetId: string): Observable<Insurer[]> {
+    return combineLatest([
+      this._database.watchCollection<Insurer>('ci_insurers'),
+      this._database.watchCollection<Insurer>(`ci_cabinets/${cabinetId}/ci_insurers`),
+    ]).pipe(map(([global, cabinet]) => [...global, ...cabinet]));
   }
 
   watchMembers(cabinetId: string): Observable<Member[]> {
-    return this._database.watchCollection<Member>(`cabinets/${cabinetId}/members`);
+    return this._database.watchCollection<Member>(`ci_cabinets/${cabinetId}/ci_members`);
   }
 
   /** Crée le dossier en brouillon : la référence est attribuée par le serveur. */

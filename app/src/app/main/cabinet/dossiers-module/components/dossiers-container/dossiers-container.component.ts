@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { ActivatedRoute } from '@angular/router';
 import { DOSSIER_STATUSES, DossierStatus } from '@shared';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
-import { DossiersStore, PAGE_SIZE_OPTIONS } from '../../store/dossiers.store';
+import { DossiersStore } from '../../store/dossiers.store';
 import { EMPTY_FILTER } from '../../util/dossiers.utils';
 import {
   DossierRow,
@@ -10,7 +10,7 @@ import {
   Option,
 } from '../dossiers-list/dossiers-list.component';
 
-/** Page « Dossiers » : liste avec filtres et pagination. */
+/** Page « Dossiers » : liste avec filtres et défilement infini. */
 @Component({
   selector: 'app-dossiers-container',
   imports: [DossiersListComponent],
@@ -24,15 +24,15 @@ import {
       [filter]="store.filter()"
       [products]="productOptions()"
       [courtiers]="courtierOptions()"
-      [pageIndex]="store.pageIndex()"
-      [pageSize]="store.pageSize()"
-      [pageSizeOptions]="pageSizeOptions"
+      [hasMore]="store.hasMore()"
+      [loadingMore]="store.loadingMore()"
+      [loadedCount]="store.dossiers().length"
       [loaded]="store.loaded()"
       [createUrl]="createUrl"
       [baseUrl]="baseUrl"
       (filterChanged)="store.setFilter($event)"
       (filterReset)="store.resetFilter()"
-      (pageChanged)="store.setPage($event.pageIndex, $event.pageSize)"
+      (loadMore)="store.loadMore()"
     />
   `,
   styles: `
@@ -41,7 +41,7 @@ import {
       padding: 12px 14px;
       border-left: 3px solid var(--ci-danger);
       border-radius: 8px;
-      color: #8a1621;
+      color: var(--ci-danger);
       background: var(--ci-danger-soft);
     }
   `,
@@ -49,7 +49,6 @@ import {
 })
 export class DossiersContainerComponent {
   protected readonly store = inject(DossiersStore);
-  protected readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
   protected readonly createUrl = CabinetRouteContainerModel.DOSSIER_NEW_ROUTE.url;
   protected readonly baseUrl = CabinetRouteContainerModel.DOSSIERS_ROUTE.url;
 
@@ -71,7 +70,7 @@ export class DossiersContainerComponent {
   protected readonly rows = computed<DossierRow[]>(() => {
     const products = new Map(this.store.products().map((p) => [p.id, p.name]));
     const members = this.store.memberNames();
-    return this.store.pageItems().map((dossier) => ({
+    return this.store.filtered().map((dossier) => ({
       dossier,
       assureName: this.store.assureName(dossier.assureId),
       productName: products.get(dossier.productId) ?? dossier.productId,

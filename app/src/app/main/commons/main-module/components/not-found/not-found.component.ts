@@ -31,7 +31,7 @@ import { LogoComponent } from '../../../../../core/components/logo/logo.componen
       font-size: 72px;
       font-weight: 600;
       line-height: 1;
-      color: #00082b;
+      color: var(--ci-navy-900);
     }
 
     h1 {

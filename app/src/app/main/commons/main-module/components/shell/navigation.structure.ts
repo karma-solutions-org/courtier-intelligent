@@ -26,7 +26,10 @@ export const NAVIGATION: NavSection[] = [
   },
   {
     title: 'Cabinet',
-    items: [{ label: 'Paramètres', icon: 'settings', url: CabinetRouteContainerModel.SETTINGS_ROUTE.url, roles: ['admin'] }],
+    items: [
+      { label: 'Paramètres', icon: 'settings', url: CabinetRouteContainerModel.SETTINGS_ROUTE.url, roles: ['admin'] },
+      { label: 'Corbeille', icon: 'delete', url: CabinetRouteContainerModel.TRASH_ROUTE.url, roles: ['admin'] },
+    ],
   },
 ];
 

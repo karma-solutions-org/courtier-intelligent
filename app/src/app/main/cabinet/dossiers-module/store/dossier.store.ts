@@ -47,6 +47,9 @@ import { labelsByPath, manualTransitionsFrom } from '../util/dossiers.utils';
 /** Délai sans frappe avant d'enregistrer le brouillon. */
 const AUTOSAVE_DELAY_MS = 800;
 
+/** Taille d'une tranche de l'historique (défilement infini). */
+const EVENTS_PAGE_SIZE = 20;
+
 /** idle : rien à enregistrer · dirty : modifications en attente · saving · saved · error. */
 export type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -69,6 +72,10 @@ interface DossierState {
   /** Vrai dès la première réponse de Firestore. */
   loaded: boolean;
   events: DossierEvent[];
+  /** Événements demandés à Firestore : grandit d'une tranche à chaque fin de défilement de l'historique. */
+  eventsLimit: number;
+  eventsHasMore: boolean;
+  eventsLoadingMore: boolean;
   members: Member[];
   products: Product[];
   /** Catalogue des assureurs (onglet Tarification, historique). */
@@ -98,6 +105,9 @@ export const DossierStore = signalStore(
     dossier: null,
     loaded: false,
     events: [],
+    eventsLimit: EVENTS_PAGE_SIZE,
+    eventsHasMore: false,
+    eventsLoadingMore: false,
     members: [],
     products: [],
     insurers: [],
@@ -189,12 +199,17 @@ export const DossierStore = signalStore(
           }),
           map(() => true),
           catchError((error) => {
-            // Le courtier a changé de dossier entre-temps : ne pas mêler ces réponses au nouveau dossier.
+            // Le courtier a changé de dossier entre-temps : ne pas mêler ces réponses au nouveau dossier,
+            // mais lui dire que les dernières réponses du dossier précédent n'ont pas été enregistrées.
             if (store.selectedId() === dossierId) {
               patchState(store, {
                 pending: { ...patch, ...store.pending() },
                 saveStatus: 'error',
                 error: toBackendErrorMessage(error),
+              });
+            } else {
+              patchState(store, {
+                error: `Les dernières réponses du dossier précédent n'ont pas pu être enregistrées : ${toBackendErrorMessage(error)}`,
               });
             }
             return of(false);
@@ -277,6 +292,9 @@ export const DossierStore = signalStore(
           dossier: null,
           loaded: false,
           events: [],
+          eventsLimit: EVENTS_PAGE_SIZE,
+          eventsHasMore: false,
+          eventsLoadingMore: false,
           assure: null,
           answers: {},
           answersFor: null,
@@ -285,6 +303,29 @@ export const DossierStore = signalStore(
           error: null,
         }),
       setAutosave: (autosave: boolean) => patchState(store, { autosave }),
+      /** Fin du défilement de l'historique : demande la tranche suivante. */
+      loadMoreEvents: () => {
+        if (store.eventsHasMore() && !store.eventsLoadingMore()) {
+          patchState(store, { eventsLimit: store.eventsLimit() + EVENTS_PAGE_SIZE, eventsLoadingMore: true });
+        }
+      },
+      _listenEvents: rxMethod<{ cabinet: string | null; id: string | null; limit: number }>(
+        pipe(
+          switchMap(({ cabinet, id, limit }) =>
+            cabinet && id
+              ? service.watchEvents(cabinet, id, limit).pipe(
+                  tap(({ events, hasMore }) =>
+                    patchState(store, { events, eventsHasMore: hasMore, eventsLoadingMore: false }),
+                  ),
+                  catchError((error) => {
+                    patchState(store, { error: toBackendErrorMessage(error), eventsLoadingMore: false });
+                    return EMPTY;
+                  }),
+                )
+              : EMPTY,
+          ),
+        ),
+      ),
       clearMessages: () => patchState(store, { error: null, successMessage: null }),
       /** Après affichage du snackbar : l'erreur éventuelle reste affichée. */
       clearSuccess: () => patchState(store, { successMessage: null }),
@@ -369,9 +410,8 @@ export const DossierStore = signalStore(
                   }),
                 ),
               ),
-              guard(service.watchEvents(cabinet, id).pipe(tap((events) => patchState(store, { events })))),
-              guard(service.watchProducts().pipe(tap((products) => patchState(store, { products })))),
-              guard(service.watchInsurers().pipe(tap((insurers) => patchState(store, { insurers })))),
+              guard(service.watchProducts(cabinet).pipe(tap((products) => patchState(store, { products })))),
+              guard(service.watchInsurers(cabinet).pipe(tap((insurers) => patchState(store, { insurers })))),
               guard(service.watchMembers(cabinet).pipe(tap((members) => patchState(store, { members })))),
             );
           }),
@@ -432,6 +472,12 @@ export const DossierStore = signalStore(
           computed(
             () => ({ cabinet: authStore.cabinetId(), id: store.selectedId() }),
             { equal: (a, b) => a.cabinet === b.cabinet && a.id === b.id },
+          ),
+        );
+        store._listenEvents(
+          computed(
+            () => ({ cabinet: authStore.cabinetId(), id: store.selectedId(), limit: store.eventsLimit() }),
+            { equal: (a, b) => a.cabinet === b.cabinet && a.id === b.id && a.limit === b.limit },
           ),
         );
         store._listenAssure(computed(() => store.dossier()?.assureId ?? null));

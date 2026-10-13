@@ -15,7 +15,7 @@ export class AssuresService {
   /** Pièces rangées avec le client (CIN, Kbis), de la plus récente à la plus ancienne. */
   watchDocuments(cabinetId: string, assureId: string): Observable<AssureDocument[]> {
     return this._database
-      .watchCollection<AssureDocument>(`cabinets/${cabinetId}/assures/${assureId}/documents`)
+      .watchCollection<AssureDocument>(`ci_cabinets/${cabinetId}/ci_assures/${assureId}/ci_documents`)
       .pipe(map(documents => documents.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))));
   }
 
@@ -38,33 +38,55 @@ export class AssuresService {
     return this._storage.getUrl(storagePath);
   }
 
-  /** Tous les assurés du cabinet : recherche et pagination se font côté app (Firestore n'a pas de recherche texte). */
+  /** Assurés du cabinet hors corbeille : recherche et pagination se font côté app (Firestore n'a pas de recherche texte). */
   watchAssures(cabinetId: string): Observable<Assure[]> {
-    return this._database.watchCollection<Assure>(`cabinets/${cabinetId}/assures`, {
-      orderBy: [{ field: 'lastName' }],
-    });
+    return this._database
+      .watchCollection<Assure>(`ci_cabinets/${cabinetId}/ci_assures`, { orderBy: [{ field: 'lastName' }] })
+      .pipe(map((assures) => assures.filter((assure) => !assure.deletedAt)));
+  }
+
+  /**
+   * Une tranche de la liste des assurés : les `limit` premiers dans l'ordre demandé (défilement infini).
+   * `hasMore` est vrai tant que Firestore a rempli la tranche (corbeille comprise, filtrée ensuite).
+   */
+  watchAssuresPage(cabinetId: string, limit: number, sort: 'name' | 'recent'): Observable<{ assures: Assure[]; hasMore: boolean }> {
+    return this._database
+      .watchCollection<Assure>(`ci_cabinets/${cabinetId}/ci_assures`, {
+        orderBy: [sort === 'recent' ? { field: 'createdAt', direction: 'desc' } : { field: 'lastName' }],
+        limit,
+      })
+      .pipe(map((assures) => ({ assures: assures.filter((assure) => !assure.deletedAt), hasMore: assures.length >= limit })));
+  }
+
+  watchAssure(cabinetId: string, assureId: string): Observable<Assure | null> {
+    return this._database.watchDocument<Assure>(`ci_cabinets/${cabinetId}/ci_assures/${assureId}`);
   }
 
   /** Dossiers d'un assuré, du plus récent au plus ancien. */
   watchDossiersOf(cabinetId: string, assureId: string): Observable<Dossier[]> {
     return this._database
-      .watchCollection<Dossier>(`cabinets/${cabinetId}/dossiers`, {
+      .watchCollection<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers`, {
         filters: [{ field: 'assureId', operator: '==', value: assureId }],
       })
-      .pipe(map(dossiers => dossiers.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))));
+      .pipe(map(dossiers => dossiers.filter(dossier => !dossier.deletedAt).sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))));
   }
 
   /** Crée l'assuré et renvoie son identifiant. */
   create(cabinetId: string, uid: string, data: AssureData): Observable<string> {
-    return this._database.add(`cabinets/${cabinetId}/assures`, {
+    return this._database.add(`ci_cabinets/${cabinetId}/ci_assures`, {
       ...data,
       createdBy: uid,
       createdAt: this._database.serverTimestamp(),
     });
   }
 
+  /** Met le client et ses dossiers dans la corbeille (admin) : restaurables depuis la page Corbeille. */
+  remove(assureId: string): Observable<{ ok: boolean }> {
+    return this._backend.call('corbeille-supprimer', { kind: 'assure', id: assureId });
+  }
+
   update(cabinetId: string, assureId: string, data: AssureData): Observable<void> {
-    return this._database.update(`cabinets/${cabinetId}/assures/${assureId}`, {
+    return this._database.update(`ci_cabinets/${cabinetId}/ci_assures/${assureId}`, {
       ...data,
       updatedAt: this._database.serverTimestamp(),
     });

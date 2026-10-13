@@ -189,7 +189,7 @@ export const money = (value: number | null | undefined): string => (value == nul
 
     thead th.best,
     td.best-col {
-      background: #f2f9f9;
+      background: var(--row-hover);
     }
 
     .best-flag {

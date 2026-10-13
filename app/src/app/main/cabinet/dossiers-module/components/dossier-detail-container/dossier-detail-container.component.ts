@@ -15,8 +15,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { DossierStatus, PROPOSAL_DOSSIER_STATUSES } from '@shared';
+import { toBackendErrorMessage } from '../../../../../core/utils/backend-error.utils';
+import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
+import { DossiersService } from '../../services/dossiers.service';
 import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { displayName } from '../../../assures-module/util/assures.utils';
@@ -74,6 +77,12 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
     >
 
     @if (store.dossier(); as dossier) {
+      @if (dossier.deletedAt) {
+        <p class="trashed" role="status">
+          <mat-icon aria-hidden="true">delete</mat-icon>
+          Ce dossier est dans la corbeille. Un administrateur peut le restaurer depuis la page Corbeille.
+        </p>
+      }
       <header class="card header" [attr.data-status]="dossier.status">
         <div class="title">
           <span class="title-icon" aria-hidden="true"><mat-icon>folder_open</mat-icon></span>
@@ -141,6 +150,22 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
             <a mat-stroked-button [routerLink]="[listUrl, dossier.id, 'brouillon']">{{
               structure.resume
             }}</a>
+          }
+
+          @if (isAdmin() && !dossier.deletedAt) {
+            @if (confirmingDelete()) {
+              <span class="confirm" role="alert">
+                Mettre ce dossier dans la corbeille ?
+                <button mat-button type="button" (click)="confirmingDelete.set(false)">Annuler</button>
+                <button mat-flat-button class="danger" type="button" [disabled]="deleting()" (click)="remove(dossier.id)">
+                  Supprimer
+                </button>
+              </span>
+            } @else {
+              <button mat-button type="button" class="danger-text" (click)="confirmingDelete.set(true)">
+                <mat-icon>delete</mat-icon>Supprimer le dossier
+              </button>
+            }
           }
         </div>
         @if (dossier.status === 'brouillon' && !store.isComplete() && store.schema().length) {
@@ -225,6 +250,9 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
                 [events]="store.events()"
                 [memberNames]="store.memberNames()"
                 [insurerNames]="store.insurerNames()"
+                [hasMore]="store.eventsHasMore()"
+                [loadingMore]="store.eventsLoadingMore()"
+                (loadMore)="store.loadMoreEvents()"
               />
             </div>
           }
@@ -444,6 +472,33 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
       --mat-button-filled-label-text-color: var(--ci-navy-900);
     }
 
+    .trashed {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin: 0;
+      padding: 12px 16px;
+      border: 1px solid var(--ci-danger, #c62828);
+      border-radius: 8px;
+      color: var(--ci-danger, #c62828);
+    }
+
+    .danger-text {
+      color: var(--ci-danger, #c62828);
+    }
+
+    .danger {
+      background: var(--ci-danger, #c62828);
+      color: #fff;
+    }
+
+    .confirm {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
     .hint {
       margin: 12px 0 0;
       font-size: 13px;
@@ -480,13 +535,13 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
 
     .warning {
       border-left: 3px solid var(--ci-warning);
-      color: #7a3e00;
+      color: var(--ci-warning);
       background: var(--ci-warning-soft);
     }
 
     .error {
       border-left: 3px solid var(--ci-danger);
-      color: #8a1621;
+      color: var(--ci-danger);
       background: var(--ci-danger-soft);
     }
 
@@ -514,6 +569,29 @@ export class DossierDetailContainerComponent implements OnInit, HasUnsavedChange
   private readonly _snackBar = inject(MatSnackBar);
   protected readonly structure = DOSSIERS_STRUCTURE.detail;
   protected readonly listUrl = CabinetRouteContainerModel.DOSSIERS_ROUTE.url;
+  private readonly _router = inject(Router);
+  private readonly _dossiers = inject(DossiersService);
+  private readonly _auth = inject(AuthStore);
+  protected readonly isAdmin = computed(() => this._auth.role() === 'admin');
+  protected readonly confirmingDelete = signal(false);
+  protected readonly deleting = signal(false);
+
+  /** Met le dossier dans la corbeille, puis revient à l'espace du client. */
+  protected remove(dossierId: string): void {
+    const back = this.backUrl();
+    this.deleting.set(true);
+    this._dossiers.remove(dossierId).subscribe({
+      next: () => {
+        this._snackBar.open('Dossier placé dans la corbeille.', undefined, { duration: 3000 });
+        this._router.navigateByUrl(back);
+      },
+      error: (error) => {
+        this.deleting.set(false);
+        this.confirmingDelete.set(false);
+        this._snackBar.open(toBackendErrorMessage(error), undefined, { duration: 5000 });
+      },
+    });
+  }
 
   /** Le dossier se gère depuis l'espace de son client. */
   protected backUrl(): string {

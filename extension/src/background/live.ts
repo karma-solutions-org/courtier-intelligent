@@ -3,6 +3,7 @@ import { collectionGroup, doc, getDoc, limit, onSnapshot, orderBy, query, where 
 import { getFirebase } from '../shared/firebase';
 import type { CurrentJob, ExtensionUser } from '../shared/messages';
 import { JobSnapshot, pickCurrentJob } from './jobs';
+import { insurerDocPath } from '@shared';
 
 export interface LiveHandlers {
   /** La fiche du membre a changé (ou n'est plus lisible) : la session est à revérifier. */
@@ -25,7 +26,8 @@ export function startLiveWatch(user: ExtensionUser, handlers: LiveHandlers): () 
   const loadInsurerName = async (insurerId: string) => {
     if (insurerNames.has(insurerId)) return;
     try {
-      const snapshot = await getDoc(doc(firestore, `insurers/${insurerId}`));
+      // Assureur du catalogue, ou ajouté par le cabinet (identifiant préfixé, voir shared/cabinet-insurers.ts).
+      const snapshot = await getDoc(doc(firestore, insurerDocPath(user.cabinetId, insurerId)));
       const name = snapshot.get('name');
       if (typeof name === 'string') {
         insurerNames.set(insurerId, name);
@@ -37,7 +39,7 @@ export function startLiveWatch(user: ExtensionUser, handlers: LiveHandlers): () 
   };
 
   const stopMember = onSnapshot(
-    doc(firestore, `cabinets/${user.cabinetId}/members/${user.uid}`),
+    doc(firestore, `ci_cabinets/${user.cabinetId}/ci_members/${user.uid}`),
     () => handlers.onSessionMaybeChanged(),
     error => {
       if (error instanceof FirebaseError && error.code === 'permission-denied') handlers.onSessionMaybeChanged();
@@ -45,7 +47,7 @@ export function startLiveWatch(user: ExtensionUser, handlers: LiveHandlers): () 
   );
 
   const stopJobs = onSnapshot(
-    query(collectionGroup(firestore, 'quoteJobs'), where('ownerUid', '==', user.uid), orderBy('updatedAt', 'desc'), limit(5)),
+    query(collectionGroup(firestore, 'ci_quoteJobs'), where('ownerUid', '==', user.uid), orderBy('updatedAt', 'desc'), limit(5)),
     snapshot => {
       lastJobs = snapshot.docs.map(d => ({
         // …/dossiers/{dossierId}/quoteJobs/{insurerId}

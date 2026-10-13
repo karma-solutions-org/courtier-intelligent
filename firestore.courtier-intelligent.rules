@@ -32,7 +32,7 @@
 
     // Membre actif dont l'appareil courant détient la session.
     function ciSessionOk(t) {
-      let member = get(/databases/$(database)/documents/cabinets/$(t)/members/$(request.auth.uid)).data;
+      let member = get(/databases/$(database)/documents/ci_cabinets/$(t)/ci_members/$(request.auth.uid)).data;
       return member.get('status', null) == 'active'
         && member.get('session', null) != null
         && member.session.get('authTime', null) == request.auth.token.auth_time;
@@ -41,7 +41,7 @@
     // Cabinet au-delà de sa limite d'utilisateurs (baisse d'offre) : une fois le délai de grâce
     // (cabinets/{t}.graceEndsAt) écoulé, seuls les admins gardent l'accès.
     function ciWithinSeatLimit(t) {
-      let cabinet = get(/databases/$(database)/documents/cabinets/$(t)).data;
+      let cabinet = get(/databases/$(database)/documents/ci_cabinets/$(t)).data;
       return cabinet.get('graceEndsAt', null) == null
         || request.time < cabinet.graceEndsAt
         || ciRole() == 'admin';
@@ -49,7 +49,7 @@
 
     // Cabinet actif : un cabinet désactivé (script set-cabinet-status) n'a plus aucun accès.
     function ciCabinetActive(t) {
-      return get(/databases/$(database)/documents/cabinets/$(t)).data.get('active', false) == true;
+      return get(/databases/$(database)/documents/ci_cabinets/$(t)).data.get('active', false) == true;
     }
 
     // Membre du cabinet t, actif, sur son appareil de session.
@@ -78,8 +78,8 @@
     // de l'app, et perd les siens dès que la session de l'app disparaît (fermée, remplacée, appareil réinitialisé,
     // membre désactivé, cabinet désactivé).
     function ciExtActive(t) {
-      let member = get(/databases/$(database)/documents/cabinets/$(t)/members/$(request.auth.uid)).data;
-      let cabinet = get(/databases/$(database)/documents/cabinets/$(t)).data;
+      let member = get(/databases/$(database)/documents/ci_cabinets/$(t)/ci_members/$(request.auth.uid)).data;
+      let cabinet = get(/databases/$(database)/documents/ci_cabinets/$(t)).data;
       return request.auth != null
         && request.auth.token.get('ci_cabinet_id', null) == t
         && cabinet.get('active', false) == true
@@ -147,7 +147,7 @@
     // Offre écrite par l'extension : get() lit le job AVANT le batch writeCapturedOffer (offre + job 'captured'),
     // il est donc encore dans un statut de travail (une page de résultat peut être capturée dès 'requested').
     function ciExtOfferWrite(t, dossierId, insurerId) {
-      let job = get(/databases/$(database)/documents/cabinets/$(t)/dossiers/$(dossierId)/quoteJobs/$(insurerId)).data;
+      let job = get(/databases/$(database)/documents/ci_cabinets/$(t)/ci_dossiers/$(dossierId)/ci_quoteJobs/$(insurerId)).data;
       return ciExtActive(t)
         && job.ownerUid == request.auth.uid
         && job.get('status', null) in ciExtRunnableStatuses()
@@ -158,11 +158,11 @@
     }
 
     // La requête du side panel : « mes jobs en cours », tous dossiers confondus.
-    match /{path=**}/quoteJobs/{insurerId} {
+    match /{path=**}/ci_quoteJobs/{insurerId} {
       allow read: if ciExtAny() && resource.data.ownerUid == request.auth.uid;
     }
 
-    match /cabinets/{cabinetId} {
+    match /ci_cabinets/{cabinetId} {
       allow read: if ciActive(cabinetId);
       // Création, planId, overrides, limits, graceEndsAt, deviceResets, ownerUid, active : serveur uniquement.
       allow create, delete: if false;
@@ -173,7 +173,7 @@
         request.resource.data.name.size() > 0 &&
         request.resource.data.name.size() < 200;
 
-      match /members/{uid} {
+      match /ci_members/{uid} {
         // L'extension relit sa propre fiche pour savoir si sa session est toujours ouverte.
         allow get: if request.auth.uid == uid && ciExtActive(cabinetId);
         // Son propre document reste lisible même sans la session : l'app y détecte
@@ -192,22 +192,22 @@
       }
 
       // Invitations : lecture par l'admin, écriture par les Functions.
-      match /invitations/{invitationId} {
+      match /ci_invitations/{invitationId} {
         allow read: if ciActiveAdmin(cabinetId);
         allow write: if false;
       }
 
       // Journal des connexions et des appareils : lu par les admins, écrit par les Functions.
-      match /auditLog/{entryId} {
+      match /ci_auditLog/{entryId} {
         allow read: if ciActiveAdmin(cabinetId);
         allow write: if false;
       }
 
-      match /counters/{counterId} {
+      match /ci_counters/{counterId} {
         allow read, write: if false;
       }
 
-      match /assures/{assureId} {
+      match /ci_assures/{assureId} {
         allow read: if ciActive(cabinetId);
         // Champs écrits par AssuresService.create (toAssureData + createdBy + createdAt), mêmes limites qu'à l'update.
         allow create: if ciActive(cabinetId) &&
@@ -233,13 +233,13 @@
         allow delete: if ciActiveAdmin(cabinetId);
 
         // Pièces du client (CNI, Kbis) : rattachées par la function assures-rattacherPiece.
-        match /documents/{documentId} {
+        match /ci_documents/{documentId} {
           allow read: if ciActive(cabinetId);
           allow write: if false;
         }
       }
 
-      match /dossiers/{dossierId} {
+      match /ci_dossiers/{dossierId} {
         allow read: if ciActive(cabinetId);
         // Création, données, besoin, statut, assignation et référence passent par les functions dossiers-* :
         // elles appliquent la machine à états, la complétude et la numérotation.
@@ -255,15 +255,15 @@
         // écrit le statut, la progression et les informations manquantes.
         // Jobs et offres : écrits par les functions tarification-* (besoin validé, assureur activé, offre contrôlée)
         // et par l'extension (voir plus bas), jamais directement par l'app.
-        match /quoteJobs/{insurerId} {
+        match /ci_quoteJobs/{insurerId} {
           allow read: if ciActive(cabinetId);
         }
 
-        match /offers/{insurerId} {
+        match /ci_offers/{insurerId} {
           allow read: if ciActive(cabinetId);
         }
 
-        match /documents/{documentId} {
+        match /ci_documents/{documentId} {
           allow read: if ciActive(cabinetId);
           // Écrits uniquement par les functions documents-enregistrer / documents-analyser (statut, OCR, chemin).
           allow create, update: if false;
@@ -272,12 +272,12 @@
         }
 
         // ── Extension : jobs et offres (voir ciExtActive). Écriture limitée au statut du job et aux offres automatiques.
-        match /quoteJobs/{insurerId} {
+        match /ci_quoteJobs/{insurerId} {
           allow get, list: if ciExtActive(cabinetId) && resource.data.ownerUid == request.auth.uid;
           allow update: if ciExtActive(cabinetId) && resource.data.ownerUid == request.auth.uid && ciExtJobUpdate();
         }
 
-        match /offers/{insurerId} {
+        match /ci_offers/{insurerId} {
           allow create: if ciExtOfferWrite(cabinetId, dossierId, insurerId);
           // Jamais par-dessus une offre saisie à la main dans l'app.
           allow update: if resource.data.get('source', null) == 'auto'
@@ -285,7 +285,7 @@
         }
 
         // Historique non modifiable : création seule.
-        match /events/{eventId} {
+        match /ci_events/{eventId} {
           allow read: if ciActive(cabinetId);
           // Les événements du dossier sont écrits par les functions ; seule une note est ajoutée depuis l'app.
           allow create: if ciActive(cabinetId) &&
@@ -301,22 +301,22 @@
     }
 
     // ── Catalogue global : lecture pour les utilisateurs d'un cabinet, écriture serveur.
-    match /products/{productId} {
+    match /ci_products/{productId} {
       allow read: if ciActiveAnyCabinet() || ciExtAny();
       allow write: if false;
     }
 
-    match /insurers/{insurerId} {
+    match /ci_insurers/{insurerId} {
       allow read: if ciActiveAnyCabinet() || ciExtAny();
       allow write: if false;
     }
 
-    match /plans/{planId} {
+    match /ci_plans/{planId} {
       allow read: if ciActiveAnyCabinet();
       allow write: if false;
     }
 
-    match /guaranteeSynonyms/{productId} {
+    match /ci_guaranteeSynonyms/{productId} {
       allow read: if ciActiveAnyCabinet() || ciExtAny();
       allow write: if false;
     }
@@ -325,13 +325,13 @@
     // Partagée entre tous les cabinets, lue par l'extension. Écrite UNIQUEMENT par les functions memoires-*,
     // qui valident à la lettre chaque champ (les règles ne peuvent pas contrôler le contenu d'une liste) :
     // un cabinet ne peut donc ni y déposer une valeur, ni fausser la mémoire des autres.
-    match /formMemories/{memoryKey} {
+    match /ci_formMemories/{memoryKey} {
       allow read: if ciExtAny();
       allow write: if false;
     }
 
     // ── Signalements de l'extension (AUCUNE donnée client) : création seule.
-    match /extensionReports/{reportId} {
+    match /ci_extensionReports/{reportId} {
       // Codes fermés (voir EXTENSION_REPORT_ISSUES dans shared/models.ts) : un texte libre pourrait porter une donnée client.
       allow create: if ciExtAny()
         && request.resource.data.keys().hasOnly(['insurerId', 'origin', 'step', 'issue', 'at'])

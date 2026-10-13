@@ -41,7 +41,7 @@ export class SessionService {
 
   /** Signal de vie : dernière activité de l'appareil, visible dans le suivi des membres. */
   heartbeat(cabinetId: string, uid: string): Observable<void> {
-    return this._database.update(`cabinets/${cabinetId}/members/${uid}`, {
+    return this._database.update(`ci_cabinets/${cabinetId}/ci_members/${uid}`, {
       'session.lastSeen': this._database.serverTimestamp(),
     });
   }
@@ -49,7 +49,7 @@ export class SessionService {
   /** Session actuellement autorisée pour ce membre (null si aucune). */
   watchActiveSession(cabinetId: string, uid: string): Observable<Session | null> {
     return this._database
-      .watchDocument<Member>(`cabinets/${cabinetId}/members/${uid}`)
+      .watchDocument<Member>(`ci_cabinets/${cabinetId}/ci_members/${uid}`)
       .pipe(map(member => member?.session ?? null));
   }
 }

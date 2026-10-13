@@ -64,7 +64,7 @@ export const firebaseBackendPort: BackendPort = {
 export const firestoreSessionPort: SessionPort = {
   async read(user): Promise<SessionRead> {
     try {
-      const snapshot = await getDoc(doc(getFirebase().firestore, `cabinets/${user.cabinetId}/members/${user.uid}`));
+      const snapshot = await getDoc(doc(getFirebase().firestore, `ci_cabinets/${user.cabinetId}/ci_members/${user.uid}`));
       const session = snapshot.get('session') as { extensionAuthTime?: number } | undefined;
       if (!snapshot.exists() || !session) return { kind: 'closed' };
       return { kind: 'open', extensionAuthTime: session.extensionAuthTime ?? null };

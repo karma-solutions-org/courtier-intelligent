@@ -277,7 +277,7 @@ import {
       align-items: center;
       gap: 8px;
       margin: 0;
-      color: #1e7d50;
+      color: var(--ci-success);
     }
 
     .actions {

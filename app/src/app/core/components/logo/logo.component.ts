@@ -30,7 +30,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
       font-weight: 600;
       line-height: 1.05;
       letter-spacing: -0.01em;
-      color: #00082b;
+      color: var(--ci-navy-900);
     }
 
     .inverse {

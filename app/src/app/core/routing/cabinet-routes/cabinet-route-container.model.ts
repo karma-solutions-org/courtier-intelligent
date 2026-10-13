@@ -10,5 +10,7 @@ export class CabinetRouteContainerModel {
     return `${CabinetRouteContainerModel.CLIENTS_ROUTE.url}/${clientId}`;
   }
 
+  /** Clients et dossiers supprimés, restaurables (admin). */
+  static readonly TRASH_ROUTE = { path: 'corbeille', url: '/espace/corbeille' };
   static readonly SETTINGS_ROUTE = { path: 'parametres', url: '/espace/parametres' };
 }

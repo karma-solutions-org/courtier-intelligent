@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
-import { AssuresStore, PAGE_SIZE_OPTIONS } from '../../store/assures.store';
+import { AssuresStore } from '../../store/assures.store';
 import { AssuresListComponent } from '../assures-list/assures-list.component';
 
-/** Page « Assurés » : liste avec recherche et pagination. */
+/** Page « Assurés » : liste avec recherche et défilement infini. */
 @Component({
   selector: 'app-assures-container',
   imports: [AssuresListComponent],
@@ -12,17 +12,21 @@ import { AssuresListComponent } from '../assures-list/assures-list.component';
       <p class="error" role="alert">{{ store.error() }}</p>
     }
     <app-assures-list
-      [assures]="store.pageItems()"
+      [assures]="store.filtered()"
       [total]="store.total()"
       [query]="store.query()"
-      [pageIndex]="store.pageIndex()"
-      [pageSize]="store.pageSize()"
-      [pageSizeOptions]="pageSizeOptions"
+      [filters]="store.filters()"
+      [hasFilters]="store.hasFilters()"
+      [hasMore]="store.hasMore()"
+      [loadingMore]="store.loadingMore()"
+      [loadedCount]="store.assures().length"
       [loaded]="store.loaded()"
       [createUrl]="createUrl"
       [detailBaseUrl]="detailBaseUrl"
       (queryChanged)="store.setQuery($event)"
-      (pageChanged)="store.setPage($event.pageIndex, $event.pageSize)"
+      (filtersChanged)="store.setFilters($event)"
+      (filtersCleared)="store.clearFilters()"
+      (loadMore)="store.loadMore()"
     />
   `,
   styles: `
@@ -31,7 +35,7 @@ import { AssuresListComponent } from '../assures-list/assures-list.component';
       padding: 12px 14px;
       border-left: 3px solid var(--ci-danger);
       border-radius: 8px;
-      color: #8a1621;
+      color: var(--ci-danger);
       background: var(--ci-danger-soft);
     }
   `,
@@ -39,7 +43,6 @@ import { AssuresListComponent } from '../assures-list/assures-list.component';
 })
 export class AssuresContainerComponent {
   protected readonly store = inject(AssuresStore);
-  protected readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
   protected readonly createUrl = CabinetRouteContainerModel.CLIENT_NEW_ROUTE.url;
   protected readonly detailBaseUrl = CabinetRouteContainerModel.CLIENTS_ROUTE.url;
 }

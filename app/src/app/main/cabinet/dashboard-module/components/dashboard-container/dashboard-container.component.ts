@@ -36,7 +36,7 @@ import {
       padding: 12px 14px;
       border-left: 3px solid var(--ci-danger);
       border-radius: 8px;
-      color: #8a1621;
+      color: var(--ci-danger);
       background: var(--ci-danger-soft);
     }
   `,

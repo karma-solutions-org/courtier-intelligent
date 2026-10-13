@@ -26,7 +26,8 @@ import { displayName, matchesSearch } from '../../assures-module/util/assures.ut
 import { DossiersService } from '../services/dossiers.service';
 import { DEFAULT_FILTER, DossierFilter, filterDossiers } from '../util/dossiers.utils';
 
-export const PAGE_SIZE_OPTIONS = [10, 25, 50];
+/** Taille d'une tranche du défilement infini. */
+export const PAGE_SIZE = 20;
 const MAX_ASSURE_RESULTS = 8;
 
 interface DossiersState {
@@ -36,8 +37,12 @@ interface DossiersState {
   products: Product[];
   loaded: boolean;
   filter: DossierFilter;
-  pageIndex: number;
-  pageSize: number;
+  /** Nombre de dossiers demandés à Firestore : grandit d'une tranche à chaque fin de défilement. */
+  limit: number;
+  /** Firestore a peut-être d'autres dossiers au-delà de la tranche chargée. */
+  hasMore: boolean;
+  /** Une tranche supplémentaire est demandée et pas encore arrivée. */
+  loadingMore: boolean;
   /** Recherche d'assuré de l'étape 1 du stepper « Nouveau dossier ». */
   assureQuery: string;
   /** Dossier qui vient d'être créé : le stepper navigue vers son questionnaire. */
@@ -53,8 +58,9 @@ export const DossiersStore = signalStore(
     products: [],
     loaded: false,
     filter: DEFAULT_FILTER,
-    pageIndex: 0,
-    pageSize: PAGE_SIZE_OPTIONS[0],
+    limit: PAGE_SIZE,
+    hasMore: false,
+    loadingMore: false,
     assureQuery: '',
     createdId: null,
   }),
@@ -68,10 +74,6 @@ export const DossiersStore = signalStore(
     return {
       filtered,
       total: computed(() => filtered().length),
-      pageItems: computed(() => {
-        const start = store.pageIndex() * store.pageSize();
-        return filtered().slice(start, start + store.pageSize());
-      }),
       assureById: computed(() => new Map(store.assures().map((a) => [a.id, a]))),
       /** Nom affiché d'un membre, par uid. */
       memberNames: computed(
@@ -83,7 +85,7 @@ export const DossiersStore = signalStore(
         const enabled = cabinetStatus.cabinet()?.enabledProducts ?? [];
         return store
           .products()
-          .filter((p) => p.active && (enabled.length === 0 || enabled.includes(p.id)));
+          .filter((p) => p.active && !p.archived && (enabled.length === 0 || enabled.includes(p.id)));
       }),
       /** Assurés proposés à l'étape 1 : les plus proches de la recherche. */
       assureResults: computed(() =>
@@ -97,9 +99,14 @@ export const DossiersStore = signalStore(
   withMethods(
     (store, service = inject(DossiersService), assuresService = inject(AssuresService)) => ({
       setFilter: (changes: Partial<DossierFilter>) =>
-        patchState(store, { filter: { ...store.filter(), ...changes }, pageIndex: 0 }),
-      resetFilter: () => patchState(store, { filter: DEFAULT_FILTER, pageIndex: 0 }),
-      setPage: (pageIndex: number, pageSize: number) => patchState(store, { pageIndex, pageSize }),
+        patchState(store, { filter: { ...store.filter(), ...changes } }),
+      resetFilter: () => patchState(store, { filter: DEFAULT_FILTER }),
+      /** Fin du défilement : demande la tranche suivante. */
+      loadMore: () => {
+        if (store.hasMore() && !store.loadingMore()) {
+          patchState(store, { limit: store.limit() + PAGE_SIZE, loadingMore: true });
+        }
+      },
       setAssureQuery: (assureQuery: string) => patchState(store, { assureQuery }),
       assureName: (assureId: string): string => {
         const assure = store.assureById().get(assureId);
@@ -123,21 +130,37 @@ export const DossiersStore = signalStore(
         ),
       ),
 
+      /** Tranche de dossiers : écoute à part, relancée à chaque nouvelle tranche sans toucher aux autres écoutes. */
+      _listenDossiers: rxMethod<{ cabinetId: string | null; limit: number }>(
+        pipe(
+          switchMap(({ cabinetId, limit }) =>
+            cabinetId
+              ? service.watchDossiersPage(cabinetId, limit).pipe(
+                  tap(({ dossiers, hasMore }) =>
+                    patchState(store, { dossiers, hasMore, loaded: true, loadingMore: false }),
+                  ),
+                  catchError((error) => {
+                    patchState(store, setError(toBackendErrorMessage(error)), { loaded: true, loadingMore: false });
+                    return EMPTY;
+                  }),
+                )
+              : EMPTY,
+          ),
+        ),
+      ),
+
       _listen: rxMethod<string | null>(
         pipe(
           switchMap((cabinetId) =>
             cabinetId
               ? merge(
-                  service
-                    .watchDossiers(cabinetId)
-                    .pipe(tap((dossiers) => patchState(store, { dossiers, loaded: true }))),
                   assuresService
                     .watchAssures(cabinetId)
                     .pipe(tap((assures) => patchState(store, { assures }))),
                   service
                     .watchMembers(cabinetId)
                     .pipe(tap((members) => patchState(store, { members }))),
-                  service.watchProducts().pipe(tap((products) => patchState(store, { products }))),
+                  service.watchProducts(cabinetId).pipe(tap((products) => patchState(store, { products }))),
                 ).pipe(
                   // Une écoute refusée affiche l'erreur sans arrêter l'écoute (changement de cabinet).
                   catchError((error) => {
@@ -152,6 +175,15 @@ export const DossiersStore = signalStore(
     }),
   ),
   withHooks({
-    onInit: (store) => store._listen(inject(AuthStore).cabinetId),
+    onInit: (store) => {
+      const authStore = inject(AuthStore);
+      store._listen(authStore.cabinetId);
+      store._listenDossiers(
+        computed(
+          () => ({ cabinetId: authStore.cabinetId(), limit: store.limit() }),
+          { equal: (a, b) => a.cabinetId === b.cabinetId && a.limit === b.limit },
+        ),
+      );
+    },
   }),
 );

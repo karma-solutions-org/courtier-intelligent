@@ -109,4 +109,13 @@ export const CABINET_ROUTES: Routes = [
         (c) => c.SettingsContainerComponent,
       ),
   },
+  {
+    path: CabinetRouteContainerModel.TRASH_ROUTE.path,
+    canMatch: [roleGuard('admin')],
+    title: 'Corbeille — Courtier Intelligent',
+    loadComponent: () =>
+      import('../../../main/cabinet/trash-module/components/trash-container/trash-container.component').then(
+        (c) => c.TrashContainerComponent,
+      ),
+  },
 ];

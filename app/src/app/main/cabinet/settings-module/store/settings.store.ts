@@ -31,13 +31,20 @@ import { toBackendErrorMessage } from '../../../../core/utils/backend-error.util
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
 import { CabinetInfoModel } from '../models/cabinet-info.model';
 import { CatalogChoicesModel } from '../models/catalog-choices.model';
-import { SettingsService } from '../services/settings.service';
+import { CabinetInsurerInput, CabinetProductInput, SettingsService } from '../services/settings.service';
+
+/** Taille d'une tranche du journal (défilement infini). */
+const AUDIT_LOG_PAGE_SIZE = 20;
 
 interface SettingsState {
   cabinet: Cabinet | null;
   members: Member[];
   invitations: Invitation[];
   auditLog: AuditLogEntry[];
+  /** Entrées du journal demandées à Firestore : grandit d'une tranche à chaque fin de défilement. */
+  auditLogLimit: number;
+  auditLogHasMore: boolean;
+  auditLogLoadingMore: boolean;
   products: Product[];
   insurers: Insurer[];
   /** Message de confirmation de la dernière action réussie. */
@@ -51,6 +58,9 @@ export const SettingsStore = signalStore(
     members: [],
     invitations: [],
     auditLog: [],
+    auditLogLimit: AUDIT_LOG_PAGE_SIZE,
+    auditLogHasMore: false,
+    auditLogLoadingMore: false,
     products: [],
     insurers: [],
     successMessage: null,
@@ -118,11 +128,46 @@ export const SettingsStore = signalStore(
         (uid) => service.resetDevice(uid),
         'Appareil réinitialisé : le membre peut se connecter depuis son nouvel appareil.',
       ),
+      createProduct: runAction<{ name: string; baseProductId: string | null }>(
+        ({ name, baseProductId }) => service.createProduct(name, baseProductId),
+        'Produit créé : complétez son questionnaire.',
+      ),
+      updateProduct: runAction<CabinetProductInput>((product) => service.updateProduct(product), 'Produit enregistré.'),
+      archiveProduct: runAction<string>((id) => service.archiveProduct(id), 'Produit retiré.'),
+      addInsurer: runAction<CabinetInsurerInput>((insurer) => service.addInsurer(insurer), 'Assureur ajouté.'),
+      updateInsurer: runAction<{ id: string; insurer: CabinetInsurerInput }>(
+        ({ id, insurer }) => service.updateInsurer(id, insurer),
+        'Assureur modifié.',
+      ),
+      archiveInsurer: runAction<string>((id) => service.archiveInsurer(id), 'Assureur retiré.'),
       saveCatalogChoices: runAction<CatalogChoicesModel>(
         (choices) => onCabinet((id) => service.saveCatalogChoices(id, choices)),
         'Assureurs et produits enregistrés.',
       ),
       clearMessage: () => patchState(store, { successMessage: null }),
+      /** Fin du défilement du journal : demande la tranche suivante. */
+      loadMoreAuditLog: () => {
+        if (store.auditLogHasMore() && !store.auditLogLoadingMore()) {
+          patchState(store, { auditLogLimit: store.auditLogLimit() + AUDIT_LOG_PAGE_SIZE, auditLogLoadingMore: true });
+        }
+      },
+      _listenAuditLog: rxMethod<{ cabinetId: string | null; limit: number }>(
+        pipe(
+          switchMap(({ cabinetId, limit }) =>
+            cabinetId
+              ? service.watchAuditLog(cabinetId, limit).pipe(
+                  tap(({ entries, hasMore }) =>
+                    patchState(store, { auditLog: entries, auditLogHasMore: hasMore, auditLogLoadingMore: false }),
+                  ),
+                  catchError((error) => {
+                    patchState(store, setError(toBackendErrorMessage(error)), { auditLogLoadingMore: false });
+                    return EMPTY;
+                  }),
+                )
+              : EMPTY,
+          ),
+        ),
+      ),
       _listen: rxMethod<string | null>(
         pipe(
           switchMap((id) =>
@@ -142,11 +187,8 @@ export const SettingsStore = signalStore(
                         }),
                       ),
                     ),
-                  service
-                    .watchAuditLog(id)
-                    .pipe(tap((auditLog) => patchState(store, { auditLog }))),
-                  service.watchProducts().pipe(tap((products) => patchState(store, { products }))),
-                  service.watchInsurers().pipe(tap((insurers) => patchState(store, { insurers }))),
+                  service.watchProducts(id).pipe(tap((products) => patchState(store, { products }))),
+                  service.watchInsurers(id).pipe(tap((insurers) => patchState(store, { insurers }))),
                 ).pipe(
                   // Écoute en échec (droits, réseau) : on affiche l'erreur au lieu de l'avaler.
                   catchError((error) => {
@@ -164,6 +206,12 @@ export const SettingsStore = signalStore(
     onInit: (store) => {
       const authStore = inject(AuthStore);
       store._listen(authStore.cabinetId);
+      store._listenAuditLog(
+        computed(
+          () => ({ cabinetId: authStore.cabinetId(), limit: store.auditLogLimit() }),
+          { equal: (a, b) => a.cabinetId === b.cabinetId && a.limit === b.limit },
+        ),
+      );
     },
   }),
 );

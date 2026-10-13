@@ -95,7 +95,7 @@ describe('DossierStore', () => {
           useValue: {
             ...service,
             watchDossier: () => dossier$,
-            watchEvents: () => of([]),
+            watchEvents: () => of({ events: [], hasMore: false }),
             watchProducts: () => of([PRODUCT]),
             watchInsurers: () => of([]),
             watchMembers: () => of([]),

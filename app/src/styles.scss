@@ -3,58 +3,80 @@
 
 html {
   height: 100%;
+  font-size: 14.4px;
   @include mat.theme(
     (
       color: (
         primary: mat.$blue-palette,
-        tertiary: mat.$cyan-palette,
+        tertiary: mat.$azure-palette,
       ),
       typography: (
-        plain-family: 'Inter, Roboto, sans-serif',
-        brand-family: 'Inter, Roboto, sans-serif',
+        plain-family: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+        brand-family: 'Outfit, Inter, sans-serif',
       ),
       density: 0,
     )
   );
 
-  // Surcharge des rôles Material pour coller à la marque (navy).
+  // Rôles Material alignés sur le design system BAZZ-CRM (bleu #0b63ff, navy #0b2265).
   @include mat.theme-overrides(
     (
-      primary: #0b1f4d,
+      primary: #0b63ff,
       on-primary: #ffffff,
-      primary-container: #e3e9fb,
-      on-primary-container: #0b1f4d,
-      secondary-container: #d9f6f6,
-      on-secondary-container: #04484d,
-      tertiary: #0b7480,
-      tertiary-container: #d9f6f6,
-      on-tertiary-container: #04484d,
-      surface-tint: #0b1f4d,
+      primary-container: #e8f1fd,
+      on-primary-container: #0a48a3,
+      secondary-container: #e6f0ff,
+      on-secondary-container: #0b2265,
+      tertiary: #0b63ff,
+      tertiary-container: #eff6ff,
+      on-tertiary-container: #0a48a3,
+      surface-tint: #0b63ff,
     )
   );
 }
 
 :root {
-  /* ---- Marque ---- */
-  --ci-navy-900: #0b1f4d;
-  --ci-navy-800: #142c66;
-  --ci-navy-700: #1f3d85;
-  --ci-navy-100: #e3e9fb;
-  --ci-navy-50: #f1f4fd;
+  /* ---- Marque (design system BAZZ-CRM) ---- */
+  /* Les noms « navy » / « pink » sont gardés pour ne pas toucher aux composants. */
+  --ci-navy-900: #0b2265;
+  --ci-navy-800: #0a48a3;
+  --ci-navy-700: #0b63ff;
+  --ci-navy-100: #e8f1fd;
+  --ci-navy-50: #f2f7ff;
 
-  --ci-accent: #0b7480; /* teal, seul accent (focus, onglet actif, liens) — 5.3:1 sur blanc */
-  --ci-accent-soft: #d9f6f6;
-  --ci-accent-ink: #04484d;
+  --ci-pink: #0b63ff; /* bouton principal */
+  --ci-pink-hover: #0a48a3;
+  --ci-accent: #0b63ff; /* focus, onglet actif, liens */
+  --ci-accent-soft: #e6f0ff;
+  --ci-accent-ink: #0a48a3;
+
+  /* ---- Menu latéral (rail sombre BAZZ) ---- */
+  --ci-sidebar-bg: #0f1624;
+  --ci-sidebar-text: #94a3b8;
+  --ci-sidebar-muted: #64748b;
+  --ci-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --ci-sidebar-active: linear-gradient(135deg, #0b63ff, #0847b8);
+  --ci-sidebar-border: #243147;
 
   /* ---- Sémantique ---- */
-  --ci-success: #116b3d;
-  --ci-success-soft: #dcf5e7;
-  --ci-warning: #8f5100;
-  --ci-warning-soft: #fff1d6;
-  --ci-danger: #b3262f;
-  --ci-danger-soft: #fde4e6;
-  --ci-info: #1a5cad;
-  --ci-info-soft: #e1edfc;
+  --ci-success: #067a45;
+  --ci-success-soft: #e2fcef;
+  --ci-warning: #a8500a;
+  --ci-warning-soft: #fff3e0;
+  --ci-danger: #d4142c;
+  --ci-danger-soft: #ffe9ed;
+  --ci-info: #5b21e0;
+  --ci-info-soft: #f0e9ff;
+
+  /* ---- Rôles BAZZ ---- */
+  --accent-solid: #0b63ff;
+  --accent-deep: #0847b8;
+  --danger-solid: #ff2d55;
+  --border-strong: #cbd5e1;
+  --surface-3: #f1f5f9;
+  --on-accent: #ffffff;
+  --row-hover: #f2f7ff;
+  --transition-fast: 0.15s ease;
 
   /* ---- Statuts de dossier (texte AA + fond doux ; le point sert aux indicateurs) ---- */
   --st-brouillon: #5b6475;
@@ -89,33 +111,50 @@ html {
   --st-sans_suite-dot: #6b7280;
 
   /* ---- Surfaces ---- */
-  --ci-bg: #f7f8fa;
+  --ci-bg: #f5f7fa;
   --ci-surface: #ffffff;
-  --ci-surface-2: #f9fafb;
-  --ci-border: #e5e7eb;
-  --ci-text: #141b2d;
-  --ci-text-muted: #5a6478; /* 5.9:1 sur blanc */
+  --ci-surface-2: #f8fafc;
+  --ci-border: #e2e8f0;
+  --ci-text: #0f172a;
+  --ci-text-muted: #55627a;
 
   /* ---- Formes / élévation ---- */
-  --ci-radius-sm: 8px;
-  --ci-radius: 8px;
-  --ci-radius-lg: 12px;
-  --ci-radius-pill: 999px;
-  --ci-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --ci-radius-sm: 6px;
+  --ci-radius: 12px;
+  --ci-radius-lg: 16px;
+  --ci-radius-pill: 9999px;
+  --ci-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --ci-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 
   /* ---- Typographie ---- */
-  --ci-font: 'Inter', Roboto, system-ui, sans-serif;
-  --ci-fs-xs: 12px;
+  --ci-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ci-font-display: 'Outfit', 'Inter', sans-serif;
+  --ci-fs-xs: 0.8125rem;
 }
 
-/* Mode sombre (opt-in) : contrastes texte AA conservés. */
+/* Mode sombre (opt-in) — valeurs BAZZ-CRM. */
 :root[data-theme='dark'] {
-  --ci-bg: #0b1120;
-  --ci-surface: #131b2e;
-  --ci-surface-2: #182238;
-  --ci-border: #26314a;
-  --ci-text: #e8ecf5;
-  --ci-text-muted: #a9b3c7;
+  color-scheme: dark;
+  --ci-bg: #0b111e;
+  --ci-surface: #182235;
+  --ci-surface-2: #1e2a3f;
+  --ci-border: #2b3a54;
+  --ci-text: #f8fafc;
+  --ci-text-muted: #9aa8bf;
+  --ci-accent: #4ea8ff;
+  --ci-accent-soft: #10294f;
+  --ci-navy-900: #cddcff;
+  --ci-success: #2ee88f;
+  --ci-success-soft: #0d3325;
+  --ci-warning: #ffb02e;
+  --ci-warning-soft: #3a2a10;
+  --ci-danger: #ff6b85;
+  --ci-danger-soft: #3d151f;
+  --ci-info: #a78bff;
+  --ci-info-soft: #221a4d;
+  --border-strong: #3a4a67;
+  --surface-3: #212e46;
+  --row-hover: #1c2740;
 }
 
 body {
@@ -126,6 +165,7 @@ body {
   font-family: var(--ci-font);
   margin: 0;
   height: 100%;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
@@ -133,14 +173,14 @@ body {
 h1,
 h2,
 h3 {
-  font-family: var(--ci-font);
+  font-family: var(--ci-font-display);
   color: var(--ci-text);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 a {
-  color: var(--ci-navy-700);
+  color: var(--ci-accent);
 }
 
 /* ---- Material : finitions globales ---- */
@@ -175,7 +215,7 @@ a {
   --mat-tab-active-hover-label-text-color: var(--ci-navy-900);
   --mat-tab-active-focus-indicator-color: var(--ci-accent);
   --mat-tab-active-hover-indicator-color: var(--ci-accent);
-  --mat-tab-active-indicator-height: 2px;
+  --mat-tab-active-indicator-height: 3px;
   --mat-tab-label-text-weight: 500;
 }
 
@@ -202,7 +242,7 @@ a {
 }
 
 .mat-mdc-row:hover {
-  background: var(--ci-surface-2);
+  background: var(--row-hover);
 }
 
 .mat-mdc-dialog-surface {
@@ -241,6 +281,118 @@ a {
   --mat-snack-bar-container-shape: var(--ci-radius);
 }
 
+/* ---- Boutons Material au style BAZZ-CRM ---- */
+.mat-mdc-button-base {
+  font-family: var(--ci-font) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+}
+
+.mat-mdc-unelevated-button.mat-mdc-button-base:not(:disabled) {
+  --mat-button-filled-container-color: var(--accent-solid);
+  --mat-button-filled-label-text-color: var(--on-accent);
+  box-shadow: 0 4px 10px rgba(16, 102, 228, 0.2);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    --mat-button-filled-container-color: var(--ci-pink-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(16, 102, 228, 0.3);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &.mat-warn {
+    --mat-button-filled-container-color: #ef4444;
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2);
+  }
+}
+
+.mat-mdc-outlined-button.mat-mdc-button-base:not(:disabled) {
+  --mat-button-outlined-outline-color: var(--ci-border);
+  --mat-button-outlined-label-text-color: var(--ci-text-muted);
+
+  &:hover {
+    background: var(--surface-3);
+    color: var(--ci-text);
+  }
+}
+
+/* Classes de boutons BAZZ (pour les éléments non Material) */
+.btn-ident {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.4rem;
+  border: none;
+  border-radius: var(--ci-radius);
+  font-family: var(--ci-font);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &.btn-pill { border-radius: var(--ci-radius-pill); }
+  &.btn-square { border-radius: var(--ci-radius-sm); }
+  &.btn-sm { padding: 0.4rem 0.9rem; font-size: 0.875rem; }
+  &.btn-lg { padding: 0.8rem 1.8rem; font-size: 1rem; }
+  &:disabled { opacity: 0.65; cursor: not-allowed; }
+
+  &.btn-primary {
+    background-color: var(--accent-solid);
+    color: var(--on-accent);
+    box-shadow: 0 4px 10px rgba(16, 102, 228, 0.2);
+    &:hover { background-color: var(--ci-pink-hover); transform: translateY(-1px); box-shadow: 0 6px 14px rgba(16, 102, 228, 0.3); }
+    &:active { transform: translateY(0); }
+  }
+
+  &.btn-secondary {
+    background-color: transparent;
+    border: 1px solid var(--ci-border);
+    color: var(--ci-text-muted);
+    &:hover { background-color: var(--surface-3); color: var(--ci-text); }
+  }
+
+  &.btn-dark {
+    background-color: #0b111e;
+    color: var(--on-accent);
+    &:hover { background-color: #1e293b; transform: translateY(-1px); }
+  }
+
+  &.btn-danger {
+    background-color: #ef4444;
+    color: var(--on-accent);
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2);
+    &:hover { background-color: var(--danger-solid); transform: translateY(-1px); }
+  }
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--ci-accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--ci-radius-pill); }
+
+/* Bouton d'action principale de la page (rose, comme CompliScan) : <a mat-flat-button class="ci-cta"> */
+.mat-mdc-unelevated-button.ci-cta {
+  --mat-button-filled-container-color: var(--ci-pink);
+  --mat-button-filled-label-text-color: #fff;
+  font-weight: 600;
+}
+
+.mat-mdc-unelevated-button.ci-cta:hover {
+  --mat-button-filled-container-color: var(--ci-pink-hover);
+}
+
 /* ---- Utilitaires du design system ---- */
 .ci-card {
   background: var(--ci-surface);
@@ -254,9 +406,9 @@ a {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: var(--ci-radius-pill);
+  border-radius: var(--ci-radius-sm);
   font-size: var(--ci-fs-xs);
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
 }
 

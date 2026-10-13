@@ -24,20 +24,37 @@ import { AssureFormModel, toAssureData } from '../models/assure-form.model';
 import { AssuresService } from '../services/assures.service';
 import { DuplicateCandidate, findDuplicates, matchesSearch } from '../util/assures.utils';
 
-export const PAGE_SIZE_OPTIONS = [10, 25, 50];
+/** Taille d'une tranche du défilement infini. */
+export const PAGE_SIZE = 20;
+
+/** Filtres de la liste : type de client et ordre d'affichage. */
+export interface AssureFilters {
+  type: Assure['type'] | 'all';
+  sort: 'name' | 'recent';
+}
+
+export const DEFAULT_ASSURE_FILTERS: AssureFilters = { type: 'all', sort: 'name' };
 
 interface AssuresState {
   assures: Assure[];
   /** Vrai dès la première réponse de Firestore (distingue « chargement » de « aucun assuré »). */
   loaded: boolean;
   query: string;
-  pageIndex: number;
-  pageSize: number;
-  /** Fiche ouverte et ses dossiers. */
+  filters: AssureFilters;
+  /** Nombre d'assurés demandés à Firestore : grandit d'une tranche à chaque fin de défilement. */
+  limit: number;
+  /** Firestore a peut-être d'autres assurés au-delà de la tranche chargée. */
+  hasMore: boolean;
+  /** Une tranche supplémentaire est demandée et pas encore arrivée. */
+  loadingMore: boolean;
+  /** Fiche ouverte (lue à part : elle peut être hors de la tranche chargée) et ses dossiers. */
   selectedId: string | null;
+  selected: Assure | null;
   dossiers: Dossier[];
   /** Identifiant de l'assuré qui vient d'être créé : la page de création navigue vers sa fiche. */
   createdId: string | null;
+  /** Vrai après la suppression du client ouvert : la fiche revient à la liste. */
+  deleted: boolean;
   successMessage: string | null;
 }
 
@@ -47,42 +64,84 @@ export const AssuresStore = signalStore(
     assures: [],
     loaded: false,
     query: '',
-    pageIndex: 0,
-    pageSize: PAGE_SIZE_OPTIONS[0],
+    filters: DEFAULT_ASSURE_FILTERS,
+    limit: PAGE_SIZE,
+    hasMore: false,
+    loadingMore: false,
     selectedId: null,
+    selected: null,
     dossiers: [],
     createdId: null,
+    deleted: false,
     successMessage: null,
   }),
   withRequestStatus(),
-  withComputed(({ assures, query, pageIndex, pageSize, selectedId }) => {
+  withComputed(({ assures, query, filters }) => {
     const filtered = computed(() => {
       const text = query();
-      return assures().filter((assure) => matchesSearch(assure, text));
+      const { type } = filters();
+      const kept = assures().filter(
+        (assure) =>
+          matchesSearch(assure, text) &&
+          (type === 'all' || assure.type === type),
+      );
+      // L'ordre (nom ou plus récents) est appliqué par Firestore.
+      return kept;
     });
     return {
       filtered,
-      total: computed(() => filtered().length),
-      /** Assurés de la page courante, triés par nom. */
-      pageItems: computed(() => {
-        const start = pageIndex() * pageSize();
-        return filtered().slice(start, start + pageSize());
+      hasFilters: computed(() => {
+        const { type, sort } = filters();
+        return !!query() || type !== 'all' || sort !== 'name';
       }),
-      selected: computed(() => assures().find((assure) => assure.id === selectedId()) ?? null),
+      total: computed(() => filtered().length),
     };
   }),
   withMethods((store, service = inject(AssuresService), authStore = inject(AuthStore)) => {
     return {
-      setQuery: (query: string) => patchState(store, { query, pageIndex: 0 }),
-      setPage: (pageIndex: number, pageSize: number) => patchState(store, { pageIndex, pageSize }),
+      setQuery: (query: string) => patchState(store, { query }),
+      setFilters: (changes: Partial<AssureFilters>) => {
+        const filters = { ...store.filters(), ...changes };
+        // Changer d'ordre relance la lecture depuis la première tranche.
+        const resort = filters.sort !== store.filters().sort;
+        patchState(store, { filters, ...(resort ? { limit: PAGE_SIZE, loaded: false } : {}) });
+      },
+      clearFilters: () => {
+        const resort = store.filters().sort !== DEFAULT_ASSURE_FILTERS.sort;
+        patchState(store, {
+          query: '',
+          filters: DEFAULT_ASSURE_FILTERS,
+          ...(resort ? { limit: PAGE_SIZE, loaded: false } : {}),
+        });
+      },
+      /** Fin du défilement : demande la tranche suivante. */
+      loadMore: () => {
+        if (store.hasMore() && !store.loadingMore()) {
+          patchState(store, { limit: store.limit() + PAGE_SIZE, loadingMore: true });
+        }
+      },
       // Même client : on garde ses dossiers. L'écoute Firestore reste ouverte et n'émettrait rien de nouveau,
       // la liste resterait vide jusqu'au rechargement de la page.
       select: (selectedId: string | null) => {
-        if (selectedId !== store.selectedId()) patchState(store, { selectedId, dossiers: [] });
+        if (selectedId !== store.selectedId()) patchState(store, { selectedId, selected: null, dossiers: [] });
       },
       clearMessage: () => patchState(store, { successMessage: null }),
-      resetStatus: () => patchState(store, resetRequestStatus(), { createdId: null }),
-      /** Assurés existants qui ressemblent à la saisie (alerte de doublon). */
+      resetStatus: () => patchState(store, resetRequestStatus(), { createdId: null, deleted: false }),
+      remove: rxMethod<string>(
+        pipe(
+          exhaustMap((id) => {
+            patchState(store, setPending(), { successMessage: null });
+            return service.remove(id).pipe(
+              tapResponse({
+                next: () =>
+                  patchState(store, setFulfilled(), { deleted: true, successMessage: 'Client placé dans la corbeille.' }),
+                error: (error) => patchState(store, setError(toBackendErrorMessage(error))),
+              }),
+            );
+          }),
+        ),
+      ),
+      /** Assurés existants qui ressemblent à la saisie (alerte de doublon), parmi ceux déjà chargés. */
       duplicatesOf: (candidate: DuplicateCandidate, excludeId?: string): Assure[] =>
         findDuplicates(candidate, store.assures(), excludeId),
 
@@ -127,15 +186,32 @@ export const AssuresStore = signalStore(
         ),
       ),
 
-      _listen: rxMethod<string | null>(
+      _listen: rxMethod<{ cabinetId: string | null; limit: number; sort: AssureFilters['sort'] }>(
         pipe(
-          switchMap((id) =>
-            id
-              ? service.watchAssures(id).pipe(
-                  tap((assures) => patchState(store, { assures, loaded: true })),
+          switchMap(({ cabinetId, limit, sort }) =>
+            cabinetId
+              ? service.watchAssuresPage(cabinetId, limit, sort).pipe(
+                  tap(({ assures, hasMore }) =>
+                    patchState(store, { assures, hasMore, loaded: true, loadingMore: false }),
+                  ),
                   // Une écoute refusée affiche l'erreur sans arrêter l'écoute (changement de cabinet).
                   catchError((error) => {
-                    patchState(store, setError(toBackendErrorMessage(error)), { loaded: true });
+                    patchState(store, setError(toBackendErrorMessage(error)), { loaded: true, loadingMore: false });
+                    return EMPTY;
+                  }),
+                )
+              : EMPTY,
+          ),
+        ),
+      ),
+      _listenSelected: rxMethod<{ cabinetId: string | null; assureId: string | null }>(
+        pipe(
+          switchMap(({ cabinetId, assureId }) =>
+            cabinetId && assureId
+              ? service.watchAssure(cabinetId, assureId).pipe(
+                  tap((assure) => patchState(store, { selected: assure && !assure.deletedAt ? assure : null })),
+                  catchError((error) => {
+                    patchState(store, setError(toBackendErrorMessage(error)));
                     return EMPTY;
                   }),
                 )
@@ -163,10 +239,18 @@ export const AssuresStore = signalStore(
   withHooks({
     onInit: (store) => {
       const authStore = inject(AuthStore);
-      store._listen(authStore.cabinetId);
-      store._listenDossiers(
-        computed(() => ({ cabinetId: authStore.cabinetId(), assureId: store.selectedId() })),
+      store._listen(
+        computed(
+          () => ({ cabinetId: authStore.cabinetId(), limit: store.limit(), sort: store.filters().sort }),
+          { equal: (a, b) => a.cabinetId === b.cabinetId && a.limit === b.limit && a.sort === b.sort },
+        ),
       );
+      const selection = computed(
+        () => ({ cabinetId: authStore.cabinetId(), assureId: store.selectedId() }),
+        { equal: (a, b) => a.cabinetId === b.cabinetId && a.assureId === b.assureId },
+      );
+      store._listenSelected(selection);
+      store._listenDossiers(selection);
     },
   }),
 );

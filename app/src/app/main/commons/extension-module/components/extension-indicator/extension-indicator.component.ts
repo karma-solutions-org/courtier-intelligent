@@ -32,8 +32,8 @@ import { ExtensionPing } from '../../../../../core/providers/extension.provider'
       }
 
       &.installed {
-        color: #1e7d50;
-        background: #e3f5ec;
+        color: var(--ci-success);
+        background: var(--ci-success-soft);
       }
     }
 

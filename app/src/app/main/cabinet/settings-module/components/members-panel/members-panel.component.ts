@@ -55,12 +55,20 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       <h2>{{ structure.listTitle }} ({{ members().length }})</h2>
       <div class="table-scroll">
         <table>
+          <!-- Quatre colonnes de même largeur (espacement régulier), plus une colonne étroite pour l'action. -->
+          <colgroup>
+            <col class="col-main" />
+            <col class="col-main" />
+            <col class="col-main" />
+            <col class="col-main" />
+            <col class="col-action" />
+          </colgroup>
           <thead>
             <tr>
               <th>{{ structure.columns.member }}</th>
-              <th>{{ structure.columns.role }}</th>
+              <th class="center">{{ structure.columns.role }}</th>
               <th>{{ structure.columns.device }}</th>
-              <th>{{ structure.columns.status }}</th>
+              <th class="center">{{ structure.columns.status }}</th>
               <th></th>
             </tr>
           </thead>
@@ -75,7 +83,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
                   }
                   <span class="sub">{{ member.email }}</span>
                 </td>
-                <td class="role-cell" [attr.data-role]="member.role">
+                <td class="role-cell center" [attr.data-role]="member.role">
                   <mat-select
                     class="role-select"
                     [value]="member.role"
@@ -88,7 +96,8 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
                     }
                   </mat-select>
                 </td>
-                <td class="device">
+                <td>
+                  <div class="device">
                   @let devices = devicesOf(member);
                   @if (devices.length) {
                     @for (device of devices; track device.id) {
@@ -115,8 +124,9 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
                   } @else {
                     <span class="sub">{{ structure.noDevice }}</span>
                   }
+                  </div>
                 </td>
-                <td>
+                <td class="center">
                   <span class="status" [class.disabled]="member.status === 'disabled'">
                     {{ member.status === 'active' ? structure.active : structure.disabled }}
                   </span>
@@ -180,9 +190,14 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
 
     th,
     td {
-      padding: 12px 8px;
+      padding: 14px 12px;
       text-align: left;
+      vertical-align: middle;
       border-bottom: 1px solid var(--ci-border);
+    }
+
+    td:first-child {
+      white-space: nowrap;
     }
 
     th {
@@ -200,7 +215,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
     }
 
     .bound-device + .bound-device {
-      margin-top: 6px;
+      margin-top: 2px;
     }
 
     .me {
@@ -208,8 +223,11 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       color: var(--ci-text-muted);
     }
 
+    /* Rôle : pastille à largeur fixe, texte entier (« Administrateur ») à la taille du tableau. */
     .role-select {
-      width: 160px;
+      width: 172px;
+      --mat-select-trigger-text-size: 13px;
+      --mat-select-trigger-text-weight: 600;
     }
 
     .status {
@@ -217,8 +235,8 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       border-radius: 999px;
       font-size: 13px;
       font-weight: 500;
-      color: #1e7d50;
-      background: #e3f5ec;
+      color: var(--ci-success);
+      background: var(--ci-success-soft);
 
       &.disabled {
         color: var(--ci-text-muted);
@@ -232,6 +250,46 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
 
     .right {
       text-align: right;
+    }
+
+    th.center,
+    td.center {
+      text-align: center;
+    }
+
+    /* Colonnes égales : chaque contenu est centré dans sa colonne, l'écart entre les quatre est donc le même. */
+    table {
+      table-layout: fixed;
+      min-width: 880px;
+    }
+
+    .col-main {
+      width: calc((100% - 130px) / 4);
+    }
+
+    .col-action {
+      width: 130px;
+    }
+
+    th:nth-child(-n + 4),
+    td:nth-child(-n + 4) {
+      text-align: center;
+    }
+
+    td:first-child {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    td:nth-child(3) .device {
+      justify-items: center;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .role-cell .role-select {
+      display: inline-block;
+      text-align: left;
     }
 
     h3 {
@@ -278,10 +336,16 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       }
     }
   
+    .role-cell {
+      white-space: nowrap;
+    }
+
     .role-cell .role-select {
-      padding: 4px 12px;
+      padding: 6px 14px;
       border-radius: 999px;
+      font-size: 13px;
       font-weight: 600;
+      line-height: 1.4;
       color: var(--ci-navy-800);
       background: var(--ci-navy-100);
       box-sizing: border-box;
@@ -295,13 +359,36 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
       background: var(--ci-accent-soft);
     }
 
+    /* Appareil : la carte de l'appareil, puis la dernière activité et l'aide, empilées et alignées. */
+    .device {
+      display: grid;
+      gap: 4px;
+      justify-items: start;
+      min-width: 240px;
+
+      .sub {
+        max-width: 420px;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+    }
+
     .bound-device {
       display: inline-flex;
       flex-direction: column;
+      gap: 2px;
       padding: 6px 12px;
       border-radius: 8px;
-      border: 1px solid #c9d4f2;
+      border: 1px solid var(--ci-border);
       background: var(--ci-navy-50);
+
+      strong {
+        font-size: 13px;
+      }
+
+      .sub {
+        font-size: 12px;
+      }
     }
 
     th {
@@ -316,7 +403,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
 
     .limit {
       border-left: 3px solid var(--ci-warning);
-      color: #7a3e00;
+      color: var(--ci-warning);
       background: var(--ci-warning-soft);
     }
 

@@ -13,13 +13,13 @@ export class PricingService {
   /** Jobs du dossier, un par assureur (statut écrit par l'extension, en temps réel). */
   watchJobs(cabinetId: string, dossierId: string): Observable<QuoteJob[]> {
     return this._database.watchCollection<QuoteJob>(
-      `cabinets/${cabinetId}/dossiers/${dossierId}/quoteJobs`,
+      `ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_quoteJobs`,
     );
   }
 
   watchOffers(cabinetId: string, dossierId: string): Observable<Offer[]> {
     return this._database.watchCollection<Offer>(
-      `cabinets/${cabinetId}/dossiers/${dossierId}/offers`,
+      `ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_offers`,
     );
   }
 

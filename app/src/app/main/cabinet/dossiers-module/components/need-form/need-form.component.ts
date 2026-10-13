@@ -182,8 +182,8 @@ const TEXT = {
       background: var(--mat-sys-surface-container);
 
       &.ok {
-        color: #1e7d50;
-        background: #e3f5ec;
+        color: var(--ci-success);
+        background: var(--ci-success-soft);
       }
     }
 

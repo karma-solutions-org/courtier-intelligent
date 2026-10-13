@@ -10,7 +10,7 @@ describe('navigationFor', () => {
   });
 
   it("ajoute les paramètres du cabinet pour l'admin", () => {
-    expect(labelsFor('admin')).toEqual(['Tableau de bord', 'Clients', 'Paramètres']);
+    expect(labelsFor('admin')).toEqual(['Tableau de bord', 'Clients', 'Paramètres', 'Corbeille']);
   });
 
   it('ne montre que le tableau de bord à un compte sans cabinet', () => {

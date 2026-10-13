@@ -256,7 +256,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
     }
 
     .success {
-      color: #1e7d50;
+      color: var(--ci-success);
     }
   
     .card {
@@ -281,7 +281,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
       gap: 4px;
       margin: 8px 0 12px;
       padding: 18px 16px;
-      border: 1px dashed #cbd2dc;
+      border: 1px dashed var(--border-strong);
       border-radius: 8px;
       text-align: center;
       background: var(--ci-surface-2);
@@ -331,7 +331,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
       height: 6px;
       overflow: hidden;
       border-radius: 3px;
-      background: #eceef2;
+      background: var(--surface-3);
 
       span {
         display: block;
@@ -341,7 +341,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
       }
 
       span.low {
-        background: #d08a1e;
+        background: #ff9500;
       }
     }
 

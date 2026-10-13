@@ -1,16 +1,18 @@
 :host {
-  --ink: #0b1b3a;
-  --muted: #5b6b85;
-  --line: #e5e7eb;
-  --soft: #f7f8fa;
+  --ink: var(--ci-text);
+  --muted: var(--ci-text-muted);
+  --line: var(--ci-border);
+  --soft: var(--ci-bg);
   --brand: var(--ci-navy-900);
+  /* Rose de la marque (thème CompliScan) : surtitres, mot mis en avant, chiffres, badges, bouton principal. */
+  --pink: var(--ci-pink);
   --brand-soft: var(--mat-sys-primary-container);
-  --ok: #116b3d;
-  --ok-bg: #e6f6ee;
-  --warn: #8f5100;
-  --warn-bg: #fff4e0;
-  --ko: #b3262f;
-  --ko-bg: #fdecec;
+  --ok: var(--ci-success);
+  --ok-bg: var(--ci-success-soft);
+  --warn: var(--ci-warning);
+  --warn-bg: var(--ci-warning-soft);
+  --ko: var(--ci-danger);
+  --ko-bg: var(--ci-danger-soft);
 
   display: block;
   color: var(--ink);
@@ -38,7 +40,7 @@ p {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--brand);
+  color: var(--pink);
 }
 
 .lead {
@@ -108,7 +110,7 @@ p {
 .hero {
   padding: 88px 0 72px;
   /* Seul traitement de fond de la page : une teinte douce qui s'estompe vers le blanc. */
-  background: linear-gradient(180deg, #f4f6fa 0%, #ffffff 100%);
+  background: linear-gradient(180deg, var(--ci-navy-50) 0%, #ffffff 100%);
 }
 
 .hero-inner {
@@ -127,7 +129,7 @@ p {
 
 .highlight {
   display: block;
-  color: var(--brand);
+  color: var(--pink);
 }
 
 .hero-actions {
@@ -157,7 +159,7 @@ p {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #d3dbe8;
+    background: var(--border-strong);
   }
 }
 
@@ -189,7 +191,7 @@ p {
   border-radius: 8px;
 
   &.chosen {
-    border-color: var(--brand);
+    border-color: var(--pink);
   }
 }
 
@@ -202,7 +204,7 @@ p {
   font-size: 11px;
   font-weight: 600;
   color: #fff;
-  background: var(--brand);
+  background: var(--pink);
 }
 
 .offer-insurer {
@@ -293,8 +295,8 @@ p {
 
 .stat-value {
   font-size: 36px;
-  font-weight: 600;
-  color: var(--brand);
+  font-weight: 700;
+  color: var(--pink);
 }
 
 .stat-label {
@@ -337,8 +339,8 @@ h3 {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  color: var(--brand);
-  background: var(--ci-navy-50);
+  color: var(--pink);
+  background: var(--ci-accent-soft);
 }
 
 /* Étapes */
@@ -438,7 +440,7 @@ h3 {
   font-weight: 600;
 
   mat-icon {
-    color: var(--brand);
+    color: var(--pink);
   }
 }
 

@@ -149,7 +149,7 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
       transition: background 0.15s, border-color 0.15s;
 
       &:hover {
-        border-color: #cbd2dc;
+        border-color: var(--border-strong);
         background: var(--ci-surface-2);
       }
     }

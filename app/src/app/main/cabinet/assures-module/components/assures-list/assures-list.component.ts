@@ -1,34 +1,80 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { RouterLink } from '@angular/router';
 import { Assure } from '@shared';
+import { InfiniteScrollDirective } from '../../../../../core/directives/infinite-scroll.directive';
+import { AssureFilters, DEFAULT_ASSURE_FILTERS } from '../../store/assures.store';
 import { displayName } from '../../util/assures.utils';
 import { ASSURES_STRUCTURE } from '../assures.structure';
 
-/** Liste des assurés : recherche, tableau et pagination. */
+/**
+ * Liste des assurés (présentation CompliScan) : en-tête « Portefeuille », barre de filtres compacte,
+ * tableau dans sa carte (nom en rose et email dessous) et défilement infini.
+ */
 @Component({
   selector: 'app-assures-list',
-  imports: [RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatPaginatorModule],
+  imports: [RouterLink, MatButtonModule, MatIconModule, InfiniteScrollDirective],
   template: `
-    <header>
-      <h1><span class="h1-icon" aria-hidden="true"><mat-icon>groups</mat-icon></span>{{ structure.title }}</h1>
-      <a mat-flat-button [routerLink]="createUrl()">
+    <header class="page-head">
+      <div>
+        <p class="eyebrow">{{ structure.eyebrow }}</p>
+        <h1>
+          {{ structure.title }}
+          @if (loaded()) {
+            <span class="count">({{ total() }}{{ hasMore() ? '+' : '' }})</span>
+          }
+        </h1>
+      </div>
+      <a mat-flat-button class="ci-cta" [routerLink]="createUrl()">
         <mat-icon>add</mat-icon>
         {{ structure.create }}
       </a>
     </header>
 
+    <section class="card toolbar" [attr.aria-label]="structure.filters.label">
+      <label class="search">
+        <mat-icon aria-hidden="true">search</mat-icon>
+        <input
+          type="search"
+          [placeholder]="structure.searchPlaceholder"
+          [attr.aria-label]="structure.search"
+          [value]="query()"
+          (input)="queryChanged.emit($any($event.target).value)"
+        />
+      </label>
+
+      <select
+        class="select"
+        [attr.aria-label]="structure.filters.type"
+        [value]="filters().type"
+        (change)="filtersChanged.emit({ type: $any($event.target).value })"
+      >
+        <option value="all">{{ structure.filters.allTypes }}</option>
+        @for (type of types; track type.value) {
+          <option [value]="type.value">{{ type.label }}</option>
+        }
+      </select>
+
+      <select
+        class="select"
+        [attr.aria-label]="structure.filters.sort"
+        [value]="filters().sort"
+        (change)="filtersChanged.emit({ sort: $any($event.target).value })"
+      >
+        <option value="name">{{ structure.filters.sortName }}</option>
+        <option value="recent">{{ structure.filters.sortRecent }}</option>
+      </select>
+
+      @if (hasFilters()) {
+        <button type="button" class="clear" (click)="filtersCleared.emit()">
+          <mat-icon aria-hidden="true">filter_alt_off</mat-icon>{{ structure.filters.clear }}
+        </button>
+      }
+    </section>
+
     <section class="card">
-      <mat-form-field appearance="outline" class="search" subscriptSizing="dynamic">
-        <mat-label>{{ structure.search }}</mat-label>
-        <mat-icon matPrefix>search</mat-icon>
-        <input matInput type="search" [value]="query()" (input)="queryChanged.emit($any($event.target).value)" />
-        <mat-hint>{{ structure.searchHint }}</mat-hint>
-      </mat-form-field>
+      <h2 class="card-title">{{ structure.eyebrow }}</h2>
 
       @if (!loaded()) {
         <p class="empty">{{ structure.loading }}</p>
@@ -39,25 +85,29 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
               <tr>
                 <th>{{ structure.columns.name }}</th>
                 <th>{{ structure.columns.type }}</th>
-                <th>{{ structure.columns.email }}</th>
+                <th>{{ structure.columns.identifier }}</th>
                 <th>{{ structure.columns.phone }}</th>
                 <th>{{ structure.columns.city }}</th>
               </tr>
             </thead>
             <tbody>
               @for (assure of assures(); track assure.id) {
-                <tr>
-                  <td class="who">
-                    <span class="avatar" [attr.data-hue]="hueOf(nameOf(assure))" aria-hidden="true">{{ initialsOf(nameOf(assure)) }}</span>
-                    <span class="who-text">
-                    <a [routerLink]="[detailBaseUrl(), assure.id]">{{ nameOf(assure) }}</a>
-                    @if (assure.type === 'pro') {
-                      <span class="sub">{{ assure.firstName }} {{ assure.lastName }}</span>
-                    }
-                    </span>
+                <tr [routerLink]="[detailBaseUrl(), assure.id]">
+                  <td>
+                    <div class="who">
+                      <span class="avatar" aria-hidden="true">
+                        <mat-icon>{{ assure.type === 'pro' ? 'apartment' : 'person' }}</mat-icon>
+                      </span>
+                      <span class="who-text">
+                        <a [routerLink]="[detailBaseUrl(), assure.id]" (click)="$event.stopPropagation()">{{
+                          nameOf(assure)
+                        }}</a>
+                        <span class="sub">{{ assure.email || '—' }}</span>
+                      </span>
+                    </div>
                   </td>
-                  <td><span class="type" [class.pro]="assure.type === 'pro'">{{ typeLabels[assure.type] }}</span></td>
-                  <td>{{ assure.email || '—' }}</td>
+                  <td class="type">{{ typeLabels[assure.type] }}</td>
+                  <td class="mono">{{ assure.siret || '—' }}</td>
                   <td>{{ assure.phone || '—' }}</td>
                   <td>{{ assure.address?.city || '—' }}</td>
                 </tr>
@@ -66,52 +116,155 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
           </table>
         </div>
       } @else {
-        <p class="empty">{{ query() ? structure.noResult : structure.empty }}</p>
+        <p class="empty">{{ hasFilters() ? structure.noResult : structure.empty }}</p>
       }
 
-      <mat-paginator
-        [length]="total()"
-        [pageIndex]="pageIndex()"
-        [pageSize]="pageSize()"
-        [pageSizeOptions]="pageSizeOptions()"
-        [hidePageSize]="false"
-        [attr.aria-label]="structure.pageSize"
-        (page)="pageChanged.emit($event)"
-      />
+      <div
+        class="more"
+        appInfiniteScroll
+        [appInfiniteScrollDisabled]="!loaded() || !hasMore() || loadingMore()"
+        [appInfiniteScrollCount]="loadedCount()"
+        (reached)="loadMore.emit()"
+      >
+        @if (loaded() && hasMore()) {
+          <span>{{ structure.loadingMore }}</span>
+        }
+      </div>
     </section>
   `,
   styles: `
     :host {
-      display: block;
+      display: grid;
+      gap: 20px;
     }
 
-    header {
+    .page-head {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-wrap: wrap;
       gap: 16px;
-      margin-bottom: 20px;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--ci-border);
+    }
+
+    .eyebrow,
+    .card-title {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow {
+      margin-bottom: 4px;
+      color: var(--ci-pink);
     }
 
     h1 {
+      display: flex;
+      gap: 12px;
+      align-items: baseline;
       margin: 0;
-      font-size: 22px;
-      font-weight: 600;
+      font-size: 30px;
+      font-weight: 800;
       letter-spacing: -0.02em;
+      color: var(--ci-navy-900);
+    }
+
+    .count {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--ci-pink);
     }
 
     .card {
-      padding: 24px;
       border: 1px solid var(--ci-border);
-      border-radius: 8px;
+      border-radius: 12px;
       background: var(--ci-surface);
       box-shadow: var(--ci-shadow-sm);
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      padding: 16px 24px;
     }
 
     .search {
-      width: 100%;
-      max-width: 480px;
-      margin-bottom: 16px;
+      display: flex;
+      flex: 1 1 280px;
+      gap: 8px;
+      align-items: center;
+      max-width: 520px;
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-bg);
+      color: var(--ci-text-muted);
+
+      &:focus-within {
+        border-color: var(--ci-accent);
+        box-shadow: 0 0 0 3px var(--ci-accent-soft);
+      }
+
+      mat-icon {
+        width: 20px;
+        height: 20px;
+        font-size: 20px;
+      }
+
+      input {
+        width: 100%;
+        border: none;
+        outline: none;
+        background: transparent;
+        font: inherit;
+        font-size: 14px;
+        color: var(--ci-text);
+      }
+    }
+
+    .select,
+    .clear {
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--ci-border);
+      border-radius: 8px;
+      background: var(--ci-surface);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ci-text);
+      cursor: pointer;
+
+      &:focus-visible {
+        outline: 2px solid var(--ci-accent);
+        outline-offset: 1px;
+      }
+    }
+
+    .clear {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+
+      mat-icon {
+        width: 18px;
+        height: 18px;
+        font-size: 18px;
+      }
+    }
+
+    .card-title {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--ci-border);
+      color: var(--ci-text-muted);
     }
 
     .table-scroll {
@@ -125,149 +278,145 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
 
     th,
     td {
-      padding: 12px 8px;
+      padding: 16px 20px;
       text-align: left;
       border-bottom: 1px solid var(--ci-border);
     }
 
     th {
-      font-size: 12px;
-      font-weight: 600;
+      padding-top: 12px;
+      padding-bottom: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
       color: var(--ci-text-muted);
+      background: var(--ci-surface-2);
     }
 
-    .sub {
-      display: block;
-      font-size: 13px;
-      color: var(--ci-text-muted);
-    }
+    tbody tr {
+      cursor: pointer;
 
-    .empty {
-      padding: 32px 0;
-      text-align: center;
-      color: var(--ci-text-muted);
-    }
-  
-    .avatar {
-      display: inline-grid;
-      flex: none;
-      place-items: center;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--ci-navy-900);
-      background: var(--ci-navy-100);
-    }
-
-    h1 {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .h1-icon {
-      display: grid;
-      place-items: center;
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      color: var(--ci-navy-900);
-      background: var(--ci-navy-50);
-    }
-
-    header {
-      flex-wrap: wrap;
+      &:hover {
+        background: var(--ci-surface-2);
+      }
     }
 
     .who {
       display: flex;
+      gap: 14px;
       align-items: center;
-      gap: 12px;
+    }
+
+    .avatar {
+      display: grid;
+      flex: none;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--ci-border);
+      border-radius: 50%;
+      color: var(--ci-text-muted);
+      background: var(--ci-surface-2);
+
+      mat-icon {
+        width: 18px;
+        height: 18px;
+        font-size: 18px;
+      }
     }
 
     .who-text {
+      display: grid;
+      gap: 2px;
       min-width: 0;
-    }
 
-    .who a {
-      font-weight: 600;
-      color: var(--ci-navy-700);
-      text-decoration: none;
+      a {
+        font-weight: 700;
+        color: var(--ci-pink);
+        text-decoration: none;
 
-      &:hover {
-        text-decoration: underline;
+        &:hover {
+          text-decoration: underline;
+        }
       }
     }
 
-    th {
-      color: var(--ci-navy-800);
-      background: var(--ci-navy-50);
-    }
-
-    tbody tr:hover {
-      background: var(--ci-navy-50);
+    .sub {
+      font-size: 13px;
+      color: var(--ci-text-muted);
     }
 
     .type {
-      padding: 2px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--ci-info);
-      background: var(--ci-info-soft);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
 
-      &.pro {
-        color: var(--st-tarification);
-        background: var(--st-tarification-bg);
-      }
+    .mono {
+      font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+      color: var(--ci-text-muted);
+    }
+
+    .empty {
+      margin: 0;
+      padding: 40px 24px;
+      text-align: center;
+      color: var(--ci-text-muted);
+    }
+
+    .more {
+      min-height: 1px;
+      padding: 12px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--ci-text-muted);
     }
 
     @media (max-width: 600px) {
-      .card {
-        padding: 16px 12px;
+      h1 {
+        font-size: 24px;
+      }
+
+      .toolbar {
+        padding: 12px;
+      }
+
+      .search,
+      .select,
+      .clear {
+        flex: 1 1 100%;
+        max-width: none;
       }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AssuresListComponent {
-  /** Assurés de la page courante. */
+  /** Assurés chargés, filtrés. */
   readonly assures = input<Assure[]>([]);
   readonly total = input(0);
   readonly query = input('');
-  readonly pageIndex = input(0);
-  readonly pageSize = input(10);
-  readonly pageSizeOptions = input<number[]>([10, 25, 50]);
+  readonly filters = input<AssureFilters>(DEFAULT_ASSURE_FILTERS);
+  readonly hasFilters = input(false);
   readonly loaded = input(false);
   readonly createUrl = input('');
   readonly detailBaseUrl = input('');
   readonly queryChanged = output<string>();
-  readonly pageChanged = output<PageEvent>();
+  /** Firestore a d'autres éléments : la sentinelle de bas de liste demande la tranche suivante. */
+  readonly hasMore = input(false);
+  readonly loadingMore = input(false);
+  /** Nombre d'éléments chargés (avant filtres) : relance la sentinelle tant qu'elle reste visible. */
+  readonly loadedCount = input(0);
+  readonly loadMore = output<void>();
+  readonly filtersChanged = output<Partial<AssureFilters>>();
+  readonly filtersCleared = output<void>();
 
   protected readonly structure = ASSURES_STRUCTURE.list;
   protected readonly typeLabels = ASSURES_STRUCTURE.typeLabels;
+  protected readonly types = ASSURES_STRUCTURE.types;
 
   protected nameOf(assure: Assure): string {
     return displayName(assure);
-  }
-
-  protected initialsOf(name: string): string {
-    return name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map(part => part[0]!.toUpperCase())
-      .join('');
-  }
-
-  /** Teinte stable (0-5) dérivée du nom, pour colorer l'avatar. */
-  protected hueOf(name: string): number {
-    let h = 0;
-    for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-    return h % 6;
   }
 }

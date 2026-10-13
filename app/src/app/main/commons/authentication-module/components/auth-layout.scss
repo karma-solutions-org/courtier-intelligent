@@ -59,7 +59,7 @@ mat-form-field {
 }
 
 .auth-error {
-  color: #8a1621;
+  color: var(--ci-danger);
   background: var(--ci-danger-soft);
 }
 

@@ -72,7 +72,7 @@ export const DashboardStore = signalStore(
                   service
                     .watchMembers(cabinetId)
                     .pipe(tap((members) => patchState(store, { members }))),
-                  service.watchProducts().pipe(tap((products) => patchState(store, { products }))),
+                  service.watchProducts(cabinetId).pipe(tap((products) => patchState(store, { products }))),
                 ).pipe(
                   // Une écoute refusée affiche l'erreur sans arrêter l'écoute (changement de cabinet).
                   catchError((error) => {

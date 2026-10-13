@@ -8,6 +8,6 @@ export class CabinetStatusService {
   private readonly _database = inject(DatabaseProvider);
 
   watchCabinet(cabinetId: string): Observable<Cabinet | null> {
-    return this._database.watchDocument<Cabinet>(`cabinets/${cabinetId}`);
+    return this._database.watchDocument<Cabinet>(`ci_cabinets/${cabinetId}`);
   }
 }

@@ -42,9 +42,9 @@ import { UserRole } from '@shared';
       margin: 16px 32px 0;
       padding: 12px 18px;
       border-radius: 8px;
-      border: 1px solid #f3d9a8;
-      color: #6b3a00;
-      background: #fff8eb;
+      border: 1px solid #ffd08a;
+      color: var(--ci-warning);
+      background: var(--ci-warning-soft);
 
       mat-icon {
         flex-shrink: 0;
@@ -52,9 +52,9 @@ import { UserRole } from '@shared';
       }
 
       &.expired {
-        border-color: #f5c2c7;
-        color: #8a1621;
-        background: #fef2f3;
+        border-color: #ffb3c0;
+        color: var(--ci-danger);
+        background: var(--ci-danger-soft);
 
         mat-icon {
           color: var(--ci-danger);

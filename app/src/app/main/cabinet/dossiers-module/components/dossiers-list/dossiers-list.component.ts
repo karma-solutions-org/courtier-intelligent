@@ -3,11 +3,11 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { RouterLink } from '@angular/router';
 import { Dossier, DOSSIER_STATUS_LABELS, DossierStatus } from '@shared';
+import { InfiniteScrollDirective } from '../../../../../core/directives/infinite-scroll.directive';
 import { DossierFilter, isDefaultFilter, STATUS_ORDER } from '../../util/dossiers.utils';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 import { StatusChipComponent } from '../status-chip/status-chip.component';
@@ -25,7 +25,7 @@ export interface Option {
   label: string;
 }
 
-/** Liste des dossiers : filtres (statut, produit, courtier, « Mes dossiers »), tableau et pagination. */
+/** Liste des dossiers : filtres (statut, produit, courtier, « Mes dossiers »), tableau et défilement infini. */
 @Component({
   selector: 'app-dossiers-list',
   imports: [
@@ -34,10 +34,10 @@ export interface Option {
     MatButtonModule,
     MatFormFieldModule,
     MatIconModule,
-    MatPaginatorModule,
     MatSelectModule,
     MatSlideToggleModule,
     StatusChipComponent,
+    InfiniteScrollDirective,
   ],
   template: `
     <header>
@@ -127,14 +127,17 @@ export interface Option {
         <div class="empty-wrap"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="empty">{{ hasFilter() ? structure.noResult : structure.empty }}</p></div>
       }
 
-      <mat-paginator
-        [length]="total()"
-        [pageIndex]="pageIndex()"
-        [pageSize]="pageSize()"
-        [pageSizeOptions]="pageSizeOptions()"
-        [attr.aria-label]="structure.pageSize"
-        (page)="pageChanged.emit($event)"
-      />
+      <div
+        class="more"
+        appInfiniteScroll
+        [appInfiniteScrollDisabled]="!loaded() || !hasMore() || loadingMore()"
+        [appInfiniteScrollCount]="loadedCount()"
+        (reached)="loadMore.emit()"
+      >
+        @if (loaded() && hasMore()) {
+          <span>{{ structure.loadingMore }}</span>
+        }
+      </div>
     </section>
   `,
   styles: `
@@ -301,6 +304,14 @@ export interface Option {
       height: 92px;
     }
 
+    .more {
+      min-height: 1px;
+      padding: 12px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--ci-text-muted);
+    }
+
     .empty-wrap .empty {
       padding-top: 8px;
     }
@@ -323,15 +334,17 @@ export class DossiersListComponent {
   readonly filter = input.required<DossierFilter>();
   readonly products = input<Option[]>([]);
   readonly courtiers = input<Option[]>([]);
-  readonly pageIndex = input(0);
-  readonly pageSize = input(10);
-  readonly pageSizeOptions = input<number[]>([10, 25, 50]);
   readonly loaded = input(false);
   readonly createUrl = input('');
   readonly baseUrl = input('');
   readonly filterChanged = output<Partial<DossierFilter>>();
   readonly filterReset = output<void>();
-  readonly pageChanged = output<PageEvent>();
+  /** Firestore a d'autres éléments : la sentinelle de bas de liste demande la tranche suivante. */
+  readonly hasMore = input(false);
+  readonly loadingMore = input(false);
+  /** Nombre d'éléments chargés (avant filtres) : relance la sentinelle tant qu'elle reste visible. */
+  readonly loadedCount = input(0);
+  readonly loadMore = output<void>();
 
   protected readonly structure = DOSSIERS_STRUCTURE.list;
   protected readonly statuses: DossierStatus[] = STATUS_ORDER;
