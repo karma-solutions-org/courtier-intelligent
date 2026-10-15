@@ -23,6 +23,9 @@ import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-s
 import { PricingService } from '../services/pricing.service';
 import { DossierStore } from './dossier.store';
 
+/** Message unique après l'annulation d'une tarification (snackbar et carte de l'assureur). */
+export const PRICING_CANCELLED_TEXT = 'Tarification annulée : vous pouvez la relancer.';
+
 /** Une carte de l'onglet Tarification : l'assureur, son job et son offre. */
 export interface PricingCard {
   insurer: Insurer;
@@ -32,7 +35,8 @@ export interface PricingCard {
 
 type Action =
   | { kind: 'launch'; insurerId: string; target: Window | null }
-  | { kind: 'complete'; insurerId: string; answers: CanonicalData };
+  | { kind: 'complete'; insurerId: string; answers: CanonicalData }
+  | { kind: 'cancel'; insurerId: string };
 
 interface PricingState {
   jobs: QuoteJob[];
@@ -106,17 +110,21 @@ export const PricingStore = signalStore(
                 }
                 patchState(store, {
                   successMessage:
-                    'Tarification lancée : l’extension prend le relais sur l’extranet.',
+                    "Tarification lancée : l'extension prend le relais sur l'extranet.",
                 });
               }),
             );
+          case 'cancel':
+            return service
+              .cancel(dossierId, action.insurerId)
+              .pipe(tap(() => patchState(store, { successMessage: PRICING_CANCELLED_TEXT })));
           case 'complete':
             return service
               .complete(dossierId, action.insurerId, action.answers)
               .pipe(
                 tap(() =>
                   patchState(store, {
-                    successMessage: 'Informations envoyées : l’extension reprend le remplissage.',
+                    successMessage: "Informations envoyées : l'extension reprend le remplissage.",
                   }),
                 ),
               );
@@ -153,12 +161,15 @@ export const PricingStore = signalStore(
           ),
         ),
 
-        _listen: rxMethod<string | null>(
+        /** Écoute relancée quand le dossier ou le cabinet change (cabinet connu après le dossier au démarrage). */
+        _listen: rxMethod<{ id: string | null; cabinetId: string | null }>(
           pipe(
             tap(() => patchState(store, { jobs: [], offers: [], loaded: false })),
-            switchMap((id) => {
-              const cabinetId = authStore.cabinetId();
-              if (!id || !cabinetId) return EMPTY;
+            switchMap(({ id, cabinetId }) => {
+              if (!id || !cabinetId) {
+                patchState(store, { loaded: true });
+                return EMPTY;
+              }
               return merge(
                 service
                   .watchJobs(cabinetId, id)
@@ -185,10 +196,19 @@ export const PricingStore = signalStore(
      */
     launch: (insurerId: string, target: Window | null) =>
       store._act({ kind: 'launch', insurerId, target }),
+    cancel: (insurerId: string) => store._act({ kind: 'cancel', insurerId }),
     complete: (insurerId: string, answers: CanonicalData) =>
       store._act({ kind: 'complete', insurerId, answers }),
   })),
   withHooks({
-    onInit: (store) => store._listen(inject(DossierStore).selectedId),
+    onInit: (store) => {
+      const dossierStore = inject(DossierStore);
+      const authStore = inject(AuthStore);
+      store._listen(
+        computed(() => ({ id: dossierStore.selectedId(), cabinetId: authStore.cabinetId() }), {
+          equal: (a, b) => a.id === b.id && a.cabinetId === b.cabinetId,
+        }),
+      );
+    },
   }),
 );

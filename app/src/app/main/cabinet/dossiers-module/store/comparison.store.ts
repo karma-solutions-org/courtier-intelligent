@@ -15,6 +15,7 @@ import { AuthStore } from '../../../commons/authentication-module/store/auth.sto
 import { ComparisonColumn } from '../components/comparison-table/comparison-table.component';
 import { COMPARISON_STRUCTURE } from '../components/comparison-tab/comparison-tab.structure';
 import { ComparisonService } from '../services/comparison.service';
+import { DossiersService } from '../services/dossiers.service';
 import { PricingService } from '../services/pricing.service';
 import { DossierStore } from './dossier.store';
 
@@ -53,6 +54,16 @@ export const ComparisonStore = signalStore(
           offer,
         }));
     }),
+    /** Offres à refaire : les données du dossier ont changé depuis leur capture. */
+    staleNames: computed(() => {
+      const names = dossierStore.insurerNames();
+      return store.offers().filter((offer) => offer.stale).map((offer) => names.get(offer.id) ?? offer.id);
+    }),
+    /** Après la décision (avant l'envoi de la proposition), on peut revenir au comparatif. */
+    canReopen: computed(() => {
+      const status = dossierStore.dossier()?.status;
+      return !!status && status === 'decision' && isTransitionAllowed(status, 'comparaison');
+    }),
     canDecide: computed(() => {
       const status = dossierStore.dossier()?.status;
       return !!status && DECISION_DOSSIER_STATUSES.includes(status);
@@ -65,7 +76,26 @@ export const ComparisonStore = signalStore(
       service = inject(ComparisonService),
       authStore = inject(AuthStore),
       dossierStore = inject(DossierStore),
+      dossiers = inject(DossiersService),
     ) => ({
+      /** Annule le choix : le dossier revient en « Comparaison » (permis par la machine à états depuis « Décision »). */
+      reopen: rxMethod<void>(
+        pipe(
+          exhaustMap(() => {
+            const dossierId = dossierStore.selectedId();
+            if (!dossierId) return EMPTY;
+            patchState(store, { busy: true, error: null });
+            return dossiers.changeStatus(dossierId, 'comparaison').pipe(
+              tap(() => patchState(store, { successMessage: 'Retour au comparatif : vous pouvez retenir une autre offre.' })),
+              catchError((error) => {
+                patchState(store, { error: toBackendErrorMessage(error) });
+                return EMPTY;
+              }),
+              tap({ finalize: () => patchState(store, { busy: false }) }),
+            );
+          }),
+        ),
+      ),
       clearMessages: () => patchState(store, { error: null, successMessage: null }),
       /** Après affichage du snackbar : l'erreur éventuelle reste affichée. */
       clearSuccess: () => patchState(store, { successMessage: null }),

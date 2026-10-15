@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { NEVER, of } from 'rxjs';
 import { ExtensionPing, ExtensionProvider } from '../../../../core/providers/extension.provider';
+import { FakeSessionService } from '../../../../core/utils/unit-test-utils/mocks/fake-session.service';
+import { SessionService } from '../../authentication-module/services/session.service';
 import { ExtensionStore } from './extension.store';
 
 describe('ExtensionStore', () => {
@@ -8,7 +10,10 @@ describe('ExtensionStore', () => {
   let ping: ReturnType<typeof vi.fn>;
 
   const create = () => {
-    TestBed.configureTestingModule({ providers: [{ provide: ExtensionProvider, useValue: { ping } }] });
+    TestBed.configureTestingModule({ providers: [
+        { provide: ExtensionProvider, useValue: { ping } },
+        { provide: SessionService, useClass: FakeSessionService },
+      ], });
     const store = TestBed.inject(ExtensionStore);
     TestBed.tick();
     return store;
@@ -21,6 +26,13 @@ describe('ExtensionStore', () => {
   });
 
   afterEach(() => vi.useRealTimers());
+
+  it("transmet l'identifiant de cet appareil à l'extension", async () => {
+    create();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(ping).toHaveBeenCalledWith('appareil-de-test');
+  });
 
   it("détecte l'extension dès le démarrage", async () => {
     const store = create();

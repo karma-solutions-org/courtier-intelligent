@@ -19,7 +19,7 @@ export const SESSION_ISSUE_PAGE_STRUCTURE: Record<
     icon: 'logout',
     explanation:
       'Vous avez été déconnecté : une nouvelle connexion à votre compte a été ouverte, ou un administrateur a réinitialisé votre appareil.',
-    steps: ['Si vous êtes à l’origine de cette connexion, reconnectez-vous simplement.', "Sinon, changez votre mot de passe et prévenez l'administrateur de votre cabinet."],
+    steps: ["Si vous êtes à l'origine de cette connexion, reconnectez-vous simplement.", "Sinon, changez votre mot de passe et prévenez l'administrateur de votre cabinet."],
   },
 };
 

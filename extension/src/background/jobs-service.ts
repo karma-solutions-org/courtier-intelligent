@@ -4,6 +4,7 @@ import {
   collectionGroup,
   doc,
   DocumentSnapshot,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
@@ -16,9 +17,9 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getFirebase } from '../shared/firebase';
-import type { ExtensionReportIssue, ExtensionReportStep } from '@shared';
+import { productDocPath, questionsOf, type ExtensionReportIssue, type ExtensionReportStep, type QuestionnaireSection } from '@shared';
 import type { CapturedOffer, ExtensionUser, JobContext, JobUpdate } from '../shared/messages';
-import { insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin } from './origin-match';
+import { insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin, PickOptions } from './origin-match';
 
 /** Les assureurs changent rarement : on les relit au plus toutes les 10 minutes. */
 const INSURERS_TTL_MS = 10 * 60 * 1000;
@@ -104,12 +105,43 @@ const toRecord = (d: DocumentSnapshot): JobRecord => ({
   data: d.data() ?? {},
 });
 
-/** Le job à exécuter sur la page d'un extranet (ou `null` : rien à faire ici). */
-export async function findJobForOrigin(user: ExtensionUser, origin: string): Promise<JobContext | null> {
+/** Le job à exécuter sur la page d'un extranet (ou `null` : rien à faire ici). `pick` : job épinglé à l'onglet, jobs des autres onglets. */
+export async function findJobForOrigin(user: ExtensionUser, origin: string, pick: Pick<PickOptions, 'pinned' | 'exclude'> = {}): Promise<JobContext | null> {
   const insurers = await loadInsurers();
   // Une page qui n'est l'extranet d'aucun assureur ne déclenche aucune requête de jobs.
   if (!insurerForOrigin(origin, insurers)) return null;
-  return pickJobForOrigin(await loadRecentJobs(user), insurers, origin);
+  const job = pickJobForOrigin(await loadRecentJobs(user), insurers, origin, pick);
+  if (!job) return null;
+  // Chemins du produit copiés dans le job par `tarification-lancer` ; à défaut (ancien job), lecture du produit.
+  if (job.productPaths?.length) return job;
+  const productPaths = await loadProductPaths(user, job.dossierId);
+  return productPaths ? { ...job, productPaths } : job;
+}
+
+/** Questions du produit par dossier : un produit change rarement pendant un remplissage. */
+const productPathsCache = new Map<string, string[]>();
+
+/**
+ * Chemins de toutes les questions du produit du dossier (questionnaire complet, conditions comprises), ou null si le
+ * dossier ou le produit est illisible (règles, réseau) : l'appelant se rabat alors sur les clés de quoteData.
+ */
+async function loadProductPaths(user: ExtensionUser, dossierId: string): Promise<string[] | null> {
+  const cached = productPathsCache.get(dossierId);
+  if (cached) return cached;
+  try {
+    const { firestore } = getFirebase();
+    const dossier = await getDoc(doc(firestore, `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}`));
+    const productId = dossier.get('productId');
+    if (typeof productId !== 'string' || !productId) return null;
+    const product = await getDoc(doc(firestore, productDocPath(user.cabinetId, productId)));
+    const schema = product.get('questionnaireSchema') as QuestionnaireSection[] | undefined;
+    if (!Array.isArray(schema)) return null;
+    const paths = [...new Set(questionsOf(schema).map(question => question.canonicalPath as string))];
+    productPathsCache.set(dossierId, paths);
+    return paths;
+  } catch {
+    return null;
+  }
 }
 
 /** Jobs récents du courtier (pour le badge « n tarifications à lancer »). */
@@ -133,6 +165,30 @@ export async function updateJob(user: ExtensionUser, dossierId: string, insurerI
   });
 }
 
+export const JOB_MESSAGES = {
+  cancelled: 'Tarification annulée : ce dossier n’attend plus de tarif de cet assureur.',
+  notInPricing: 'Le dossier n’est plus en tarification ni en comparaison : rien ne peut y être enregistré.',
+} as const;
+
+/**
+ * Raison d'un refus d'écriture (`permission-denied`) sur un job ou une offre : job annulé, dossier sorti de la
+ * tarification, ou null si aucune des deux (autorisation réellement manquante).
+ */
+export async function explainJobDenied(user: ExtensionUser, dossierId: string, insurerId: string): Promise<{ message: string; cancelled: boolean } | null> {
+  const { firestore } = getFirebase();
+  const base = `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}`;
+  try {
+    const job = await getDoc(doc(firestore, `${base}/ci_quoteJobs/${insurerId}`));
+    if (job.get('status') === 'cancelled') return { message: JOB_MESSAGES.cancelled, cancelled: true };
+    const dossier = await getDoc(doc(firestore, base));
+    const status = dossier.get('status');
+    if (!dossier.exists() || !['tarification', 'comparaison'].includes(status)) return { message: JOB_MESSAGES.notInPricing, cancelled: false };
+  } catch {
+    // Lecture refusée elle aussi : autorisation manquante.
+  }
+  return null;
+}
+
 /**
  * Suit un job : appelle `onChange` quand le dossier a changé (le courtier a répondu aux champs manquants)
  * ou que le job est relancé. Renvoie la fonction qui arrête le suivi.
@@ -145,7 +201,9 @@ export function watchJob(user: ExtensionUser, dossierId: string, insurerId: stri
     if (!data) return;
     // Nos propres écritures de statut ne relancent pas le remplissage : seul un changement des données le fait.
     const quoteData = JSON.stringify(data['quoteData'] ?? {});
-    if (lastQuoteData !== '' && quoteData !== lastQuoteData) {
+    // Une annulation (corbeille, sans suite, tarification-annuler) est toujours transmise : le remplissage s'arrête.
+    const cancelled = data['status'] === 'cancelled';
+    if (cancelled || (lastQuoteData !== '' && quoteData !== lastQuoteData)) {
       onChange({
         dossierId,
         insurerId,
@@ -153,6 +211,7 @@ export function watchJob(user: ExtensionUser, dossierId: string, insurerId: stri
         status: data['status'],
         quoteData: data['quoteData'] ?? {},
         missingFields: data['missingFields'] ?? [],
+        ...(Array.isArray(data['productPaths']) && data['productPaths'].length ? { productPaths: data['productPaths'] } : {}),
       });
     }
     lastQuoteData = quoteData;

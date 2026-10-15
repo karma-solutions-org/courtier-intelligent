@@ -1,4 +1,4 @@
-import { Dossier, DOSSIER_STATUSES, DossierStatus } from '@shared';
+import { conversionOutcome, Dossier, DOSSIER_STATUSES, DossierStatus } from '@shared';
 
 /** Statuts où le dossier attend une action du courtier en charge. */
 export const TO_PROCESS_STATUSES: DossierStatus[] = [
@@ -12,9 +12,6 @@ export const TO_PROCESS_STATUSES: DossierStatus[] = [
 
 /** Une proposition envoyée depuis plus longtemps est à relancer. */
 export const FOLLOW_UP_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
-
-/** Issues finales prises en compte dans le taux de conversion. */
-const CLOSED_STATUSES: DossierStatus[] = ['souscrit', 'refuse'];
 
 /** Nombre de dossiers par statut (tous les statuts présents, même à zéro). */
 export function countByStatus(dossiers: Dossier[]): Record<DossierStatus, number> {
@@ -51,7 +48,7 @@ export interface ConversionRate {
   key: string;
   souscrit: number;
   closed: number;
-  /** souscrit / (souscrit + refusé + sans suite), entre 0 et 1 ; null sans dossier clos. */
+  /** gagnés / (gagnés + perdus) selon `conversionOutcome` (refusé, ou sans suite après proposition) ; null sans issue. */
   rate: number | null;
 }
 
@@ -59,11 +56,12 @@ export interface ConversionRate {
 export function conversionRates(dossiers: Dossier[], keyOf: (dossier: Dossier) => string): ConversionRate[] {
   const groups = new Map<string, ConversionRate>();
   for (const dossier of dossiers) {
-    if (!CLOSED_STATUSES.includes(dossier.status)) continue;
+    const outcome = conversionOutcome(dossier);
+    if (!outcome) continue;
     const key = keyOf(dossier);
     const group = groups.get(key) ?? { key, souscrit: 0, closed: 0, rate: null };
     group.closed++;
-    if (dossier.status === 'souscrit') group.souscrit++;
+    if (outcome === 'won') group.souscrit++;
     group.rate = group.souscrit / group.closed;
     groups.set(key, group);
   }

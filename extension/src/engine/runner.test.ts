@@ -202,6 +202,21 @@ describe('FormRunner sur l’extranet de l’assureur A', () => {
     });
   });
 
+  describe('Tarification annulée', () => {
+    it('s’arrête définitivement quand le job passe à cancelled', async () => {
+      create({}, { ...QUOTE_DATA, 'client.email': null });
+      await runner.start();
+      const before = reports.length;
+
+      await runner.updateJob({ ...job(QUOTE_DATA), status: 'cancelled' });
+      await runner.updateJob(job(QUOTE_DATA));
+
+      expect(states.at(-1)?.phase).toBe('cancelled');
+      expect(value('email')).toBe('');
+      expect(reports.length).toBe(before);
+    });
+  });
+
   describe('Parcours en plusieurs étapes', () => {
     it('remplit chaque étape quand le courtier passe à la suivante, et signale currentStep', async () => {
       create();
@@ -347,6 +362,8 @@ describe('FormRunner sur l’extranet de l’assureur A', () => {
       expect(value('nom')).toBe('Dupont');
       expect(value('tel')).toBe('');
       expect(lastReport().status).toBe('filling');
+      // Le message de l'échec est affiché dans le side panel.
+      expect(lastState().message).toBe('quota dépassé');
     });
 
     it('ne redemande pas à l’IA pour le même formulaire', async () => {

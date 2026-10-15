@@ -115,7 +115,7 @@ describe('DossierStore', () => {
   afterEach(() => vi.useRealTimers());
 
   describe('Sélection', () => {
-    it('resélectionner le même dossier conserve l’état (l’écoute ne réémettrait pas)', () => {
+    it("resélectionner le même dossier conserve l'état (l'écoute ne réémettrait pas)", () => {
       store.edit('vehicle.fiscalPower', 5);
       store.select('d1');
 
@@ -124,7 +124,7 @@ describe('DossierStore', () => {
       expect(store.saveStatus()).toBe('dirty');
     });
 
-    it('sélectionner un autre dossier repart d’un état vide', () => {
+    it("sélectionner un autre dossier repart d'un état vide", () => {
       store.edit('vehicle.fiscalPower', 5);
       dossier$.next(null);
       store.select('d2');
@@ -136,7 +136,7 @@ describe('DossierStore', () => {
       expect(store.hasPendingEdits()).toBe(false);
     });
 
-    it('une erreur d’écoute est affichée, marque le chargement terminé et n’arrête pas l’écoute suivante', () => {
+    it("une erreur d'écoute est affichée, marque le chargement terminé et n'arrête pas l'écoute suivante", () => {
       dossier$.error({ code: 'permission-denied', message: 'Accès refusé.' });
       TestBed.tick();
 
@@ -161,7 +161,7 @@ describe('DossierStore', () => {
   });
 
   describe('Reprise du brouillon', () => {
-    it('restaure les réponses et la section où le courtier s’était arrêté', () => {
+    it("restaure les réponses et la section où le courtier s'était arrêté", () => {
       expect(store.answers()).toEqual({ 'vehicle.registration': 'AB-123-CD' });
       expect(store.sectionIndex()).toBe(1);
       expect(store.schema()).toHaveLength(2);
@@ -176,7 +176,7 @@ describe('DossierStore', () => {
       expect(store.sectionIndex()).toBe(0);
     });
 
-    it('les mises à jour du serveur n’écrasent pas la saisie en cours', () => {
+    it("les mises à jour du serveur n'écrasent pas la saisie en cours", () => {
       store.edit('vehicle.fiscalPower', 5);
       dossier$.next(
         dossier({ status: 'brouillon', data: { 'vehicle.registration': 'AB-123-CD' } }),
@@ -187,7 +187,7 @@ describe('DossierStore', () => {
   });
 
   describe('Sauvegarde automatique', () => {
-    it('affiche la réponse aussitôt et l’enregistre quand la frappe s’arrête', async () => {
+    it("affiche la réponse aussitôt et l'enregistre quand la frappe s'arrête", async () => {
       store.edit('vehicle.fiscalPower', 5);
 
       expect(store.answers()['vehicle.fiscalPower']).toBe(5);
@@ -226,7 +226,7 @@ describe('DossierStore', () => {
       });
     });
 
-    it('en cas d’échec, garde les réponses et les renvoie à l’enregistrement suivant', async () => {
+    it("en cas d'échec, garde les réponses et les renvoie à l'enregistrement suivant", async () => {
       service.save.mockReturnValueOnce(throwError(() => ({ code: 'functions/unavailable' })));
       store.edit('vehicle.fiscalPower', 5);
       await typingStops();
@@ -245,7 +245,7 @@ describe('DossierStore', () => {
       expect(store.saveStatus()).toBe('saved');
     });
 
-    it('n’enregistre pas à la frappe quand la sauvegarde automatique est désactivée (fiche du dossier)', async () => {
+    it("n'enregistre pas à la frappe quand la sauvegarde automatique est désactivée (fiche du dossier)", async () => {
       store.setAutosave(false);
       store.edit('vehicle.fiscalPower', 5);
       await typingStops();
@@ -298,7 +298,7 @@ describe('DossierStore', () => {
       );
     });
 
-    it('ne change pas le statut si l’enregistrement des réponses a échoué', () => {
+    it("ne change pas le statut si l'enregistrement des réponses a échoué", () => {
       service.save.mockReturnValueOnce(throwError(() => ({ message: 'Hors ligne' })));
       store.edit('vehicle.fiscalPower', 5);
       store.changeStatus('complet');
@@ -337,11 +337,11 @@ describe('DossierStore', () => {
 
     it('affiche le refus du serveur', () => {
       service.assign.mockReturnValueOnce(
-        throwError(() => ({ message: 'Ce membre n’est pas actif dans le cabinet.' })),
+        throwError(() => ({ message: "Ce membre n'est pas actif dans le cabinet." })),
       );
       store.assign('u2');
 
-      expect(store.error()).toBe('Ce membre n’est pas actif dans le cabinet.');
+      expect(store.error()).toBe("Ce membre n'est pas actif dans le cabinet.");
     });
   });
 
@@ -376,7 +376,7 @@ describe('DossierStore', () => {
       notes: null,
     } as const;
 
-    it('n’est ouverte qu’à un dossier complet ou au besoin validé', () => {
+    it("n'est ouverte qu'à un dossier complet ou au besoin validé", () => {
       expect(store.needEditable()).toBe(false);
       dossier$.next(dossier({ status: 'complet' }));
       expect(store.needEditable()).toBe(true);
@@ -397,7 +397,7 @@ describe('DossierStore', () => {
       expect(store.successMessage()).toBe('Couverture enregistrée.');
     });
 
-    it('n’enregistre pas le besoin si les réponses en attente n’ont pas pu l’être', () => {
+    it("n'enregistre pas le besoin si les réponses en attente n'ont pas pu l'être", () => {
       service.save.mockReturnValueOnce(throwError(() => ({ message: 'Hors ligne' })));
       store.edit('vehicle.fiscalPower', 5);
       store.saveNeed({ ...need, mandatoryGuarantees: [], niceToHave: [] });
@@ -406,7 +406,7 @@ describe('DossierStore', () => {
       expect(store.error()).toBe('Hors ligne');
     });
 
-    it('signale quand rien n’a changé', () => {
+    it("signale quand rien n'a changé", () => {
       service.saveNeed.mockReturnValueOnce(of({ status: 'complet', changed: [] }));
       store.saveNeed({ ...need, mandatoryGuarantees: [], niceToHave: [] });
 
@@ -440,7 +440,7 @@ describe('DossierStore', () => {
       expect(store.error()).toContain('niveau de couverture');
     });
 
-    it('suggère un besoin d’après les réponses du questionnaire, sans budget ni franchise', () => {
+    it("suggère un besoin d'après les réponses du questionnaire, sans budget ni franchise", () => {
       store.edit('vehicle.firstRegistrationDate', `${new Date().getFullYear() - 1}-01-01`);
       const suggestion = store.needSuggestion();
 

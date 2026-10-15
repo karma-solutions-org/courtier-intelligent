@@ -82,7 +82,15 @@ describe('FormRunner : mémoire partagée des formulaires', () => {
   /** La mémoire que le serveur aurait enregistrée pour le formulaire affiché (étape 1, champ « numéro direct »). */
   const learnedStep1 = (overrides: Partial<Record<string, string | null>> = {}): LoadedMemory => {
     const { fields, fingerprint } = analyzeForm(document);
-    const memoryFields = toMemoryFields(fields, mapFields(fields)).map(f => (f.fieldKey in overrides ? { ...f, canonicalPath: overrides[f.fieldKey] as never } : f));
+    // toMemoryFields n'envoie que les champs associés : les entrées forcées (dont « aucun équivalent ») sont ajoutées à la main.
+    const learned = toMemoryFields(fields, mapFields(fields));
+    const memoryFields = [
+      ...learned.filter(f => !(f.fieldKey in overrides)),
+      ...Object.entries(overrides).map(([fieldKey, canonicalPath]) => {
+        const field = fields.find(f => f.key === fieldKey)!;
+        return { fieldKey, label: field.label, type: field.kind, order: field.order, canonicalPath: (canonicalPath ?? null) as never, confidence: canonicalPath ? 0.9 : 0 };
+      }),
+    ];
     return { key: `cle-${fingerprint}`, fields: memoryFields };
   };
 
@@ -216,7 +224,7 @@ describe('FormRunner : mémoire partagée des formulaires', () => {
     const strangeMemory = (): LoadedMemory => {
       mountStrangeForm();
       const { fields, fingerprint } = analyzeForm(document);
-      return { key: `cle-${fingerprint}`, fields: toMemoryFields(fields, mapFields(fields)).map((f, i) => ({ ...f, canonicalPath: i === 0 ? 'client.lastName' : 'client.firstName', confidence: 0.9 })) };
+      return { key: `cle-${fingerprint}`, fields: fields.map((f, i) => ({ fieldKey: f.key, label: f.label, type: f.kind, order: f.order, canonicalPath: i === 0 ? 'client.lastName' : 'client.firstName', confidence: 0.9 })) };
     };
 
     const createStrange = (memory: MemoryPort) => {
@@ -290,7 +298,9 @@ describe('FormRunner : mémoire partagée des formulaires', () => {
       expect(origin).toBe('https://extranet.assureur-a.fr');
       expect(fingerprint).toBe(step1Fingerprint);
       expect(fields.find(f => f.label === 'Nom')).toMatchObject({ type: 'text', canonicalPath: 'client.lastName' });
-      expect(fields.find(f => f.label === 'Civilité')).toMatchObject({ type: 'radio', canonicalPath: null, confidence: 0 });
+      // « Aucun équivalent » n'est pas envoyé à la mémoire (bruit) : seuls les champs associés le sont.
+      expect(fields.find(f => f.label === 'Civilité')).toBeUndefined();
+      expect(fields.every(f => f.canonicalPath !== null)).toBe(true);
       expect(fields.find(f => f.label === 'Confirmez votre e-mail')).toMatchObject({ canonicalPath: 'client.email' });
       expect(lastState().memory).toBe('learned');
     });

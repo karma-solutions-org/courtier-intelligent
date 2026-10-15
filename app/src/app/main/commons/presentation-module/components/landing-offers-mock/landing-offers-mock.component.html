@@ -1,0 +1,28 @@
+<div class="mock" aria-hidden="true">
+  <div class="mock-header">
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+  </div>
+  <div class="mock-body">
+    <p class="mock-title">{{ mock().title }}</p>
+    <p class="mock-subtitle">{{ mock().subtitle }}</p>
+    <div class="offers">
+      @for (offer of mock().offers; track offer.insurer; let first = $first) {
+        <div class="offer" [class.chosen]="first">
+          @if (first) {
+            <span class="chosen-badge">{{ mock().chosen }}</span>
+          }
+          <p class="offer-insurer">{{ offer.insurer }}</p>
+          <p class="offer-premium">{{ offer.premium }}</p>
+          <p class="offer-meta">{{ mock().premiumLabel }}</p>
+          <p class="offer-line">
+            <span>{{ mock().deductibleLabel }}</span><strong>{{ offer.deductible }}</strong>
+          </p>
+          <p class="gap" [class]="'gap gap-' + offer.status">
+            <mat-icon>{{ offer.status === 'ok' ? 'check_circle' : offer.status === 'warn' ? 'error' : 'cancel' }}</mat-icon>
+            {{ offer.label }}
+          </p>
+        </div>
+      }
+    </div>
+  </div>
+</div>

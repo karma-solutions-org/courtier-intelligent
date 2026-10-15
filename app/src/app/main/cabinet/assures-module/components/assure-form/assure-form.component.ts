@@ -14,8 +14,8 @@ import {
   birthDateValidator,
   displayName,
   DuplicateCandidate,
+  DuplicateMatch,
   EMAIL_PATTERN,
-  normalize,
   phoneValidator,
   POSTAL_CODE_PATTERN,
   siretValidator,
@@ -189,11 +189,15 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
           <ul>
             @for (duplicate of duplicates(); track duplicate.id) {
               <li>
-                <strong>{{ nameOf(duplicate) }}</strong>
+                <strong>{{ duplicate.name }}</strong>
                 <span class="reason">({{ reasonOf(duplicate) }})</span>
-                <a [routerLink]="['/espace/assures', duplicate.id]" target="_blank">{{
-                  duplicateStructure.open
-                }}</a>
+                @if (duplicate.deleted) {
+                  <span class="reason">{{ duplicateStructure.deleted }}</span>
+                } @else {
+                  <a [routerLink]="['/espace/assures', duplicate.id]" target="_blank">{{
+                    duplicateStructure.open
+                  }}</a>
+                }
               </li>
             }
           </ul>
@@ -297,7 +301,7 @@ export class AssureFormComponent {
   readonly isPending = input(false);
   readonly error = input<string | null>(null);
   /** Assurés existants qui ressemblent à la saisie. */
-  readonly duplicates = input<Assure[]>([]);
+  readonly duplicates = input<DuplicateMatch[]>([]);
   /** Valeurs lues sur une pièce (CIN, Kbis) : elles remplissent les champs correspondants, modifiables ensuite. */
   readonly prefill = input<Partial<AssureFormModel> | null>(null);
   readonly submitted = output<AssureFormModel>();
@@ -383,12 +387,14 @@ export class AssureFormComponent {
     });
 
     effect(() => {
-      const { email, firstName, lastName, birthDate, type } = this._value();
+      const { email, firstName, lastName, birthDate, type, siret, companyName } = this._value();
       this.candidateChanged.emit({
         email,
         firstName,
         lastName,
         birthDate: type === 'pro' ? null : birthDate,
+        siret: type === 'pro' ? siret : null,
+        companyName: type === 'pro' ? companyName : null,
       });
     });
   }
@@ -398,11 +404,13 @@ export class AssureFormComponent {
   }
 
   /** Pourquoi cet assuré est signalé comme doublon. */
-  protected reasonOf(duplicate: Assure): string {
-    const { email } = this.form.getRawValue();
-    return email && normalize(email) === normalize(duplicate.email)
-      ? this.duplicateStructure.sameEmail
-      : this.duplicateStructure.sameIdentity;
+  protected reasonOf(duplicate: DuplicateMatch): string {
+    return duplicate.reasons.map((reason) => this.duplicateStructure.reasons[reason]).join(', ');
+  }
+
+  /** Saisie pas encore enregistrée (garde de sortie de route). */
+  hasUnsavedChanges(): boolean {
+    return this.form.dirty;
   }
 
   protected submit(): void {

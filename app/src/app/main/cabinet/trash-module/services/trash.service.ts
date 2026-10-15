@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { Assure, Dossier } from '@shared';
-import { combineLatest, map, Observable, of } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
 
@@ -29,12 +29,27 @@ export class TrashService {
       .pipe(map((items) => ({ items: items.filter((dossier) => !!dossier.deletedAt), hasMore: items.length >= limit })));
   }
 
+  /**
+   * Recherche Elasticsearch dans la corbeille (function recherche-corbeille) : texte, type et période de suppression
+   * (`from`/`to` en millisecondes), du plus récemment supprimé au plus ancien sans texte.
+   */
+  search(params: { q?: string; kind?: 'client' | 'dossier'; from?: number; to?: number; size: number; offset?: number }): Observable<{ kind: 'client' | 'dossier'; id: string }[]> {
+    const data = Object.fromEntries(Object.entries(params).filter(([, value]) => value !== '' && value !== undefined));
+    return this._backend
+      .call<typeof data, { items: { kind: 'client' | 'dossier'; id: string }[] }>('recherche-corbeille', data)
+      .pipe(map((result) => result.items));
+  }
+
+  /** Dossiers trouvés, en direct et dans l'ordre donné (restaurés ou disparus écartés). */
+  watchDeletedDossiersByIds(cabinetId: string, ids: string[]): Observable<Dossier[]> {
+    return this._database
+      .watchByIds<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers`, ids)
+      .pipe(map((dossiers) => dossiers.filter((dossier) => !!dossier.deletedAt)));
+  }
+
   /** Clients des dossiers affichés (le nom d'un dossier supprimé vient de son client, actif ou non). */
   watchAssuresByIds(cabinetId: string, ids: string[]): Observable<Assure[]> {
-    if (!ids.length) return of([]);
-    return combineLatest(ids.map((id) => this._database.watchDocument<Assure>(`ci_cabinets/${cabinetId}/ci_assures/${id}`))).pipe(
-      map((assures) => assures.filter((assure): assure is Assure => !!assure)),
-    );
+    return this._database.watchByIds<Assure>(`ci_cabinets/${cabinetId}/ci_assures`, ids);
   }
 
   restore(kind: TrashKind, id: string): Observable<{ ok: boolean }> {
@@ -44,9 +59,4 @@ export class TrashService {
   deleteForever(kind: TrashKind, id: string): Observable<{ ok: boolean }> {
     return this._backend.call('corbeille-supprimerDefinitivement', { kind, id });
   }
-}
-
-export function byDeletedAt(a: { deletedAt?: unknown }, b: { deletedAt?: unknown }): number {
-  const time = (value: unknown) => (value as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
-  return time(b.deletedAt) - time(a.deletedAt);
 }

@@ -1,5 +1,5 @@
 import { AbstractControl, ValidationErrors } from '@angular/forms';
-import { Assure, ASSURE_EMAIL_PATTERN, ASSURE_POSTAL_CODE_PATTERN, ASSURE_SIRET_PATTERN } from '@shared';
+import { Assure, AssureDuplicateReason, duplicateReasons, ASSURE_EMAIL_PATTERN, ASSURE_POSTAL_CODE_PATTERN, ASSURE_SIRET_PATTERN } from '@shared';
 
 /** Formats acceptés (France). Email, code postal et SIRET : partagés avec les règles Firestore (shared/assure-format). */
 export const EMAIL_PATTERN = ASSURE_EMAIL_PATTERN;
@@ -76,6 +76,43 @@ export interface DuplicateCandidate {
   firstName?: string | null;
   lastName?: string | null;
   birthDate?: string | null;
+  siret?: string | null;
+  companyName?: string | null;
+}
+
+/** Client existant signalé comme doublon possible, avec les raisons (SIRET, email, identité, raison sociale). */
+export interface DuplicateMatch {
+  id: string;
+  name: string;
+  reasons: AssureDuplicateReason[];
+  /** Le client est dans la corbeille. */
+  deleted: boolean;
+}
+
+/** Le candidat a-t-il de quoi être comparé (le serveur refuse une recherche vide) ? */
+export function hasDuplicateCriteria(candidate: DuplicateCandidate): boolean {
+  return [candidate.siret, candidate.email, candidate.lastName, candidate.companyName].some(value => !!value?.trim());
+}
+
+/** Repli local (serveur injoignable) : mêmes règles que le serveur, parmi les clients chargés. */
+export function localDuplicates(candidate: DuplicateCandidate, assures: Assure[], excludeId?: string): DuplicateMatch[] {
+  const identity = (value: DuplicateCandidate) => ({
+    firstName: value.firstName || null,
+    lastName: value.lastName || null,
+    birthDate: value.birthDate || null,
+    email: value.email || null,
+    siret: value.siret || null,
+    companyName: value.companyName || null,
+  });
+  return assures
+    .filter(assure => assure.id !== excludeId)
+    .map(assure => ({
+      id: assure.id,
+      name: displayName(assure),
+      reasons: duplicateReasons(identity(candidate), identity(assure as DuplicateCandidate)),
+      deleted: !!assure.deletedAt,
+    }))
+    .filter(match => match.reasons.length > 0);
 }
 
 /**

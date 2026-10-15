@@ -16,6 +16,7 @@ export interface JobRecord {
     status?: QuoteJobStatus;
     quoteData?: JobContext['quoteData'];
     missingFields?: JobContext['missingFields'];
+    productPaths?: string[];
   };
 }
 
@@ -36,20 +37,33 @@ export interface MatchOptions {
   allowLocalhost?: boolean;
 }
 
-/** Domaine du catalogue normalisé (`*.x.fr` → `x.fr`), ou null s'il est inacceptable (vide, sans point). */
+/** `localhost` ou `localhost:port` (extranet de démonstration). */
+const LOCALHOST_DOMAIN = /^localhost(:\d{1,5})?$/;
+
+/**
+ * Domaine du catalogue normalisé (`*.x.fr` → `x.fr`), ou null s'il est inacceptable (vide, sans point).
+ * En développement, `localhost:8090` est accepté : le port fait partie du domaine (deux démos sur deux ports).
+ */
 export function normalizeDomain(domain: string, { allowLocalhost = DEV_BUILD }: MatchOptions = {}): string | null {
   const wanted = domain.trim().toLowerCase().replace(/^\*?\./, '').replace(/\.$/, '');
-  if (wanted === 'localhost') return allowLocalhost ? wanted : null;
+  if (LOCALHOST_DOMAIN.test(wanted)) return allowLocalhost ? wanted : null;
   // Un domaine sans point (« com », « fr », un nom d'hôte interne) couvrirait trop de sites : refusé.
   if (!wanted.includes('.') || wanted.startsWith('.') || /[\s/:*]/.test(wanted)) return null;
   return wanted;
 }
 
-/** Le domaine de la page est-il celui de l'extranet ? Le domaine exact ou l'un de ses sous-domaines (jamais un domaine voisin). */
+/**
+ * Le domaine de la page est-il celui de l'extranet ? Le domaine exact ou l'un de ses sous-domaines (jamais un domaine voisin).
+ * `hostname` peut porter le port (`url.host`) : pour localhost, hôte ET port doivent être ceux du catalogue
+ * (`localhost` seul = port par défaut uniquement ; jamais l'app ou une autre démo sur un autre port).
+ */
 export function hostMatchesDomain(hostname: string, domain: string, options: MatchOptions = {}): boolean {
   const host = hostname.toLowerCase().replace(/\.$/, '');
   const wanted = normalizeDomain(domain, options);
-  return wanted !== null && (host === wanted || host.endsWith(`.${wanted}`));
+  if (wanted === null) return false;
+  if (LOCALHOST_DOMAIN.test(wanted)) return host === wanted;
+  const bareHost = host.replace(/:\d+$/, '');
+  return bareHost === wanted || bareHost.endsWith(`.${wanted}`);
 }
 
 /**
@@ -61,7 +75,8 @@ export function extranetPatterns(domains: string[], options: MatchOptions = {}):
   for (const domain of domains) {
     const wanted = normalizeDomain(domain, options);
     if (!wanted) continue;
-    if (wanted === 'localhost') {
+    if (LOCALHOST_DOMAIN.test(wanted)) {
+      // Les motifs Chrome ne filtrent pas le port de façon fiable : le port est vérifié par hostMatchesDomain.
       patterns.add('http://localhost/*');
       continue;
     }
@@ -97,25 +112,46 @@ export function insurersForOrigin(origin: string, insurers: InsurerInfo[], optio
     // L'extension ne remplit jamais une page non sécurisée (sauf localhost dans un build de développement).
     const devLocalhost = allowLocalhost && url.protocol === 'http:' && url.hostname === 'localhost';
     if (url.protocol !== 'https:' && !devLocalhost) return [];
-    hostname = url.hostname;
+    // Localhost : le port compte (host = hôte:port) ; ailleurs, le nom d'hôte seul.
+    hostname = devLocalhost ? url.host : url.hostname;
   } catch {
     return [];
   }
   return insurers.filter(insurer => insurer.extranetDomains.some(domain => hostMatchesDomain(hostname, domain, { allowLocalhost })));
 }
 
+/** Job identifié (dossier, assureur) : celui épinglé à un onglet. */
+export interface JobRef {
+  dossierId: string;
+  insurerId: string;
+}
+
+export interface PickOptions extends MatchOptions {
+  /** Job déjà épinglé à cet onglet : repris tel quel au rechargement s'il est toujours à faire sur cet extranet. */
+  pinned?: JobRef | null;
+  /** Jobs épinglés à d'autres onglets : jamais deux onglets sur le même job. */
+  exclude?: readonly JobRef[];
+}
+
+const sameJob = (a: JobRef, b: JobRef) => a.dossierId === b.dossierId && a.insurerId === b.insurerId;
+
 /**
- * Le job à exécuter sur cette page : le plus récent (la liste arrive du plus récent au plus ancien) qui est
- * encore à faire ET qui vise l'assureur de cet extranet. `null` si la page n'est pas un extranet connu ou s'il n'y a pas de job.
+ * Le job à exécuter sur cette page. Si l'onglet a déjà un job épinglé (rechargement, étape suivante) et qu'il est
+ * toujours à faire sur cet extranet, c'est lui : jamais le dossier d'un autre client parce qu'il est plus récent.
+ * Sinon, le plus récent (la liste arrive du plus récent au plus ancien) qui est encore à faire, vise l'assureur de
+ * cet extranet et n'est pas déjà suivi par un autre onglet. `null` si la page n'est pas un extranet connu ou s'il n'y a pas de job.
  */
-export function pickJobForOrigin(jobs: JobRecord[], insurers: InsurerInfo[], origin: string, options: MatchOptions = {}): JobContext | null {
+export function pickJobForOrigin(jobs: JobRecord[], insurers: InsurerInfo[], origin: string, options: PickOptions = {}): JobContext | null {
   // Plusieurs assureurs peuvent partager un domaine (ex. deux extranets de démonstration sur localhost) :
   // la tâche est cherchée parmi tous les assureurs de cette adresse, pas seulement le premier.
   const candidates = insurersForOrigin(origin, insurers, options);
   if (!candidates.length) return null;
-  const job = jobs.find(
-    j => candidates.some(c => c.id === j.insurerId) && j.data.status !== undefined && RUNNABLE_STATUSES.includes(j.data.status),
-  );
+  const runnable = (j: JobRecord) =>
+    candidates.some(c => c.id === j.insurerId) && j.data.status !== undefined && RUNNABLE_STATUSES.includes(j.data.status);
+  const pinned = options.pinned;
+  const job =
+    (pinned ? jobs.find(j => sameJob(j, pinned) && runnable(j)) : undefined) ??
+    jobs.find(j => runnable(j) && !(options.exclude ?? []).some(other => sameJob(j, other)));
   if (!job) return null;
   const insurer = candidates.find(c => c.id === job.insurerId)!;
   return {
@@ -125,6 +161,7 @@ export function pickJobForOrigin(jobs: JobRecord[], insurers: InsurerInfo[], ori
     status: job.data.status!,
     quoteData: job.data.quoteData ?? {},
     missingFields: job.data.missingFields ?? [],
+    ...(job.data.productPaths?.length ? { productPaths: job.data.productPaths } : {}),
   };
 }
 

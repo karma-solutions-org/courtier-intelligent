@@ -1,6 +1,7 @@
-import { LoadedMemory, MemoryPort } from '../engine/memory';
+import { JobUpdateError } from '../engine/runner';
+import { LoadedMemory, MemoryPort, type MemorySaveOutcome } from '../engine/memory';
 import { FormRunner } from '../engine/runner';
-import { AskAiResponse, ExtensionMessage, JobContext, JobUpdate, RUNNER_PORT, RunState, TabMessage } from '../shared/messages';
+import { AskAiResponse, ExtensionMessage, JobContext, JobUpdate, RUNNER_PORT, type UpdateJobResponse, RunState, TabMessage } from '../shared/messages';
 
 /** Compte les champs de formulaire visibles (affiché dans le side panel). */
 function countVisibleFields(): number {
@@ -52,7 +53,11 @@ if (!alreadyLoaded) {
 /** Mémoire partagée des formulaires : le service worker lit et écrit pour nous (il a la connexion Firebase). */
 const memoryPort: MemoryPort = {
   load: (origin, fingerprint) => send<LoadedMemory | null>({ type: 'MEMORY_LOAD', origin, fingerprint }),
-  save: async (origin, fingerprint, fields) => void (await send({ type: 'MEMORY_SAVE', origin, fingerprint, fields })),
+  save: async (origin, fingerprint, fields) => {
+    const outcome = await send<MemorySaveOutcome | boolean>({ type: 'MEMORY_SAVE', origin, fingerprint, fields });
+    if (outcome === false) throw new Error('memory_save_failed');
+    return typeof outcome === 'string' ? outcome : undefined;
+  },
   touch: async key => void (await send({ type: 'MEMORY_TOUCH', key })),
   invalidate: async key => void (await send({ type: 'MEMORY_INVALIDATE', key })),
 };
@@ -91,8 +96,8 @@ async function startRunner(job: JobContext): Promise<void> {
     doc: document,
     report: async (update: JobUpdate) => {
       // `false` : le service worker n'a pas pu écrire l'avancement (le runner le signale, E10-4).
-      const saved = await send<boolean>({ type: 'UPDATE_JOB', dossierId: job.dossierId, insurerId: job.insurerId, update });
-      if (saved === false) throw new Error('job_update_failed');
+      const saved = await send<UpdateJobResponse>({ type: 'UPDATE_JOB', dossierId: job.dossierId, insurerId: job.insurerId, update });
+      if (!saved?.ok) throw new JobUpdateError(saved?.message ?? 'Avancement non enregistré dans l’application.', saved?.cancelled === true);
     },
     publish: (state: RunState) => void send({ type: 'RUN_STATE', state }).catch(() => undefined),
     memory: memoryPort,

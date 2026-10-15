@@ -101,8 +101,8 @@ describe('Guards', () => {
       expect(session.open).toHaveBeenCalledOnce();
     });
 
-    it('refuse un autre appareil, le déconnecte et affiche l’écran « Appareil non autorisé »', async () => {
-      session.refuseWith = 'Cet appareil n’est pas autorisé : votre compte est lié à un autre appareil.';
+    it("refuse un autre appareil, le déconnecte et affiche l'écran « Appareil non autorisé »", async () => {
+      session.refuseWith = "Cet appareil n'est pas autorisé : votre compte est lié à un autre appareil.";
       session.refuseReason = 'device_not_authorized';
       const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
       const decision = evaluate(authGuard);

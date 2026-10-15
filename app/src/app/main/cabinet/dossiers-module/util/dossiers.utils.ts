@@ -7,10 +7,12 @@ export interface DossierFilter {
   assignedTo: string;
   /** « Mes dossiers » : uniquement ceux qui me sont assignés (prioritaire sur `assignedTo`). */
   mine: boolean;
+  /** Texte cherché (référence, nom du client) : recherche Elasticsearch, repli local. */
+  query: string;
 }
 
 /** Aucun filtre : tous les dossiers du cabinet (ex. accès depuis un compteur du tableau de bord). */
-export const EMPTY_FILTER: DossierFilter = { status: '', productId: '', assignedTo: '', mine: false };
+export const EMPTY_FILTER: DossierFilter = { status: '', productId: '', assignedTo: '', mine: false, query: '' };
 
 /** Filtre initial de la liste : « Mes dossiers » activé. « Réinitialiser » y revient. */
 export const DEFAULT_FILTER: DossierFilter = { ...EMPTY_FILTER, mine: true };
@@ -21,13 +23,29 @@ export function isDefaultFilter(filter: DossierFilter): boolean {
 }
 
 /** Applique les filtres de la liste. `myUid` sert à « Mes dossiers ». */
-export function filterDossiers(dossiers: Dossier[], filter: DossierFilter, myUid: string | null): Dossier[] {
+export function filterDossiers(
+  dossiers: Dossier[],
+  filter: DossierFilter,
+  myUid: string | null,
+  assureName: (assureId: string) => string = () => '',
+): Dossier[] {
+  const words = normalize(filter.query ?? '').split(' ').filter(Boolean);
   return dossiers.filter(
     dossier =>
+      (!words.length || words.every(word => normalize(`${dossier.reference ?? ''} ${assureName(dossier.assureId)}`).includes(word))) &&
       (!filter.status || dossier.status === filter.status) &&
       (!filter.productId || dossier.productId === filter.productId) &&
       (filter.mine ? dossier.assignedTo === myUid : !filter.assignedTo || dossier.assignedTo === filter.assignedTo),
   );
+}
+
+function normalize(text: string): string {
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+/** Faut-il interroger Elasticsearch (texte ou filtre) plutôt que lire simplement la tranche Firestore ? */
+export function needsSearch(filter: DossierFilter): boolean {
+  return !!filter.query.trim() || !!filter.status || !!filter.productId || !!filter.assignedTo || filter.mine;
 }
 
 /**
@@ -66,4 +84,5 @@ export const STATUS_ORDER: DossierStatus[] = [
   'proposition_envoyee',
   'souscrit',
   'refuse',
+  'sans_suite',
 ];

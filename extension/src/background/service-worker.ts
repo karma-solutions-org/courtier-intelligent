@@ -19,13 +19,15 @@ import {
   SIDE_PANEL_PORT,
   SignInResponse,
   TabMessage,
+  type JobUpdate,
+  type UpdateJobResponse,
 } from '../shared/messages';
-import { createAuthController, toUserMessage, UserFacingError } from './auth-controller';
-import { firebaseAuthPort, firebaseBackendPort, firestoreSessionPort } from './firebase-adapters';
-import { addExtensionReport, askAi, findJobForOrigin, listRecentJobs, loadInsurers, updateJob, watchJob, watchRecentJobs, writeCapturedOffer } from './jobs-service';
+import { createAuthController, MESSAGES, toAiMessage, toUserMessage, UserFacingError } from './auth-controller';
+import { APP_DEVICE_KEY, firebaseAuthPort, firebaseBackendPort, firestoreSessionPort } from './firebase-adapters';
+import { addExtensionReport, askAi, explainJobDenied, findJobForOrigin, listRecentJobs, loadInsurers, updateJob, watchJob, watchRecentJobs, writeCapturedOffer } from './jobs-service';
 import { startLiveWatch } from './live';
 import { invalidateMemory, loadMemory, reportDiscoveredFields, saveMemory, touchMemory } from './memory-service';
-import { countRequested, extranetPatterns, insurerForOrigin } from './origin-match';
+import { countRequested, extranetPatterns, insurerForOrigin, JobRef } from './origin-match';
 import { checkSender, externalOriginsFromMatches, JOB_COMMANDS, jobMatches, MemoryKeyRegistry, sanitizeAiRequest } from './sender-guard';
 import { MAPPING_SYSTEM_PROMPT } from '../engine/ai-fallback';
 import { CAPTURE_SYSTEM_PROMPT } from '../engine/capture-ai';
@@ -140,6 +142,55 @@ async function syncJobsWatch(): Promise<void> {
   jobsWatch = watch;
 }
 
+// ── Job épinglé par onglet (chrome.storage.session : survit aux redémarrages du service worker) ──
+/**
+ * Un onglet qui commence un job le garde : au rechargement ou à l'étape suivante, c'est ce dossier qui est repris,
+ * jamais « le plus récent » (qui peut être celui d'un autre client). Un job n'est suivi que par un seul onglet.
+ */
+const PIN_PREFIX = 'jobPin:';
+let pinLock: Promise<unknown> = Promise.resolve();
+
+/** Exécute `task` seul (deux onglets qui chargent en même temps ne prennent pas le même job). */
+function withPinLock<T>(task: () => Promise<T>): Promise<T> {
+  const run = pinLock.then(task, task);
+  pinLock = run.catch(() => undefined);
+  return run;
+}
+
+async function readPins(): Promise<Map<number, JobRef>> {
+  const all = await chrome.storage.session.get(null).catch(() => ({}) as Record<string, unknown>);
+  const pins = new Map<number, JobRef>();
+  for (const [key, value] of Object.entries(all)) {
+    const ref = value as Partial<JobRef> | undefined;
+    if (key.startsWith(PIN_PREFIX) && typeof ref?.dossierId === 'string' && typeof ref.insurerId === 'string') {
+      pins.set(Number(key.slice(PIN_PREFIX.length)), { dossierId: ref.dossierId, insurerId: ref.insurerId });
+    }
+  }
+  return pins;
+}
+
+async function unpinJob(tabId: number): Promise<void> {
+  await chrome.storage.session.remove(`${PIN_PREFIX}${tabId}`).catch(() => undefined);
+}
+
+async function clearPins(): Promise<void> {
+  const pins = await readPins();
+  await chrome.storage.session.remove([...pins.keys()].map(tabId => `${PIN_PREFIX}${tabId}`)).catch(() => undefined);
+}
+
+/** Le job de cet onglet : son job épinglé s'il est toujours à faire, sinon un job libre (épinglé alors à l'onglet). */
+function findTabJob(user: ExtensionUser, tabId: number, origin: string): Promise<JobContext | null> {
+  return withPinLock(async () => {
+    const pins = await readPins();
+    const pinned = pins.get(tabId) ?? null;
+    pins.delete(tabId);
+    const found = await findJobForOrigin(user, origin, { pinned, exclude: [...pins.values()] });
+    if (found) await chrome.storage.session.set({ [`${PIN_PREFIX}${tabId}`]: { dossierId: found.dossierId, insurerId: found.insurerId } });
+    else if (pinned) await unpinJob(tabId);
+    return found;
+  });
+}
+
 function stopJobWatch(tabId: number): void {
   jobWatchByTab.get(tabId)?.();
   jobWatchByTab.delete(tabId);
@@ -193,6 +244,7 @@ auth.onChange(state => {
     jobWatchByTab.forEach(stop => stop());
     jobWatchByTab.clear();
     jobByTab.clear();
+    void clearPins();
   }
   void syncContentScripts();
   void syncLiveWatch().then(() => broadcast(state));
@@ -234,7 +286,7 @@ chrome.runtime.onConnect.addListener(port => {
     void signedInUser()
       .then(async user => {
         if (!user) return;
-        const job = await findJobForOrigin(user, origin);
+        const job = await findTabJob(user, tabId, origin);
         if (job && jobMatches(job, String(message.dossierId), String(message.insurerId)) && !jobByTab.has(tabId)) startJobWatch(tabId, user, job);
       })
       .catch(() => undefined);
@@ -292,6 +344,28 @@ function finishCapture(tabId: number, run: RunState, update: Partial<RunState>):
 }
 
 /** Le courtier confirme le tarif lu sur l'onglet actif (avec ses corrections) : offre écrite, job `captured` (E10-3). */
+/** Écrit l'avancement d'un job ; en cas d'échec, renvoie la cause exacte (session, annulation, dossier, réseau). */
+async function updateJobWithCause(dossierId: string, insurerId: string, update: JobUpdate): Promise<UpdateJobResponse> {
+  const user = await signedInUser().catch(() => null);
+  if (!user) return { ok: false, message: MESSAGES.sessionExpired };
+  try {
+    await updateJob(user, dossierId, insurerId, update);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, ...(await deniedCause(user, dossierId, insurerId, error)) };
+  }
+}
+
+/** Message d'un refus d'écriture : annulation ou dossier hors tarification si c'est la cause, sinon message générique. */
+async function deniedCause(user: ExtensionUser, dossierId: string, insurerId: string, error: unknown): Promise<{ message: string; cancelled: boolean }> {
+  const code = (error as { code?: string } | null)?.code;
+  if (code === 'permission-denied') {
+    const cause = await explainJobDenied(user, dossierId, insurerId);
+    if (cause) return cause;
+  }
+  return { message: toUserMessage(error), cancelled: false };
+}
+
 async function confirmCapture(edits: CaptureEdits): Promise<CaptureResponse> {
   const user = await signedInUser();
   const tabId = await activeTabId();
@@ -305,7 +379,7 @@ async function confirmCapture(edits: CaptureEdits): Promise<CaptureResponse> {
     await writeCapturedOffer(user, run.dossierId, run.insurerId, offer);
   } catch (error) {
     await report(run.insurerId, pagesByTab.get(tabId)?.origin ?? '', 'write', 'offer_write_failed');
-    return { ok: false, message: toUserMessage(error) };
+    return { ok: false, message: (await deniedCause(user, run.dossierId, run.insurerId, error)).message };
   }
   finishCapture(tabId, run, { phase: 'captured', capture: { ...run.capture, offer }, message: 'Tarif enregistré : il apparaît dans le dossier.' });
   return { ok: true };
@@ -504,7 +578,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
       const { tabId, origin } = tab!;
       signedInUser()
         .then(async user => {
-          const found = user ? await findJobForOrigin(user, origin) : null;
+          const found = user ? await findTabJob(user, tabId, origin) : null;
           if (user && found) startJobWatch(tabId, user, found);
           sendResponse(found);
         })
@@ -515,17 +589,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     case 'UPDATE_JOB':
       // Seul le job suivi par cet onglet peut être mis à jour.
       if (!jobMatches(job, message.dossierId, message.insurerId)) {
-        sendResponse(false);
+        sendResponse({ ok: false, message: 'Ce job n’est pas suivi par cet onglet.' } satisfies UpdateJobResponse);
         return false;
       }
-      signedInUser()
-        .then(async user => {
-          if (!user) return false;
-          await updateJob(user, message.dossierId, message.insurerId, message.update);
-          return true;
-        })
-        .then(sendResponse)
-        .catch(() => sendResponse(false));
+      updateJobWithCause(message.dossierId, message.insurerId, message.update).then(sendResponse);
       return true;
 
     case 'RUN_STATE':
@@ -563,13 +630,12 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
       }
       signedInUser()
         .then(user => {
-          if (!user) throw new UserFacingError('Connectez-vous à l’extension pour utiliser l’assistance IA.');
+          if (!user) throw new UserFacingError(MESSAGES.sessionExpired);
           return askAi(request);
         })
         .then(text => sendResponse({ ok: true, text } satisfies AskAiResponse))
-        .catch(error =>
-          sendResponse({ ok: false, message: error instanceof UserFacingError ? error.message : toUserMessage(error) } satisfies AskAiResponse),
-        );
+        // Session expirée, autorisation manquante ou IA indisponible : message clair affiché dans le side panel.
+        .catch(error => sendResponse({ ok: false, message: toAiMessage(error) } satisfies AskAiResponse));
       return true;
     }
 
@@ -590,7 +656,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     // Mémoire partagée des formulaires (E8) : une panne ne doit jamais empêcher le remplissage.
     case 'MEMORY_LOAD':
       signedInUser()
-        .then(user => (user ? loadMemory(tab!.origin, message.fingerprint) : null))
+        .then(user => (user ? loadMemory(tab!.origin, message.fingerprint, user.cabinetId) : null))
         .then(async loaded => {
           // La clé est calculée ici pour l'origine réelle de l'onglet : seule celle-ci pourra être utilisée/invalidée.
           memoryKeys.remember(tab!.tabId, tab!.origin, await memoryKeyFor(tab!.origin, String(message.fingerprint)));
@@ -609,15 +675,16 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
       }
       signedInUser()
         .then(async user => {
-          if (!user) return;
+          if (!user) return false;
           if (message.type === 'MEMORY_SAVE') {
-            await saveMemory(tab!.origin, message.fingerprint, message.fields);
+            const outcome = await saveMemory(tab!.origin, message.fingerprint, message.fields);
             memoryKeys.remember(tab!.tabId, tab!.origin, await memoryKeyFor(tab!.origin, String(message.fingerprint)));
-            return;
+            return outcome;
           }
-          return message.type === 'MEMORY_TOUCH' ? touchMemory(message.key) : invalidateMemory(message.key);
+          await (message.type === 'MEMORY_TOUCH' ? touchMemory(message.key) : invalidateMemory(message.key));
+          return true;
         })
-        .then(() => sendResponse(true))
+        .then(sendResponse)
         .catch(() => sendResponse(false));
       return true;
 
@@ -668,12 +735,14 @@ chrome.tabs.onRemoved.addListener(tabId => {
   runByTab.delete(tabId);
   memoryKeys.forget(tabId);
   stopJobWatch(tabId);
+  void unpinJob(tabId);
 });
 // Le side panel montre l'avancement de l'onglet actif : il change avec lui.
 chrome.tabs.onActivated.addListener(() => void broadcast());
 
 // Messages de l'app Angular (domaines autorisés dans manifest.json → externally_connectable).
-// L'app ne transmet aucun identifiant : l'extension a sa propre connexion Firebase.
+// L'app ne transmet aucun identifiant de connexion (l'extension a sa propre connexion Firebase), seulement son
+// identifiant d'appareil : le serveur vérifie que l'extension s'ouvre sur l'appareil lié de la session de l'app.
 const EXTERNAL_ORIGINS = externalOriginsFromMatches(chrome.runtime.getManifest().externally_connectable?.matches);
 
 chrome.runtime.onMessageExternal.addListener((message: ExternalMessage, sender, sendResponse) => {
@@ -683,6 +752,9 @@ chrome.runtime.onMessageExternal.addListener((message: ExternalMessage, sender, 
   if (!origin || !EXTERNAL_ORIGINS.has(origin)) return false;
   switch (message?.type) {
     case 'PING':
+      if (typeof message.deviceId === 'string' && /^[A-Za-z0-9-]{16,64}$/.test(message.deviceId)) {
+        void chrome.storage.local.set({ [APP_DEVICE_KEY]: message.deviceId }).catch(() => undefined);
+      }
       sendResponse({ type: 'PONG', version: chrome.runtime.getManifest().version });
       return false;
   }

@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CanonicalData, questionsOf } from '@shared';
+import { openConfirmDialog } from '../../../../../core/components/confirm-dialog/confirm-dialog.component';
 import { ExtensionStore } from '../../../../commons/extension-module/store/extension.store';
 import { DossierStore } from '../../store/dossier.store';
 import { PricingCard, PricingStore } from '../../store/pricing.store';
@@ -49,6 +51,7 @@ const TEXT = {
             [schemaQuestions]="questions()"
             [answers]="dossierStore.answers()"
             (launch)="launch(card)"
+            (cancel)="cancel(card)"
             (openExtranet)="openExtranet(card)"
             (answered)="complete(card, $event)"
           />
@@ -103,6 +106,20 @@ export class PricingTabComponent {
   protected readonly dossierStore = inject(DossierStore);
   protected readonly extension = inject(ExtensionStore);
   private readonly _snackBar = inject(MatSnackBar);
+  private readonly _dialog = inject(MatDialog);
+
+  /** Annuler une tarification en cours arrête l'extension : confirmation d'abord. */
+  protected cancel(card: PricingCard): void {
+    openConfirmDialog(this._dialog, {
+      title: 'Annuler la tarification',
+      message: `Arrêter la tarification en cours chez ${card.insurer.name} ? Vous pourrez la relancer.`,
+      confirm: 'Annuler la tarification',
+      cancel: 'Continuer',
+      destructive: true,
+    }).subscribe((confirmed) => {
+      if (confirmed) this.store.cancel(card.insurer.id);
+    });
+  }
 
   protected readonly text = TEXT;
   protected readonly questions = computed(() => questionsOf(this.dossierStore.schema()));

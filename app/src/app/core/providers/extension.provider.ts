@@ -15,7 +15,11 @@ export type ExtensionPing =
 
 /** Port « extension du navigateur » : l'app ne connaît que cette classe, jamais l'API `chrome`. */
 export abstract class ExtensionProvider {
-  abstract ping(): Observable<ExtensionPing>;
+  /**
+   * [deviceId] : appareil de l'app, transmis à l'extension pour qu'elle ouvre sa session sur le MÊME appareil
+   * (le serveur vérifie qu'il est lié au compte).
+   */
+  abstract ping(deviceId?: string): Observable<ExtensionPing>;
 }
 
 /** Surface de `chrome.runtime` utilisée depuis une page web (autorisée par `externally_connectable`). */
@@ -29,7 +33,7 @@ const PING_TIMEOUT_MS = 2000;
 
 @Injectable()
 export class ChromeExtensionProvider extends ExtensionProvider {
-  ping(): Observable<ExtensionPing> {
+  ping(deviceId?: string): Observable<ExtensionPing> {
     const extensionId = environment.extensionId;
     if (!extensionId) {
       return of({ status: 'unconfigured' });
@@ -42,7 +46,7 @@ export class ChromeExtensionProvider extends ExtensionProvider {
     }
     return new Observable<ExtensionPing>(subscriber => {
       try {
-        runtime.sendMessage(extensionId, { type: 'PING' }, response => {
+        runtime.sendMessage(extensionId, { type: 'PING', ...(deviceId ? { deviceId } : {}) }, response => {
           // `lastError` doit être lu dans le callback pour ne pas être signalé comme erreur non gérée.
           const failed = !!runtime.lastError || response?.type !== 'PONG';
           subscriber.next(failed ? { status: 'absent' } : { status: 'installed', version: response?.version ?? '' });

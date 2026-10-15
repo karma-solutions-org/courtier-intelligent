@@ -48,9 +48,20 @@ export const firebaseAuthPort: AuthPort = {
   },
 };
 
+/** Clé (chrome.storage.local) de l'identifiant d'appareil transmis par l'app (message `PING`). */
+export const APP_DEVICE_KEY = 'appDeviceId';
+
+/** Identifiant d'appareil de l'app ouverte dans ce navigateur, ou null si l'app ne l'a jamais transmis. */
+async function readAppDeviceId(): Promise<string | null> {
+  const stored = (await chrome.storage.local.get(APP_DEVICE_KEY).catch(() => ({}) as Record<string, unknown>))[APP_DEVICE_KEY];
+  return typeof stored === 'string' ? stored : null;
+}
+
 export const firebaseBackendPort: BackendPort = {
   async openExtensionSession() {
-    await httpsCallable(getFirebase().functions, 'sessions-ouvrirExtension')({});
+    // Le serveur vérifie que cet appareil est celui de la session de l'app (liaison à l'appareil).
+    const deviceId = await readAppDeviceId();
+    await httpsCallable(getFirebase().functions, 'sessions-ouvrirExtension')(deviceId ? { deviceId } : {});
   },
   async closeExtensionSession() {
     await httpsCallable(getFirebase().functions, 'sessions-fermerExtension')({});

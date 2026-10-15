@@ -16,6 +16,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DossierOutcomeResult, PROPOSAL_MESSAGE_MAX } from '@shared';
+import { openConfirmDialog } from '../../../../../core/components/confirm-dialog/confirm-dialog.component';
 import { DossierStore } from '../../store/dossier.store';
 import { ProposalStore } from '../../store/proposal.store';
 import {
@@ -48,7 +49,17 @@ import { PROPOSAL_STRUCTURE } from './proposal-tab.structure';
           <mat-icon class="h-icon" aria-hidden="true">workspace_premium</mat-icon
           >{{ text.offerTitle }} : {{ insurerName() }}
         </h2>
+        @if (store.chosenOfferStale()) {
+          <p class="stale" role="status">
+            <mat-icon>warning</mat-icon>
+            Les informations du dossier ont changé depuis ce tarif : relancez la tarification et revenez au comparatif
+            avant d'envoyer la proposition.
+          </p>
+        }
         @if (store.chosenOffer(); as offer) {
+          @if ('insurerName' in offer) {
+            <p class="muted">Offre figée au moment du choix{{ dossier.proposal?.offerSnapshot ? " et de l'envoi" : '' }}.</p>
+          }
           <dl>
             @if (offer.premiumAnnual !== null) {
               <dt>{{ text.premiumAnnual }}</dt>
@@ -178,6 +189,17 @@ import { PROPOSAL_STRUCTURE } from './proposal-tab.structure';
     }
   `,
   styles: `
+    .stale {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: var(--mat-sys-on-error-container);
+      background: var(--mat-sys-error-container);
+    }
+
     :host {
       display: grid;
       gap: 16px;
@@ -400,9 +422,15 @@ export class ProposalTabComponent {
   }
 
   protected answer(result: Exclude<DossierOutcomeResult, 'souscrit'>): void {
-    if (confirm(result === 'refuse' ? this.text.confirmRefused : this.text.confirmNoFollowUp)) {
-      this.store.recordAnswer({ result });
-    }
+    const refused = result === 'refuse';
+    openConfirmDialog(this._dialog, {
+      title: refused ? this.text.refusedTitle : this.text.noFollowUpTitle,
+      message: refused ? this.text.confirmRefused : this.text.confirmNoFollowUp,
+      confirm: this.text.confirmAnswer,
+      destructive: true,
+    }).subscribe((confirmed) => {
+      if (confirmed) this.store.recordAnswer({ result });
+    });
   }
 
   protected subscribe(): void {

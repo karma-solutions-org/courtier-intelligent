@@ -25,7 +25,7 @@ export interface AuthPort {
 
 /** Functions de session de l'extension. */
 export interface BackendPort {
-  /** `sessions-ouvrirExtension` : refuse si aucune session de l'app n'est ouverte sur l'appareil. */
+  /** `sessions-ouvrirExtension` : refuse si aucune session de l'app n'est ouverte sur CET appareil (identifiant transmis par l'app). */
   openExtensionSession(): Promise<void>;
   /** `sessions-fermerExtension` : échec toléré. */
   closeExtensionSession(): Promise<void>;
@@ -49,9 +49,24 @@ export const MESSAGES = {
   network: 'Connexion impossible : vérifiez votre réseau.',
   noCabinet: 'Ce compte n’est rattaché à aucun cabinet. Créez ou rejoignez un cabinet dans l’application avant d’utiliser l’extension.',
   noAppSession: 'Ouvrez Courtier Intelligent dans votre navigateur et connectez-vous avant d’utiliser l’extension.',
+  wrongDevice: 'L’extension doit être utilisée sur l’appareil où Courtier Intelligent est ouvert. Ouvrez l’application dans ce navigateur, puis réessayez.',
   sessionClosed: 'Votre session a été fermée sur cet appareil (déconnexion de l’application, nouvelle connexion ou compte désactivé). Reconnectez-vous.',
   generic: 'Connexion impossible pour le moment. Réessayez.',
+  sessionExpired: 'Session expirée : reconnectez-vous à l’extension.',
+  permissionDenied: 'Autorisation manquante : votre compte n’a pas accès à ce dossier ou à cette action. Reconnectez-vous ou contactez l’administrateur du cabinet.',
+  aiUnavailable: 'IA indisponible pour le moment : les champs non reconnus sont à compléter à la main (ou réessayez plus tard).',
 } as const;
+
+/** Codes d'erreur (Firebase Auth, Firestore, Functions) qui signifient « session expirée ». */
+const SESSION_EXPIRED_CODES = new Set([
+  'auth/user-token-expired',
+  'auth/id-token-expired',
+  'auth/requires-recent-login',
+  'unauthenticated',
+  'functions/unauthenticated',
+]);
+/** Codes qui signifient « autorisation manquante » (règles Firestore ou function qui refuse). */
+const PERMISSION_CODES = new Set(['permission-denied', 'functions/permission-denied']);
 
 const FIREBASE_AUTH_MESSAGES: Record<string, string> = {
   'auth/invalid-credential': MESSAGES.badCredentials,
@@ -69,9 +84,26 @@ export function toUserMessage(error: unknown): string {
   const { code, message, details } = (error ?? {}) as { code?: string; message?: string; details?: { reason?: string } };
   if (code && FIREBASE_AUTH_MESSAGES[code]) return FIREBASE_AUTH_MESSAGES[code];
   if (details?.reason === 'no_app_session') return MESSAGES.noAppSession;
+  if (details?.reason === 'device_mismatch') return MESSAGES.wrongDevice;
+  if (code && SESSION_EXPIRED_CODES.has(code)) return MESSAGES.sessionExpired;
+  if (code && PERMISSION_CODES.has(code) && !message?.trim()) return MESSAGES.permissionDenied;
+  if (code === 'permission-denied') return MESSAGES.permissionDenied;
   // Les functions rédigent déjà leurs refus en français pour l'utilisateur.
   if (code?.startsWith('functions/') && !['functions/internal', 'functions/unavailable'].includes(code) && message) return message;
   return MESSAGES.generic;
+}
+
+/**
+ * Message d'un échec de l'assistance IA, pour le side panel : session expirée et autorisation manquante sont dites
+ * telles quelles ; toute autre panne (quota, réseau, function indisponible) devient « IA indisponible ».
+ */
+export function toAiMessage(error: unknown): string {
+  if (error instanceof UserFacingError) return error.message;
+  const message = toUserMessage(error);
+  if (message === MESSAGES.sessionExpired || message === MESSAGES.permissionDenied || message === MESSAGES.noAppSession) return message;
+  const code = (error as { code?: string } | null)?.code;
+  if (code && PERMISSION_CODES.has(code)) return MESSAGES.permissionDenied;
+  return MESSAGES.aiUnavailable;
 }
 
 const toExtensionUser = (user: AuthedUser): ExtensionUser => ({

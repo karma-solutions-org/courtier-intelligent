@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { RouterLink } from '@angular/router';
@@ -34,6 +35,7 @@ export interface Option {
     MatButtonModule,
     MatFormFieldModule,
     MatIconModule,
+    MatInputModule,
     MatSelectModule,
     MatSlideToggleModule,
     StatusChipComponent,
@@ -50,6 +52,23 @@ export interface Option {
 
     <section class="card">
       <div class="filters">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>{{ structure.search }}</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input
+            matInput
+            type="search"
+            [value]="filter().query"
+            [placeholder]="structure.searchHint"
+            (input)="filterChanged.emit({ query: $any($event.target).value })"
+            (keydown.escape)="filterChanged.emit({ query: '' })"
+          />
+          @if (searching()) {
+            <mat-hint>{{ structure.searching }}</mat-hint>
+          } @else if (searchUnavailable()) {
+            <mat-hint>{{ structure.searchUnavailable }}</mat-hint>
+          }
+        </mat-form-field>
         <mat-slide-toggle [checked]="filter().mine" (change)="filterChanged.emit({ mine: $event.checked })">
           {{ structure.mine }}
         </mat-slide-toggle>
@@ -342,6 +361,10 @@ export class DossiersListComponent {
   /** Firestore a d'autres éléments : la sentinelle de bas de liste demande la tranche suivante. */
   readonly hasMore = input(false);
   readonly loadingMore = input(false);
+  /** Recherche Elasticsearch en cours. */
+  readonly searching = input(false);
+  /** Elasticsearch en échec : résultats limités aux dossiers chargés. */
+  readonly searchUnavailable = input(false);
   /** Nombre d'éléments chargés (avant filtres) : relance la sentinelle tant qu'elle reste visible. */
   readonly loadedCount = input(0);
   readonly loadMore = output<void>();
@@ -351,8 +374,8 @@ export class DossiersListComponent {
   protected readonly statusLabels = DOSSIER_STATUS_LABELS;
 
   protected hasFilter(): boolean {
-    const { status, productId, assignedTo, mine } = this.filter();
-    return !!status || !!productId || !!assignedTo || mine;
+    const { status, productId, assignedTo, mine, query } = this.filter();
+    return !!status || !!productId || !!assignedTo || mine || !!query.trim();
   }
 
   protected isDefault(): boolean {

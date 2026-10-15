@@ -86,13 +86,13 @@ describe('PricingStore', () => {
     expect(store.cards().map((c) => c.insurer.id)).toEqual(['b']);
   });
 
-  it('bloque la tarification tant que le besoin n’est pas validé', () => {
+  it("bloque la tarification tant que le besoin n'est pas validé", () => {
     expect(store.canPrice()).toBe(true);
     dossier.set({ id: 'd1', productId: 'auto', status: 'complet', needAnalysis: null });
     expect(store.canPrice()).toBe(false);
   });
 
-  it('lance le job puis dirige l’onglet ouvert vers l’extranet', () => {
+  it("lance le job puis dirige l'onglet ouvert vers l'extranet", () => {
     const target = fakeWindow();
     store.launch('a', target);
 
@@ -102,7 +102,7 @@ describe('PricingStore', () => {
     expect(store.successMessage()).toContain('Tarification lancée');
   });
 
-  it('en cas de refus du serveur, ferme l’onglet ouvert et affiche le message', () => {
+  it("en cas de refus du serveur, ferme l'onglet ouvert et affiche le message", () => {
     service.launch.mockReturnValue(
       throwError(() => ({ code: 'functions/failed-precondition', message: 'Validez le besoin.' })),
     );
@@ -127,7 +127,7 @@ describe('PricingStore', () => {
     expect(store.busy()).toEqual([]);
   });
 
-  it('une erreur d’écoute est affichée et termine le chargement', () => {
+  it("une erreur d'écoute est affichée et termine le chargement", () => {
     expect(store.loaded()).toBe(true);
     expect(store.error()).toBeNull();
 

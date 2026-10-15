@@ -1,13 +1,19 @@
-import { CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, type DiscoveredFieldInput, isRelevantField } from '@shared';
+import { CanonicalData, CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, type DiscoveredFieldInput, isRelevantField } from '@shared';
 import type { FormField } from './analyzer';
 import { isCompatible, Mapping } from './mapping';
 
 /** Mémoire partagée des formulaires, vue par l'extension (lecture directe, écriture par les functions `memoires-*`). */
+/**
+ * Résultat de `memoires-enregistrer` : `pending` = gardé pour le cabinet, en attente d'un autre cabinet pour la
+ * mémoire commune ; `ignored` = rien à retenir (aucun champ partageable).
+ */
+export type MemorySaveOutcome = 'created' | 'confirmed' | 'kept' | 'pending' | 'relearned' | 'ignored';
+
 export interface MemoryPort {
   /** Mémoire valide (non invalidée) de ce formulaire, ou null. */
   load(origin: string, fingerprint: string): Promise<LoadedMemory | null>;
   /** Apprend le formulaire : appelé APRÈS un remplissage réussi et validé par le courtier. */
-  save(origin: string, fingerprint: string, fields: FormMemoryField[]): Promise<void>;
+  save(origin: string, fingerprint: string, fields: FormMemoryField[]): Promise<MemorySaveOutcome | void>;
   /** La mémoire a servi sans problème. */
   touch(key: string): Promise<void>;
   /** La mémoire a servi et le remplissage a échoué : à invalider (réapprentissage). */
@@ -90,34 +96,90 @@ export function safeLabel(label: string): string | null {
   return text;
 }
 
-/**
- * Ce que l'extension retient d'un formulaire : sa STRUCTURE (champs, types, libellés) et le chemin associé, jamais une valeur.
- * Un champ sans équivalent est conservé avec un chemin `null`, pour ne pas le soumettre à l'IA à chaque fois.
- */
+/** Plafonds des textes envoyés dans un signalement de nouveaux champs. */
+const MAX_NAME = 80;
+const MAX_FIELD_KEY = 120;
+const MAX_OPTION = 80;
+const MAX_OPTIONS = 40;
+
+const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+/** Plaque d'immatriculation (SIV « AB-123-CD » ou FNI « 1234 AB 75 »). */
+const PLATE = /\b[A-Z]{2}[\s-]?\d{3}[\s-]?[A-Z]{2}\b|\b\d{2,4}\s?[A-Z]{2,3}\s?\d{2}\b/;
+/** Téléphone français (06 12 34 56 78, +33 6…). */
+const PHONE = /(\+33|0033|\b0)\s?[1-9]([\s.-]?\d{2}){4}\b/;
+/** Date (12/05/1980, 1980-05-12). */
+const DATE = /\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b/;
+
+const normalizeValue = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+/** Valeurs du dossier (texte de 3 caractères et plus) : une option qui les reprend est une donnée client. */
+function clientValues(quoteData: CanonicalData | undefined): Set<string> {
+  const values = new Set<string>();
+  for (const raw of Object.values(quoteData ?? {})) {
+    const plain = raw !== null && typeof raw === 'object' && 'value' in raw ? (raw as { value: unknown }).value : raw;
+    if (typeof plain === 'string' || typeof plain === 'number') {
+      const text = normalizeValue(String(plain));
+      if (text.length >= 3) values.add(text);
+    }
+  }
+  return values;
+}
+
+/** Le texte ressemble-t-il à une donnée client (valeur du dossier, e-mail, plaque, téléphone, date, long numéro) ? */
+function looksLikeClientData(text: string, values: Set<string>): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (values.has(normalizeValue(trimmed))) return true;
+  return EMAIL.test(trimmed) || PLATE.test(trimmed) || PHONE.test(trimmed) || DATE.test(trimmed) || /\d{6,}/.test(trimmed.replace(/[\s.\-/]/g, ''));
+}
+
+/** Texte de structure plafonné, ou null s'il ressemble à une donnée client. */
+function safeText(text: string | null, max: number, values: Set<string>): string | null {
+  if (!text) return null;
+  const trimmed = text.trim().slice(0, max);
+  return trimmed && !looksLikeClientData(trimmed, values) ? trimmed : null;
+}
+
 /**
  * Champs du formulaire restés sans équivalent (ni synonyme, ni mémoire, ni IA, ni correction du courtier) et qui sont
  * de vraies questions (ni captcha, ni CGU, ni champ caché…) : structure seulement, jamais de valeur saisie.
- * `productPaths` : questions du produit du dossier. Un champ reconnu mais dont la question n'est pas dans ce produit
- * (ex. « sinistres » reconnu comme une question Auto sur un extranet Habitation) compte aussi comme nouveau.
+ * - `productPaths` : TOUTES les questions du produit du dossier (pas seulement celles de quoteData). Un champ reconnu
+ *   dont la question n'est pas dans ce produit (ex. « sinistres » Auto sur un extranet Habitation) compte comme nouveau.
+ * - un mapping « incertain » vers une question du produit (candidat pas assez sûr) n'est pas signalé : trop de bruit.
+ * - `quoteData` : valeurs du client, écartées des libellés et des options (une liste peut être pré-remplie avec elles).
  */
-export function toDiscoveredFields(fields: FormField[], mappings: Mapping[], productPaths?: readonly string[]): DiscoveredFieldInput[] {
+export function toDiscoveredFields(
+  fields: FormField[],
+  mappings: Mapping[],
+  productPaths?: readonly string[],
+  quoteData?: CanonicalData,
+): DiscoveredFieldInput[] {
   const inProduct = (path: string) => !productPaths || productPaths.includes(path);
-  const mapped = new Set(
-    mappings.filter(m => m.status === 'mapped' && m.canonicalPath !== null && inProduct(m.canonicalPath)).map(m => m.fieldKey),
+  const known = new Set(
+    mappings
+      // Reconnu (sûr ou incertain) sur une question du produit : pas nouveau. Un candidat incertain hors produit, si.
+      .filter(m => (m.status === 'mapped' || m.status === 'uncertain') && m.canonicalPath !== null && inProduct(m.canonicalPath))
+      .map(m => m.fieldKey),
   );
+  const values = clientValues(quoteData);
   return fields
-    .filter(field => !mapped.has(field.key) && isRelevantField(field))
+    .filter(field => !known.has(field.key) && isRelevantField(field))
     .slice(0, DISCOVERED_MAX_FIELDS_PER_REPORT)
     .map(field => ({
-      fieldKey: field.key,
-      label: field.label,
+      fieldKey: field.key.slice(0, MAX_FIELD_KEY),
+      label: safeLabel(field.label) ?? '',
       kind: field.kind,
       inputType: field.inputType,
-      name: field.name,
-      section: field.section,
-      options: field.options.map(option => ({ value: option.value, label: option.label })),
+      name: safeText(field.name, MAX_NAME, values),
+      section: field.section ? safeLabel(field.section) : null,
+      options: field.options
+        .filter(option => !looksLikeClientData(option.value, values) && !looksLikeClientData(option.label, values))
+        .slice(0, MAX_OPTIONS)
+        .map(option => ({ value: option.value.trim().slice(0, MAX_OPTION), label: option.label.trim().slice(0, MAX_OPTION) })),
       required: field.required,
-    }));
+    }))
+    // Libellé illisible ou qui ressemble à une donnée client : le champ n'est pas signalé du tout.
+    .filter(field => field.label !== '');
 }
 
 /** Chemins des champs obligatoires de l'extranet qui ont un équivalent dans l'application. */
@@ -129,18 +191,25 @@ export function toRequiredPaths(fields: FormField[], mappings: Mapping[]): strin
   return [...new Set(paths)];
 }
 
+/**
+ * Ce que l'extension retient d'un formulaire : sa STRUCTURE (champs, types, libellés) et le chemin associé, jamais une valeur.
+ * Seuls les champs associés à un chemin sont envoyés : un « sans équivalent » (null) n'apprend rien d'utile à la mémoire
+ * partagée et ne ferait que du bruit (il pourrait aussi figer une erreur de l'analyse).
+ */
 export function toMemoryFields(fields: FormField[], mappings: Mapping[]): FormMemoryField[] {
   const byKey = new Map(mappings.map(mapping => [mapping.fieldKey, mapping]));
-  return fields.map(field => {
+  return fields.flatMap(field => {
     const mapping = byKey.get(field.key);
-    const mapped = mapping?.status === 'mapped' && mapping.canonicalPath !== null;
-    return {
-      fieldKey: field.key,
-      label: safeLabel(field.label),
-      type: field.kind,
-      order: field.order,
-      canonicalPath: mapped ? mapping.canonicalPath : null,
-      confidence: mapped ? Math.round(mapping.confidence * 100) / 100 : 0,
-    };
+    if (mapping?.status !== 'mapped' || mapping.canonicalPath === null) return [];
+    return [
+      {
+        fieldKey: field.key,
+        label: safeLabel(field.label),
+        type: field.kind,
+        order: field.order,
+        canonicalPath: mapping.canonicalPath,
+        confidence: Math.round(mapping.confidence * 100) / 100,
+      },
+    ];
   });
 }

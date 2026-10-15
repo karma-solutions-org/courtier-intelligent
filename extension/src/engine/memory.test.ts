@@ -3,7 +3,7 @@ import type { CanonicalPath, FormMemoryField } from '@shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FormField } from './analyzer';
 import { Mapping } from './mapping';
-import { applyMemory, memoryKeyFor, safeLabel, toMemoryFields } from './memory';
+import { applyMemory, memoryKeyFor, safeLabel, toDiscoveredFields, toMemoryFields } from './memory';
 
 const field = (key: string, overrides: Partial<FormField> = {}): FormField => ({
   key,
@@ -119,11 +119,9 @@ describe('toMemoryFields : structure seulement', () => {
   ];
   const mappings = [mapping('text:nom', 'mapped', 'client.lastName', 0.876), mapping('radio:civilite', 'unmapped'), mapping('text:inconnu', 'uncertain', null, 0.5)];
 
-  it('garde le chemin des champs reconnus, et null (confiance 0) pour les autres', () => {
+  it('garde le chemin des champs reconnus, et n’envoie jamais d’entrée sans équivalent (null)', () => {
     expect(toMemoryFields(fields, mappings)).toEqual([
       { fieldKey: 'text:nom', label: 'Nom', type: 'text', order: 0, canonicalPath: 'client.lastName', confidence: 0.88 },
-      { fieldKey: 'radio:civilite', label: 'Civilité', type: 'radio', order: 1, canonicalPath: null, confidence: 0 },
-      { fieldKey: 'text:inconnu', label: 'Champ douteux', type: 'text', order: 2, canonicalPath: null, confidence: 0 },
     ]);
   });
 
@@ -134,7 +132,7 @@ describe('toMemoryFields : structure seulement', () => {
   });
 
   it('un libellé qui ressemble à une donnée saisie n’est pas conservé', () => {
-    expect(toMemoryFields([field('text:x', { label: 'jean.dupont@example.fr' })], [mapping('text:x', 'unmapped')])[0].label).toBeNull();
+    expect(toMemoryFields([field('text:x', { label: 'jean.dupont@example.fr' })], [mapping('text:x', 'mapped', 'client.email')])[0].label).toBeNull();
   });
 });
 
@@ -147,5 +145,40 @@ describe('safeLabel', () => {
     expect(safeLabel('12/03/1985 75002')).toBeNull();
     expect(safeLabel('')).toBeNull();
     expect(safeLabel('x'.repeat(121))).toBeNull();
+  });
+});
+
+describe('toDiscoveredFields : jamais de donnée client, peu de bruit', () => {
+  const QUOTE = { 'client.lastName': 'Dupont', 'vehicle.registration': 'AB-123-CD' } as never;
+
+  it('ne signale pas un mapping incertain', () => {
+    const found = toDiscoveredFields([field('text:a', { label: 'Question A' })], [mapping('text:a', 'uncertain', 'client.lastName', 0.5)], ['client.lastName']);
+    expect(found).toEqual([]);
+  });
+
+  it('écarte les options qui ressemblent à une donnée client (valeur du dossier, plaque, e-mail, téléphone, date)', () => {
+    const options = ['Oui', 'Dupont', 'AB-123-CD', 'EF-456-GH', 'x@y.fr', '06 12 34 56 78', '12/03/1985', 'Non'].map(v => ({ value: v, label: v }));
+    const [found] = toDiscoveredFields([field('select:q', { kind: 'select', inputType: 'select', label: 'Question libre', options })], [mapping('select:q', 'unmapped')], [], QUOTE);
+    expect(found.options.map(o => o.value)).toEqual(['Oui', 'Non']);
+  });
+
+  it('applique safeLabel au libellé et plafonne les longueurs', () => {
+    const long = 'x'.repeat(300);
+    const fields = [
+      field('text:mail', { label: 'jean.dupont@example.fr' }),
+      field('text:ok', { label: 'Question normale', name: long, section: long, options: [{ value: long, label: long }] as never }),
+    ];
+    const found = toDiscoveredFields(fields, [mapping('text:mail', 'unmapped'), mapping('text:ok', 'unmapped')]);
+    expect(found.map(f => f.fieldKey)).toEqual(['text:ok']);
+    expect(found[0].name!.length).toBeLessThanOrEqual(80);
+    expect(found[0].section).toBeNull();
+    expect(found[0].options[0].value.length).toBeLessThanOrEqual(80);
+  });
+
+  it('un champ reconnu sur une question du produit absente de quoteData (masquée) n’est pas nouveau', () => {
+    const fields = [field('text:immat', { label: 'Immatriculation' })];
+    const mappings = [mapping('text:immat', 'mapped', 'vehicle.registration')];
+    expect(toDiscoveredFields(fields, mappings, ['vehicle.registration'])).toEqual([]);
+    expect(toDiscoveredFields(fields, mappings, ['client.lastName'])).toHaveLength(1);
   });
 });

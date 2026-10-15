@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { Assure, AssureDocument, AssureDocumentType, AssureOcrValues, Dossier } from '@shared';
+import { Assure, AssureDocument, AssureDuplicateReason, AssureDocumentType, AssureOcrValues, Dossier } from '@shared';
 import { combineLatest, map, Observable, of } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
@@ -68,6 +68,19 @@ export class AssuresService {
       .pipe(map((result) => result.ids));
   }
 
+  /**
+   * Doublons possibles côté serveur (function assures-verifierDoublon) : tout le cabinet, corbeille comprise,
+   * par SIRET, email, identité (nom + date de naissance) ou raison sociale.
+   */
+  verifyDuplicates(candidate: {
+    firstName?: string; lastName?: string; birthDate?: string; email?: string; siret?: string; companyName?: string; excludeId?: string;
+  }): Observable<{ id: string; reasons: AssureDuplicateReason[]; deleted: boolean }[]> {
+    const data = Object.fromEntries(Object.entries(candidate).filter(([, value]) => typeof value === 'string' && value.trim()));
+    return this._backend
+      .call<typeof data, { duplicates: { id: string; reasons: AssureDuplicateReason[]; deleted: boolean }[] }>('assures-verifierDoublon', data)
+      .pipe(map((result) => result.duplicates));
+  }
+
   /** Fiches des clients trouvés, en direct et dans l'ordre donné (clients dans la corbeille ou disparus écartés). */
   watchAssuresByIds(cabinetId: string, ids: string[]): Observable<Assure[]> {
     if (!ids.length) return of([]);
@@ -89,13 +102,12 @@ export class AssuresService {
       .pipe(map(dossiers => dossiers.filter(dossier => !dossier.deletedAt).sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))));
   }
 
-  /** Crée l'assuré et renvoie son identifiant. */
-  create(cabinetId: string, uid: string, data: AssureData): Observable<string> {
-    return this._database.add(`ci_cabinets/${cabinetId}/ci_assures`, {
-      ...data,
-      createdBy: uid,
-      createdAt: this._database.serverTimestamp(),
-    });
+  /**
+   * Crée l'assuré (function assures-creer) et renvoie son identifiant. Refus BLOQUANT (`duplicate_assure`) si un
+   * client du cabinet hors corbeille a le même SIRET ou le même email ; l'homonymie reste un simple avertissement.
+   */
+  create(data: AssureData): Observable<string> {
+    return this._backend.call<AssureData, { id: string }>('assures-creer', data).pipe(map(result => result.id));
   }
 
   /** Met le client et ses dossiers dans la corbeille (admin) : restaurables depuis la page Corbeille. */
@@ -103,10 +115,13 @@ export class AssuresService {
     return this._backend.call('corbeille-supprimer', { kind: 'assure', id: assureId });
   }
 
-  update(cabinetId: string, assureId: string, data: AssureData): Observable<void> {
-    return this._database.update(`ci_cabinets/${cabinetId}/ci_assures/${assureId}`, {
-      ...data,
-      updatedAt: this._database.serverTimestamp(),
-    });
+  /**
+   * Modifie la fiche (function assures-modifier) : mêmes contrôles que la création, dont le doublon BLOQUANT
+   * (`duplicate_assure`) sur le SIRET ou l'email d'un autre client. Les règles refusent ce changement en écriture directe.
+   */
+  update(assureId: string, data: AssureData): Observable<void> {
+    return this._backend
+      .call<{ id: string; fiche: AssureData }, { id: string }>('assures-modifier', { id: assureId, fiche: data })
+      .pipe(map(() => undefined));
   }
 }

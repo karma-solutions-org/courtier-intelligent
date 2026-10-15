@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, OnInit, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, OnInit, signal, untracked, viewChild } from '@angular/core';
+import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
-import { Assure } from '@shared';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { AssureFormModel } from '../../models/assure-form.model';
 import { AssuresService } from '../../services/assures.service';
@@ -44,11 +44,18 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class NewAssureContainerComponent implements OnInit {
+export class NewAssureContainerComponent implements OnInit, HasUnsavedChanges {
+  private readonly _form = viewChild(AssureFormComponent);
+
+  /** Garde de sortie : formulaire commencé mais pas enregistré. */
+  hasUnsavedChanges(): boolean {
+    return !this.store.createdId() && !!this._form()?.hasUnsavedChanges();
+  }
+
   protected readonly store = inject(AssuresStore);
   private readonly _router = inject(Router);
   protected readonly structure = ASSURES_STRUCTURE.form;
-  protected readonly duplicates = signal<Assure[]>([]);
+  protected readonly duplicates = this.store.duplicates;
   private readonly _service = inject(AssuresService);
   private readonly _snackBar = inject(MatSnackBar);
 
@@ -89,7 +96,7 @@ export class NewAssureContainerComponent implements OnInit {
   }
 
   protected checkDuplicates(candidate: DuplicateCandidate): void {
-    this.duplicates.set(this.store.duplicatesOf(candidate));
+    this.store.checkDuplicates({ candidate });
   }
 
   protected back(): void {

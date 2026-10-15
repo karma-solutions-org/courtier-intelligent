@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { Assure } from '@shared';
 import { page } from 'vitest/browser';
 import { AssureFormModel } from '../../models/assure-form.model';
-import { DuplicateCandidate } from '../../util/assures.utils';
+import { DuplicateCandidate, DuplicateMatch } from '../../util/assures.utils';
 import { AssureFormComponent } from './assure-form.component';
 
 /** Le formulaire assuré, tel que le courtier le remplit. */
@@ -28,7 +28,7 @@ class AssureFormTester {
     component.candidateChanged.subscribe(value => this.candidates.push(value));
   }
 
-  setInputs(inputs: { duplicates?: Assure[]; assure?: Assure | null; mode?: 'create' | 'edit' }): void {
+  setInputs(inputs: { duplicates?: DuplicateMatch[]; assure?: Assure | null; mode?: 'create' | 'edit' }): void {
     for (const [name, value] of Object.entries(inputs)) {
       this.fixture.componentRef.setInput(name, value);
     }
@@ -107,7 +107,9 @@ describe('AssureFormComponent', () => {
   });
 
   it('signale les doublons trouvés et propose de créer quand même', async () => {
-    tester.setInputs({ duplicates: [existing] });
+    tester.setInputs({ duplicates: [{ id: existing.id, name: 'Jean Dupont', reasons: ['email', 'siret'], deleted: false }] });
+
+    await expect.element(tester.root.getByText('(même email, même SIRET)')).toBeVisible();
 
     await expect.element(tester.root.getByText('Ce client existe peut-être déjà')).toBeVisible();
     await expect.element(tester.root.getByRole('link', { name: "Ouvrir l'espace client" })).toBeVisible();
@@ -124,7 +126,7 @@ describe('AssureFormComponent', () => {
     await expect.poll(() => tester.candidates.at(-1)).toMatchObject({ email: 'jean@example.fr', firstName: 'Jean', lastName: 'Dupont' });
   });
 
-  it('remplit le formulaire avec l’assuré à modifier', async () => {
+  it('remplit le formulaire avec le client à modifier', async () => {
     tester.setInputs({ assure: existing, mode: 'edit' });
 
     await expect.element(tester.firstName).toHaveValue('Jean');

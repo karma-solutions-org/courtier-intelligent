@@ -10,7 +10,7 @@ import {
 } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { Assure, Dossier } from '@shared';
-import { catchError, debounceTime, EMPTY, exhaustMap, pipe, switchMap, tap } from 'rxjs';
+import { catchError, combineLatest, debounceTime, EMPTY, exhaustMap, map, of, pipe, switchMap, take, tap } from 'rxjs';
 import {
   resetRequestStatus,
   setError,
@@ -22,7 +22,7 @@ import { toBackendErrorMessage } from '../../../../core/utils/backend-error.util
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
 import { AssureFormModel, toAssureData } from '../models/assure-form.model';
 import { AssuresService } from '../services/assures.service';
-import { DuplicateCandidate, findDuplicates, matchesSearch } from '../util/assures.utils';
+import { displayName, DuplicateCandidate, DuplicateMatch, hasDuplicateCriteria, localDuplicates, matchesSearch } from '../util/assures.utils';
 
 /** Taille d'une tranche du défilement infini. */
 export const PAGE_SIZE = 20;
@@ -63,6 +63,8 @@ interface AssuresState {
   /** Vrai après la suppression du client ouvert : la fiche revient à la liste. */
   deleted: boolean;
   successMessage: string | null;
+  /** Doublons possibles de la saisie en cours (création ou modification). */
+  duplicates: DuplicateMatch[];
 }
 
 /** Store des assurés (fourni par la route) : liste, recherche, pagination, création et modification. */
@@ -83,6 +85,7 @@ export const AssuresStore = signalStore(
     createdId: null,
     deleted: false,
     successMessage: null,
+    duplicates: [],
   }),
   withRequestStatus(),
   withComputed(({ assures, query, filters, searchResults }) => {
@@ -153,9 +156,53 @@ export const AssuresStore = signalStore(
           }),
         ),
       ),
-      /** Assurés existants qui ressemblent à la saisie (alerte de doublon), parmi ceux déjà chargés. */
-      duplicatesOf: (candidate: DuplicateCandidate, excludeId?: string): Assure[] =>
-        findDuplicates(candidate, store.assures(), excludeId),
+      clearDuplicates: () => patchState(store, { duplicates: [] }),
+      /**
+       * Alerte de doublon : vérification serveur sur tout le cabinet (SIRET compris), 400 ms après la dernière frappe.
+       * switchMap écarte une réponse dépassée ; serveur injoignable : comparaison avec les clients chargés.
+       */
+      checkDuplicates: rxMethod<{ candidate: DuplicateCandidate; excludeId?: string }>(
+        pipe(
+          debounceTime(400),
+          switchMap(({ candidate, excludeId }) => {
+            const cabinetId = authStore.cabinetId();
+            if (!cabinetId || !hasDuplicateCriteria(candidate)) {
+              patchState(store, { duplicates: [] });
+              return EMPTY;
+            }
+            const clean = (value: string | null | undefined) => value?.trim() || undefined;
+            return service
+              .verifyDuplicates({
+                firstName: clean(candidate.firstName),
+                lastName: clean(candidate.lastName),
+                birthDate: clean(candidate.birthDate),
+                email: clean(candidate.email),
+                siret: clean(candidate.siret),
+                companyName: clean(candidate.companyName),
+                excludeId,
+              })
+              .pipe(
+                // Nom affiché : client déjà chargé, sinon lu une fois.
+                switchMap((found) => {
+                  if (!found.length) return of([] as DuplicateMatch[]);
+                  const known = new Map(store.assures().map((assure) => [assure.id, assure]));
+                  return combineLatest(
+                    found.map((match) =>
+                      (known.has(match.id) ? of(known.get(match.id)!) : service.watchAssure(cabinetId, match.id).pipe(take(1))).pipe(
+                        map((assure): DuplicateMatch => ({ ...match, name: assure ? displayName(assure) : 'Client' })),
+                      ),
+                    ),
+                  );
+                }),
+                tap((duplicates) => patchState(store, { duplicates })),
+                catchError(() => {
+                  patchState(store, { duplicates: localDuplicates(candidate, store.assures(), excludeId) });
+                  return EMPTY;
+                }),
+              );
+          }),
+        ),
+      ),
 
       create: rxMethod<AssureFormModel>(
         pipe(
@@ -165,10 +212,10 @@ export const AssuresStore = signalStore(
             const cabinetId = authStore.cabinetId();
             const uid = authStore.user()?.uid;
             if (!cabinetId || !uid) {
-              patchState(store, resetRequestStatus());
+              patchState(store, setError('Aucun cabinet actif : reconnectez-vous ou rejoignez un cabinet pour créer un client.'));
               return EMPTY;
             }
-            return service.create(cabinetId, uid, toAssureData(form)).pipe(
+            return service.create(toAssureData(form)).pipe(
               tapResponse({
                 next: (createdId) =>
                   patchState(store, setFulfilled(), { createdId, successMessage: 'Client créé.' }),
@@ -184,10 +231,10 @@ export const AssuresStore = signalStore(
             patchState(store, setPending(), { successMessage: null });
             const cabinetId = authStore.cabinetId();
             if (!cabinetId) {
-              patchState(store, resetRequestStatus());
+              patchState(store, setError('Aucun cabinet actif : reconnectez-vous ou rejoignez un cabinet pour modifier ce client.'));
               return EMPTY;
             }
-            return service.update(cabinetId, id, toAssureData(form)).pipe(
+            return service.update(id, toAssureData(form)).pipe(
               tapResponse({
                 next: () =>
                   patchState(store, setFulfilled(), { successMessage: 'Fiche enregistrée.' }),

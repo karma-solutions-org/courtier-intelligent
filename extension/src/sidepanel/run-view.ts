@@ -9,6 +9,7 @@ export function pathLabel(path: CanonicalPath): string {
 }
 
 const PHASE_LABELS: Record<RunState['phase'], string> = {
+  cancelled: 'Tarification annulée',
   analyzing: 'Analyse de la page…',
   filling: 'Étape remplie : vérifiez, puis passez vous-même à la suivante.',
   waiting_user: 'En attente d’informations : complétez le dossier dans l’application.',

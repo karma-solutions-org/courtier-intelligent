@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
   ACTIVE_QUOTE_JOB_STATUSES,
   canLaunchQuoteJob,
@@ -10,7 +11,7 @@ import {
   QUOTE_JOB_STATUS_LABELS,
   Question,
 } from '@shared';
-import { PricingCard } from '../../store/pricing.store';
+import { PRICING_CANCELLED_TEXT, PricingCard } from '../../store/pricing.store';
 import { MissingFieldsFormComponent } from '../missing-fields-form/missing-fields-form.component';
 
 const TEXT = {
@@ -18,11 +19,14 @@ const TEXT = {
   manual: 'Saisie manuelle',
   price: 'Tarifer',
   retry: 'Relancer',
-  openExtranet: 'Ouvrir l’extranet',
-  requested: 'Ouvrez l’extranet de l’assureur : l’extension prend le relais.',
-  resuming: 'Informations enregistrées : l’extension reprend le remplissage.',
-  awaitingSubmit: 'Formulaire rempli : vérifiez-le et validez-le vous-même sur l’extranet.',
+  openExtranet: "Ouvrir l'extranet",
+  requested: "Ouvrez l'extranet de l'assureur : l'extension prend le relais.",
+  resuming: "Informations enregistrées : l'extension reprend le remplissage.",
+  awaitingSubmit: "Formulaire rempli : vérifiez-le et validez-le vous-même sur l'extranet.",
   failed: 'La tarification a échoué.',
+  cancelled: PRICING_CANCELLED_TEXT,
+  cancel: 'Annuler la tarification',
+  stale: 'Les informations du dossier ont changé depuis ce tarif : relancez la tarification pour une offre à jour.',
   attempt: 'tentative',
   step: 'Étape',
   of: 'sur',
@@ -39,6 +43,7 @@ const TEXT = {
     MatButtonModule,
     MatIconModule,
     MatProgressBarModule,
+    MatProgressSpinnerModule,
     MissingFieldsFormComponent,
   ],
   template: `
@@ -78,6 +83,9 @@ const TEXT = {
             <span class="badge">{{ text.manual }}</span>
           }
         </div>
+        @if (offer.stale) {
+          <p class="error" role="status">{{ text.stale }}</p>
+        }
       } @else if (job) {
         @switch (job.status) {
           @case ('requested') {
@@ -102,6 +110,9 @@ const TEXT = {
           @case ('failed') {
             <p class="error" role="alert">{{ text.failed }} {{ job.error }}</p>
           }
+          @case ('cancelled') {
+            <p class="hint">{{ text.cancelled }}</p>
+          }
         }
         @if (progress(); as progress) {
           <div class="steps">
@@ -116,13 +127,16 @@ const TEXT = {
       }
 
       <footer>
-        @if (!offer && canLaunch()) {
+        @if (canLaunch()) {
           <button
             mat-flat-button
             type="button"
             [disabled]="!canPrice() || busy()"
             (click)="launch.emit()"
           >
+            @if (busy()) {
+              <mat-progress-spinner class="busy" mode="indeterminate" diameter="16" aria-hidden="true" />
+            }
             {{ job ? text.retry : text.price }}
           </button>
         }
@@ -130,11 +144,25 @@ const TEXT = {
           <button mat-stroked-button type="button" (click)="openExtranet.emit()">
             <mat-icon>open_in_new</mat-icon>{{ text.openExtranet }}
           </button>
+          <button mat-button type="button" [disabled]="busy()" [attr.aria-busy]="busy()" (click)="cancel.emit()">
+            @if (busy()) {
+              <mat-progress-spinner class="busy" mode="indeterminate" diameter="16" aria-hidden="true" />
+            } @else {
+              <mat-icon>cancel</mat-icon>
+            }
+            {{ text.cancel }}
+          </button>
         }
       </footer>
     </article>
   `,
   styles: `
+    .busy {
+      display: inline-block;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
     .card {
       display: grid;
       gap: 12px;
@@ -311,14 +339,21 @@ export class QuoteCardComponent {
 
   readonly launch = output<void>();
   readonly openExtranet = output<void>();
+  /** Annule le job en cours (bloqué, extension fermée…). */
+  readonly cancel = output<void>();
   readonly answered = output<CanonicalData>();
 
   protected readonly text = TEXT;
 
-  protected readonly canLaunch = computed(() => canLaunchQuoteJob(this.card().job));
+  /** Pas encore lancée, échouée ou annulée ; ou tarif obtenu mais périmé (données du dossier modifiées depuis). */
+  protected readonly canLaunch = computed(() => {
+    const { job, offer } = this.card();
+    if (offer) return !!offer.stale && (!job || !ACTIVE_QUOTE_JOB_STATUSES.includes(job.status));
+    return canLaunchQuoteJob(job);
+  });
   protected readonly active = computed(() => {
     const status = this.card().job?.status;
-    return !!status && ACTIVE_QUOTE_JOB_STATUSES.includes(status) && !this.card().offer;
+    return !!status && ACTIVE_QUOTE_JOB_STATUSES.includes(status) && (!this.card().offer || !!this.card().offer?.stale);
   });
 
   protected readonly statusLabel = computed(() => {
@@ -330,10 +365,13 @@ export class QuoteCardComponent {
   /** Couleur du statut : en cours, action du courtier attendue, obtenu, échec. */
   protected readonly tone = computed(() => {
     const { job, offer } = this.card();
+    if (offer?.stale) return 'action';
     if (offer || job?.status === 'captured') return 'ok';
     switch (job?.status) {
       case 'failed':
         return 'ko';
+      case 'cancelled':
+        return '';
       case 'needs_info':
       case 'awaiting_submit':
         return 'action';

@@ -15,7 +15,7 @@ describe('countByStatus', () => {
 });
 
 describe('dossiersToProcess', () => {
-  it('garde mes dossiers en attente d’action, les plus anciens d’abord', () => {
+  it("garde mes dossiers en attente d'action, les plus anciens d'abord", () => {
     const list = [
       dossier({ id: '1', status: 'decision', updatedAt: at(300) }),
       dossier({ id: '2', status: 'brouillon', updatedAt: at(100) }),

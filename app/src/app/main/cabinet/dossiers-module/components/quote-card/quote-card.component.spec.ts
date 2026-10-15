@@ -72,7 +72,7 @@ describe('QuoteCardComponent', () => {
     });
   });
 
-  it('propose « Tarifer » quand aucun job n’existe, désactivé tant que le besoin n’est pas validé', async () => {
+  it("propose « Tarifer » quand aucun job n'existe, désactivé tant que le besoin n'est pas validé", async () => {
     const blocked = new QuoteCardTester({}, false);
     await expect.element(blocked.root.getByText(/Non lancée/)).toBeVisible();
     await expect.element(blocked.button('Tarifer')).toBeDisabled();
@@ -82,17 +82,17 @@ describe('QuoteCardComponent', () => {
     expect(ready.launches).toHaveLength(1);
   });
 
-  it('suit le job en temps réel : étape en cours, et ouverture de l’extranet au lieu d’un nouveau lancement', async () => {
+  it("suit le job en temps réel : étape en cours, et ouverture de l'extranet au lieu d'un nouveau lancement", async () => {
     const tester = new QuoteCardTester({
       job: job({ status: 'filling', currentStep: 2, totalSteps: 3 }),
     });
     await expect.element(tester.root.getByText(/Remplissage en cours/)).toBeVisible();
     await expect.element(tester.root.getByText(/Étape 2 sur 3/)).toBeVisible();
-    await expect.element(tester.button('Ouvrir l’extranet')).toBeVisible();
+    await expect.element(tester.button("Ouvrir l'extranet")).toBeVisible();
     await expect.element(tester.button('Tarifer')).not.toBeInTheDocument();
   });
 
-  it('un job en échec affiche l’erreur et se relance', async () => {
+  it("un job en échec affiche l'erreur et se relance", async () => {
     const tester = new QuoteCardTester({
       job: job({ status: 'failed', error: 'Page inconnue.', attempts: 2 }),
     });
@@ -109,16 +109,16 @@ describe('QuoteCardComponent', () => {
         missingFields: [{ canonicalPath: 'driver.profession', label: 'Profession', type: 'text' }],
       }),
     });
-    await tester.button('Envoyer à l’extension').click();
+    await tester.button("Envoyer à l'extension").click();
     expect(tester.answers).toHaveLength(0);
     await expect.element(tester.root.getByText('Ce champ est obligatoire')).toBeVisible();
 
     await tester.root.getByRole('textbox', { name: 'Profession *' }).fill('Infirmière');
-    await tester.button('Envoyer à l’extension').click();
+    await tester.button("Envoyer à l'extension").click();
     expect(tester.answers).toEqual([{ 'driver.profession': 'Infirmière' }]);
   });
 
-  it('affiche l’offre obtenue et signale une saisie manuelle', async () => {
+  it("affiche l'offre obtenue et signale une saisie manuelle", async () => {
     const tester = new QuoteCardTester({ job: job({ status: 'captured' }), offer: offer() });
     await expect.element(tester.root.getByText(/Tarif obtenu/)).toBeVisible();
     await expect.element(tester.root.getByText(/640/)).toBeVisible();

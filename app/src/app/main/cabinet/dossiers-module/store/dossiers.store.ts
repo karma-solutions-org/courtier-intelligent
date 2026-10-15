@@ -10,7 +10,7 @@ import {
 } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { Assure, Dossier, Member, Product } from '@shared';
-import { catchError, EMPTY, exhaustMap, merge, pipe, switchMap, tap } from 'rxjs';
+import { catchError, debounceTime, EMPTY, exhaustMap, map, merge, pipe, switchMap, tap } from 'rxjs';
 import {
   resetRequestStatus,
   setError,
@@ -24,7 +24,7 @@ import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-s
 import { AssuresService } from '../../assures-module/services/assures.service';
 import { displayName, matchesSearch } from '../../assures-module/util/assures.utils';
 import { DossiersService } from '../services/dossiers.service';
-import { DEFAULT_FILTER, DossierFilter, filterDossiers } from '../util/dossiers.utils';
+import { DEFAULT_FILTER, DossierFilter, filterDossiers, needsSearch } from '../util/dossiers.utils';
 
 /** Taille d'une tranche du défilement infini. */
 export const PAGE_SIZE = 20;
@@ -43,6 +43,18 @@ interface DossiersState {
   hasMore: boolean;
   /** Une tranche supplémentaire est demandée et pas encore arrivée. */
   loadingMore: boolean;
+  /**
+   * Résultats Elasticsearch (texte et filtres, tout le cabinet) ; null hors recherche ou si le service est
+   * indisponible : la liste filtre alors la tranche Firestore chargée.
+   */
+  searchResults: Dossier[] | null;
+  /** Nombre de résultats demandés à Elasticsearch (distinct de `limit` : la tranche Firestore reste chargée). */
+  searchLimit: number;
+  /** Elasticsearch a peut-être d'autres résultats au-delà de `searchLimit`. */
+  searchHasMore: boolean;
+  searching: boolean;
+  /** Elasticsearch en échec : la liste filtre seulement les dossiers chargés. */
+  searchUnavailable: boolean;
   /** Recherche d'assuré de l'étape 1 du stepper « Nouveau dossier ». */
   assureQuery: string;
   /** Dossier qui vient d'être créé : le stepper navigue vers son questionnaire. */
@@ -61,6 +73,11 @@ export const DossiersStore = signalStore(
     limit: PAGE_SIZE,
     hasMore: false,
     loadingMore: false,
+    searchResults: null,
+    searchLimit: PAGE_SIZE,
+    searchHasMore: false,
+    searching: false,
+    searchUnavailable: false,
     assureQuery: '',
     createdId: null,
   }),
@@ -68,13 +85,28 @@ export const DossiersStore = signalStore(
   withComputed((store) => {
     const authStore = inject(AuthStore);
     const cabinetStatus = inject(CabinetStatusStore);
-    const filtered = computed(() =>
-      filterDossiers(store.dossiers(), store.filter(), authStore.user()?.uid ?? null),
-    );
+    const assureById = computed(() => new Map(store.assures().map((a) => [a.id, a])));
+    const nameOf = (assureId: string) => {
+      const assure = assureById().get(assureId);
+      return assure ? displayName(assure) : '';
+    };
+    const filtered = computed(() => {
+      const uid = authStore.user()?.uid ?? null;
+      const local = filterDossiers(store.dossiers(), store.filter(), uid, nameOf);
+      const results = store.searchResults();
+      if (!results) return local;
+      // Résultats d'Elasticsearch (en direct : un dossier qui ne correspond plus aux filtres disparaît), puis les
+      // dossiers chargés qui correspondent mais qu'il n'a pas encore indexés.
+      const live = filterDossiers(results, { ...store.filter(), query: '' }, uid);
+      const ids = new Set(live.map((d) => d.id));
+      return [...live, ...local.filter((d) => !ids.has(d.id))];
+    });
     return {
       filtered,
+      /** Pagination : celle d'Elasticsearch pendant une recherche, sinon celle de Firestore. */
+      canLoadMore: computed(() => (store.searchResults() ? store.searchHasMore() : store.hasMore())),
       total: computed(() => filtered().length),
-      assureById: computed(() => new Map(store.assures().map((a) => [a.id, a]))),
+      assureById,
       /** Nom affiché d'un membre, par uid. */
       memberNames: computed(
         () => new Map(store.members().map((m) => [m.id, m.displayName || m.email || m.id])),
@@ -98,12 +130,18 @@ export const DossiersStore = signalStore(
   }),
   withMethods(
     (store, service = inject(DossiersService), assuresService = inject(AssuresService)) => ({
+      // Nouveau filtre : la recherche repart de la première tranche (la tranche Firestore déjà chargée est gardée).
       setFilter: (changes: Partial<DossierFilter>) =>
-        patchState(store, { filter: { ...store.filter(), ...changes } }),
-      resetFilter: () => patchState(store, { filter: DEFAULT_FILTER }),
-      /** Fin du défilement : demande la tranche suivante. */
+        patchState(store, { filter: { ...store.filter(), ...changes }, searchLimit: PAGE_SIZE, loadingMore: false }),
+      resetFilter: () => patchState(store, { filter: DEFAULT_FILTER, searchLimit: PAGE_SIZE, loadingMore: false }),
+      /** Fin du défilement : demande la tranche suivante (Elasticsearch en recherche, Firestore sinon). */
       loadMore: () => {
-        if (store.hasMore() && !store.loadingMore()) {
+        if (store.loadingMore()) return;
+        if (store.searchResults()) {
+          if (store.searchHasMore() && !store.searching()) {
+            patchState(store, { searchLimit: store.searchLimit() + PAGE_SIZE, loadingMore: true });
+          }
+        } else if (store.hasMore()) {
           patchState(store, { limit: store.limit() + PAGE_SIZE, loadingMore: true });
         }
       },
@@ -149,6 +187,49 @@ export const DossiersStore = signalStore(
         ),
       ),
 
+      /**
+       * Recherche Elasticsearch (texte et filtres) 300 ms après le dernier changement. switchMap abandonne la requête
+       * précédente : une réponse arrivée en retard n'écrase jamais une recherche plus récente. Échec : repli local.
+       */
+      _search: rxMethod<{ cabinetId: string | null; filter: DossierFilter; uid: string | null; limit: number }>(
+        pipe(
+          debounceTime(300),
+          switchMap(({ cabinetId, filter, uid, limit }) => {
+            if (!cabinetId || !needsSearch(filter)) {
+              patchState(store, { searchResults: null, searchHasMore: false, searching: false, searchUnavailable: false });
+              return EMPTY;
+            }
+            patchState(store, { searching: true });
+            return service
+              .search({
+                q: filter.query.trim(),
+                size: limit,
+                status: filter.status,
+                productId: filter.productId,
+                assignedTo: filter.mine ? (uid ?? '') : filter.assignedTo,
+              })
+              .pipe(
+                switchMap((ids) =>
+                  service.watchDossiersByIds(cabinetId, ids).pipe(map((dossiers) => ({ dossiers, more: ids.length >= limit }))),
+                ),
+                tap(({ dossiers, more }) =>
+                  patchState(store, {
+                    searchResults: dossiers,
+                    searchHasMore: more,
+                    searching: false,
+                    searchUnavailable: false,
+                    loadingMore: false,
+                  }),
+                ),
+                catchError(() => {
+                  patchState(store, { searchResults: null, searchHasMore: false, searching: false, searchUnavailable: true, loadingMore: false });
+                  return EMPTY;
+                }),
+              );
+          }),
+        ),
+      ),
+
       _listen: rxMethod<string | null>(
         pipe(
           switchMap((cabinetId) =>
@@ -178,6 +259,16 @@ export const DossiersStore = signalStore(
     onInit: (store) => {
       const authStore = inject(AuthStore);
       store._listen(authStore.cabinetId);
+      store._search(
+        computed(
+          () => ({ cabinetId: authStore.cabinetId(), filter: store.filter(), uid: authStore.user()?.uid ?? null, limit: store.searchLimit() }),
+          {
+            equal: (a, b) =>
+              a.cabinetId === b.cabinetId && a.uid === b.uid && a.limit === b.limit &&
+              JSON.stringify({ ...a.filter, query: a.filter.query.trim() }) === JSON.stringify({ ...b.filter, query: b.filter.query.trim() }),
+          },
+        ),
+      );
       store._listenDossiers(
         computed(
           () => ({ cabinetId: authStore.cabinetId(), limit: store.limit() }),

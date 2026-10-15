@@ -84,6 +84,7 @@ export const CABINET_ROUTES: Routes = [
       {
         path: CabinetRouteContainerModel.CLIENT_NEW_ROUTE.path,
         title: 'Nouveau client — Courtier Intelligent',
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('../../../main/cabinet/assures-module/components/new-assure-container/new-assure-container.component').then(
             (c) => c.NewAssureContainerComponent,
@@ -92,6 +93,7 @@ export const CABINET_ROUTES: Routes = [
       {
         path: ':id',
         title: 'Espace client — Courtier Intelligent',
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('../../../main/cabinet/assures-module/components/assure-detail-container/assure-detail-container.component').then(
             (c) => c.AssureDetailContainerComponent,

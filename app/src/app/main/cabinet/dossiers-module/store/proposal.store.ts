@@ -23,9 +23,21 @@ interface ProposalState {
 export const ProposalStore = signalStore(
   withState<ProposalState>({ offers: [], busy: false, loaded: false, error: null, successMessage: null }),
   withComputed((store, dossierStore = inject(DossierStore)) => ({
+    /**
+     * Offre retenue telle qu'elle a été choisie puis envoyée : copie figée de la proposition, sinon de la décision
+     * (l'offre vivante peut changer ensuite), à défaut l'offre actuelle (dossiers antérieurs aux copies).
+     */
     chosenOffer: computed(() => {
-      const insurerId = dossierStore.dossier()?.decision?.insurerId;
+      const dossier = dossierStore.dossier();
+      const insurerId = dossier?.decision?.insurerId;
+      const snapshot = dossier?.proposal?.offerSnapshot ?? dossier?.decision?.offerSnapshot ?? null;
+      if (snapshot && snapshot.insurerId === insurerId) return snapshot;
       return store.offers().find(offer => offer.id === insurerId) ?? null;
+    }),
+    /** L'offre retenue est à refaire (données du dossier modifiées depuis sa capture). */
+    chosenOfferStale: computed(() => {
+      const insurerId = dossierStore.dossier()?.decision?.insurerId;
+      return !!store.offers().find(offer => offer.id === insurerId)?.stale;
     }),
   })),
   withMethods(

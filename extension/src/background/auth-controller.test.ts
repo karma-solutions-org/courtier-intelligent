@@ -5,6 +5,7 @@ import {
   BackendPort,
   createAuthController,
   MESSAGES,
+  toAiMessage,
   SessionPort,
   SessionRead,
   toUserMessage,
@@ -119,6 +120,7 @@ describe('Messages d’erreur', () => {
     [{ code: 'auth/user-disabled' }, MESSAGES.disabled],
     [{ code: 'auth/network-request-failed' }, MESSAGES.network],
     [{ code: 'functions/failed-precondition', details: { reason: 'no_app_session' } }, MESSAGES.noAppSession],
+    [{ code: 'functions/failed-precondition', details: { reason: 'device_mismatch' } }, MESSAGES.wrongDevice],
     [{ code: 'functions/resource-exhausted', message: 'Limite atteinte.' }, 'Limite atteinte.'],
     [{ code: 'functions/internal', message: 'INTERNAL' }, MESSAGES.generic],
     [{ code: 'functions/unavailable', message: 'x' }, MESSAGES.generic],
@@ -219,5 +221,24 @@ describe('Déconnexion', () => {
     await t.controller.signOut();
 
     expect(await t.controller.verify()).toEqual({ status: 'signed_out', notice: null });
+  });
+});
+
+describe('messages d’échec affichés dans le side panel', () => {
+  it('session expirée → reconnectez-vous', () => {
+    expect(toUserMessage({ code: 'auth/user-token-expired' })).toBe(MESSAGES.sessionExpired);
+    expect(toUserMessage({ code: 'functions/unauthenticated', message: 'x' })).toBe(MESSAGES.sessionExpired);
+    expect(MESSAGES.sessionExpired).toMatch(/reconnectez-vous/);
+  });
+
+  it('autorisation manquante', () => {
+    expect(toUserMessage({ code: 'permission-denied', message: 'Missing or insufficient permissions.' })).toBe(MESSAGES.permissionDenied);
+  });
+
+  it('IA indisponible pour toute autre panne de l’IA', () => {
+    expect(toAiMessage({ code: 'functions/resource-exhausted', message: 'quota' })).toBe(MESSAGES.aiUnavailable);
+    expect(toAiMessage({ code: 'functions/unavailable' })).toBe(MESSAGES.aiUnavailable);
+    expect(toAiMessage({ code: 'functions/unauthenticated' })).toBe(MESSAGES.sessionExpired);
+    expect(toAiMessage({ code: 'functions/permission-denied', message: 'Refusé' })).toBe(MESSAGES.permissionDenied);
   });
 });

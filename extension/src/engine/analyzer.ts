@@ -172,6 +172,48 @@ function optionsOf(element: HTMLElement, group: HTMLElement[]): FieldOption[] {
  * Analyse un formulaire : champs visibles et saisissables (jamais les mots de passe), avec libellé, type, options,
  * section, caractère obligatoire, et l'empreinte de sa structure. Les groupes de boutons radio forment UN champ.
  */
+/** Mots d'un formulaire de connexion (id, nom, action, classe, bouton). */
+const AUTH_WORDS = /(^|[^a-z])(log-?in|sign-?in|connexion|se connecter|authentification)([^a-z]|$)/i;
+/** Mots d'un champ de recherche (barre de recherche du site, jamais une question du devis). */
+const SEARCH_WORDS = /(^|[^a-z])(search|recherche[rz]?|rechercher|query|keywords?)([^a-z]|$)|^q$/i;
+
+/** Champ de recherche du site : type search, zone role=search, ou nom/id/placeholder « recherche ». */
+export function isSearchField(element: HTMLElement): boolean {
+  if ((element.getAttribute('type') ?? '').toLowerCase() === 'search') return true;
+  if (element.closest('[role="search"], search')) return true;
+  const hints = [element.getAttribute('name'), element.id, element.getAttribute('placeholder'), element.getAttribute('aria-label')];
+  return hints.some(hint => !!hint && SEARCH_WORDS.test(hint.trim()));
+}
+
+/** Champs « à saisir » (ni mot de passe, ni case, ni bouton, ni caché) visibles dans `scope`. */
+function visibleEntryFields(scope: ParentNode): number {
+  return [...scope.querySelectorAll<HTMLElement>('input, select, textarea')].filter(element => {
+    const type = (element.getAttribute('type') ?? 'text').toLowerCase();
+    return !(element instanceof HTMLInputElement && (IGNORED_INPUT_TYPES.has(type) || type === 'checkbox' || type === 'radio')) && isVisible(element);
+  }).length;
+}
+
+/**
+ * Page de connexion (ou d'authentification). L'extension n'y remplit RIEN :
+ * - un champ mot de passe visible accompagné d'au plus 2 champs à saisir (identifiant, code) : formulaire de connexion
+ *   (un mot de passe au milieu d'un vrai questionnaire, « créez votre espace client », n'en fait pas une page de connexion) ;
+ * - ou un formulaire dont l'identité (id, nom, action, classe, bouton d'envoi) dit « login / sign-in / connexion ».
+ */
+export function isAuthPage(root: Document | HTMLElement = document): boolean {
+  const scope = root instanceof Document ? root.body : root;
+  if (!scope) return false;
+  const passwords = [...scope.querySelectorAll<HTMLInputElement>('input[type="password" i]')].filter(input => isVisible(input));
+  if (passwords.some(input => visibleEntryFields(input.closest('form') ?? scope) <= 2)) return true;
+  return [...scope.querySelectorAll<HTMLFormElement>('form')].some(form => {
+    if (!isVisible(form)) return false;
+    const identity = [form.id, form.getAttribute('name'), form.getAttribute('action'), form.className, form.getAttribute('aria-label')];
+    const submit = [...form.querySelectorAll<HTMLElement>('button, input[type="submit" i]')].map(
+      button => (button instanceof HTMLInputElement ? button.value : button.textContent) ?? '',
+    );
+    return [...identity, ...submit].some(text => !!text && AUTH_WORDS.test(text.trim()));
+  });
+}
+
 export function analyzeForm(root: Document | HTMLElement = document): FormAnalysis {
   const doc = root instanceof Document ? root : root.ownerDocument;
   const scope = root instanceof Document ? root.body : root;
@@ -183,6 +225,7 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
       !(element instanceof HTMLInputElement && IGNORED_INPUT_TYPES.has(type)) &&
       !(element as HTMLInputElement).disabled &&
       element.getAttribute('aria-hidden') !== 'true' &&
+      !isSearchField(element) &&
       isVisible(element)
     );
   });

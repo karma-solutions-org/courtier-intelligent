@@ -41,7 +41,7 @@ La reconnaissance par le vrai moteur est vérifiée par `src/engine/demo-extrane
 7. **Tarifer** : sur la carte « Assureur Test (démo locale) » du dossier, cliquer **Tarifer**. Le job de tarification
    passe à « demandé ».
 8. **Ouvrir l'extranet** : aller sur <http://localhost:8090/index.html> et cliquer
-   **Accéder à l'espace courtier**. L'extension reconnaît le domaine `localhost` et reprend le job.
+   **Accéder à l'espace courtier**. L'extension reconnaît le domaine `localhost:8090` (hôte ET port, à déclarer tel quel dans le catalogue) et reprend le job.
 9. **Étapes 1 et 2** : l'extension remplit les champs ; vérifier puis cliquer **Suivant** (l'extension ne clique
    jamais elle-même).
 10. **Étape 3** : l'extension remplit le conducteur et les antécédents ; s'il manque une information, elle est

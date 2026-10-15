@@ -1,7 +1,7 @@
 import { CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, MissingField, type DiscoveredFieldInput } from '@shared';
 import type { CapturedOffer, CaptureState, JobContext, JobUpdate, RunField, RunState } from '../shared/messages';
 import { AskAi, resolveWithAi } from './ai-fallback';
-import { analyzeForm, FormAnalysis } from './analyzer';
+import { analyzeForm, FormAnalysis, isAuthPage } from './analyzer';
 import { detectResultPage, extractFromDom, hasPremium, hasResultHeading, parseAmounts, visibleText } from './capture';
 import { captureWithAi, mergeOffers } from './capture-ai';
 import { expectsDate } from './field-synonyms';
@@ -10,6 +10,13 @@ import { asCanonicalPath, isCompatible, Mapping, mapFields } from './mapping';
 import { applyMemory, MemoryPort, toDiscoveredFields, toMemoryFields, toRequiredPaths } from './memory';
 import { FillPlan, planFill } from './plan';
 import { detectStepHint, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
+
+/** Échec d'écriture de l'avancement, avec la cause exacte (`cancelled` : le job a été annulé). */
+export class JobUpdateError extends Error {
+  constructor(message: string, readonly cancelled = false) {
+    super(message);
+  }
+}
 
 export interface RunnerPorts {
   doc: Document;
@@ -74,15 +81,45 @@ export class FormRunner {
   private pending: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> = Promise.resolve();
   private stopped = false;
+  private cancelled = false;
   // ── Capture du tarif (E10) ──
   /** La page de résultat est en cours de lecture ou lue : le remplissage s'arrête. */
   private capturing = false;
   private readonly reportedIssues = new Set<string>();
+  /** Dernier problème à signaler au courtier dans le side panel (IA indisponible, session expirée…), ou null. */
+  private notice: string | null = null;
 
   constructor(
     private job: JobContext,
     private readonly ports: RunnerPorts,
   ) {}
+
+  /**
+   * Questions du produit (toutes, conditions comprises) : un champ reconnu sur l'une d'elles n'est pas nouveau.
+   * Sans questionnaire lisible, on se rabat sur les chemins du dossier.
+   */
+  private get productPaths(): readonly string[] {
+    return this.job.productPaths?.length ? this.job.productPaths : this.allowedPaths;
+  }
+
+  /** IA appelée via le service worker : son échec est gardé pour l'afficher (le remplissage continue sans elle). */
+  private readonly askAi: RunnerPorts['askAi'] = async request => {
+    try {
+      const text = await this.ports.askAi(request);
+      // L'IA répond de nouveau : son ancien message d'échec ne vaut plus.
+      if (this.aiNotice) {
+        this.notice = null;
+        this.aiNotice = false;
+      }
+      return text;
+    } catch (error) {
+      this.notice = error instanceof Error && error.message ? error.message : 'IA indisponible pour le moment.';
+      this.aiNotice = true;
+      throw error;
+    }
+  };
+  /** `notice` vient d'un échec de l'IA (effacé quand elle répond de nouveau). */
+  private aiNotice = false;
 
   /** Chemins du dossier : seuls ceux-ci peuvent être visés (par l'IA ou à la main). */
   private get allowedPaths(): CanonicalPath[] {
@@ -96,8 +133,9 @@ export class FormRunner {
   async start(): Promise<void> {
     // La page peut encore se charger : on attend qu'elle soit stable avant de l'analyser.
     await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
+    if (this.job.status === 'cancelled') return this.cancel();
     if (await this.tryCapture(false)) return;
-    await this.ports.report({ status: 'analyzing' }).catch(() => this.reportIssue('analyze', 'job_update_failed'));
+    await this.ports.report({ status: 'analyzing' }).catch(error => this.jobUpdateFailed('analyze', error));
     await this.enqueue(() => this.runStep(false));
     if (this.stopped) return;
     this.observer = new MutationObserver(() => this.scheduleCheck());
@@ -110,6 +148,14 @@ export class FormRunner {
     });
   }
 
+  /** Job annulé (corbeille, sans suite, tarification-annuler) : statut final, le remplissage s'arrête pour de bon. */
+  cancel(): void {
+    if (this.stopped && this.cancelled) return;
+    this.cancelled = true;
+    this.stop();
+    this.publishState('cancelled', [], [], 'Tarification annulée : ce dossier n’attend plus de tarif de cet assureur.');
+  }
+
   stop(): void {
     this.stopped = true;
     this.observer?.disconnect();
@@ -118,7 +164,8 @@ export class FormRunner {
 
   /** Le dossier a changé (le courtier a répondu aux champs manquants) : on reprend le remplissage. */
   async updateJob(job: JobContext): Promise<void> {
-    this.job = job;
+    if (job.status === 'cancelled') return this.cancel();
+    this.job = job.productPaths?.length ? job : { ...job, productPaths: this.job.productPaths };
     await this.enqueue(() => this.runStep(false));
   }
 
@@ -176,6 +223,11 @@ export class FormRunner {
     const analysis = analyzeForm(this.ports.doc);
     // Le courtier a soumis le formulaire et l'extranet affiche le tarif sans recharger la page.
     if (await this.tryCapture(false, analysis)) return;
+    // Page de connexion de l'extranet : l'extension ne touche jamais aux identifiants du courtier.
+    if (isAuthPage(this.ports.doc)) {
+      this.publishState('analyzing', [], [], 'Page de connexion : connectez-vous vous-même à l’extranet, le remplissage reprendra ensuite.');
+      return;
+    }
     const hint = detectStepHint(this.ports.doc);
     if (newStep) {
       // Le courtier a quitté l'étape précédente : l'extranet l'a acceptée, on peut en retenir la structure (E8-3).
@@ -208,7 +260,7 @@ export class FormRunner {
     }
     if (!this.aiTried.has(analysis.fingerprint)) {
       this.aiTried.add(analysis.fingerprint);
-      const resolved = await resolveWithAi(analysis.fields, this.applyManual(mappings), this.allowedPaths, this.ports.askAi);
+      const resolved = await resolveWithAi(analysis.fields, this.applyManual(mappings), this.allowedPaths, this.askAi);
       this.aiUsed ||= resolved.used;
       mappings = resolved.mappings;
       this.aiResults = new Map(mappings.filter(m => m.source === 'ai').map(m => [m.fieldKey, m]));
@@ -245,7 +297,7 @@ export class FormRunner {
     // ajoute au questionnaire (obligatoires si l'extranet les exige). Indispensable sur les extranets qui rechargent la
     // page entre deux étapes : l'apprentissage « en quittant l'étape » n'y a jamais lieu pour les étapes intermédiaires.
     if (!this.discoveredReported.has(analysis.fingerprint) && ![...results.values()].some(r => r.status === 'failed')) {
-      const discovered = toDiscoveredFields(analysis.fields, this.mappings, this.allowedPaths);
+      const discovered = toDiscoveredFields(analysis.fields, this.mappings, this.productPaths, this.job.quoteData);
       if (discovered.length) {
         this.discoveredReported.add(analysis.fingerprint);
         void this.ports.reportDiscovered?.(analysis.fingerprint, discovered).catch(() => this.discoveredReported.delete(analysis.fingerprint));
@@ -293,7 +345,7 @@ export class FormRunner {
     let aiFailure: ExtensionReportIssue | null = null;
     if (!hasPremium(offer) || offer.guarantees.length === 0) {
       this.aiUsed = true;
-      const ai = await captureWithAi(visibleText(this.ports.doc.body), this.job.quoteData, this.ports.askAi);
+      const ai = await captureWithAi(visibleText(this.ports.doc.body), this.job.quoteData, this.askAi);
       if (ai.offer) {
         const merged = mergeOffers(offer, ai.offer);
         if (JSON.stringify(merged) !== JSON.stringify(offer)) source = 'ai';
@@ -392,15 +444,16 @@ export class FormRunner {
     if (fields.length === 0 || fields.length > MEMORY_MAX_FIELDS || !fields.some(f => f.canonicalPath !== null)) return;
     this.learned.add(snapshot.fingerprint);
     try {
-      await this.ports.memory.save(this.origin, snapshot.fingerprint, fields);
-      this.memoryStatus = 'learned';
+      const outcome = await this.ports.memory.save(this.origin, snapshot.fingerprint, fields);
+      // `ignored` : le serveur n'a rien retenu. `pending` : retenu pour le cabinet (mémoire commune en attente).
+      if (outcome !== 'ignored') this.memoryStatus = 'learned';
     } catch {
       this.learned.delete(snapshot.fingerprint); // une panne réseau : on réessaiera
       return;
     }
     // Après la mémoire (le serveur y rattache les nouvelles questions) : les champs restés sans équivalent.
     if (this.discoveredReported.has(snapshot.fingerprint)) return;
-    const discovered = toDiscoveredFields(snapshot.fields, snapshot.mappings, this.allowedPaths);
+    const discovered = toDiscoveredFields(snapshot.fields, snapshot.mappings, this.productPaths, this.job.quoteData);
     if (discovered.length) await this.ports.reportDiscovered?.(snapshot.fingerprint, discovered).catch(() => undefined);
   }
 
@@ -446,7 +499,7 @@ export class FormRunner {
     const signature = JSON.stringify([update.status, update.currentStep, update.totalSteps, (update.missingFields ?? []).map(m => m.canonicalPath)]);
     if (signature === this.lastReported) return;
     this.lastReported = signature;
-    await this.ports.report(update).catch(() => this.reportIssue('fill', 'job_update_failed'));
+    await this.ports.report(update).catch(error => this.jobUpdateFailed('fill', error));
   }
 
   private publishFromPlan(plan: FillPlan, results: Map<string, FillResult>, hint: StepHint): void {
@@ -471,7 +524,19 @@ export class FormRunner {
       };
     });
     const phase = plan.missing.length > 0 ? 'waiting_user' : isFinalStep(this.ports.doc, hint) ? 'awaiting_submit' : 'filling';
-    this.publishState(phase, fields, plan.missing, null, hint);
+    this.publishState(phase, fields, plan.missing, this.notice, hint);
+  }
+
+  /** L'avancement n'a pas pu être écrit (session expirée, autorisation refusée, réseau) : signalé et affiché. */
+  private async jobUpdateFailed(step: ExtensionReportStep, error?: unknown): Promise<void> {
+    if (error instanceof JobUpdateError && error.cancelled) return this.cancel();
+    // Cause exacte renvoyée par le service worker (session, dossier hors tarification, réseau…).
+    this.notice =
+      error instanceof JobUpdateError
+        ? error.message
+        : 'Avancement non enregistré dans l’application : session expirée ou autorisation manquante. Reconnectez-vous à l’extension.';
+    this.aiNotice = false;
+    await this.reportIssue(step, 'job_update_failed');
   }
 
   private publishState(phase: RunState['phase'], fields: RunField[], missing: MissingField[], message: string | null, hint?: StepHint): void {

@@ -1,9 +1,9 @@
 export const COMPARISON_STRUCTURE = {
   loading: 'Chargement des offres…',
   empty:
-    'Aucune offre pour l’instant : lancez une tarification ou saisissez une offre dans l’onglet Tarification.',
+    "Aucune offre pour l'instant : lancez une tarification ou saisissez une offre dans l'onglet Tarification.",
   indicativeScore:
-    'Score indicatif d’adéquation à la couverture souhaitée (sur 100), calculé à partir des écarts : il ne remplace pas l’avis du courtier.',
+    "Score indicatif d'adéquation à la couverture souhaitée (sur 100), calculé à partir des écarts : il ne remplace pas l'avis du courtier.",
   noNeed: 'Aucune couverture souhaitée enregistrée : les écarts et le score ne sont pas calculés.',
   decided: 'Offre retenue',
   decisionSaved: 'Offre retenue : le dossier passe en « Décision ».',
@@ -25,9 +25,9 @@ export const COMPARISON_STRUCTURE = {
     deductible: 'franchise',
   },
   dialog: {
-    title: 'Retenir l’offre',
+    title: "Retenir l'offre",
     justification: 'Justification du choix',
-    hint: 'Pourquoi cette offre ? (10 caractères minimum, conservé dans l’historique)',
+    hint: "Pourquoi cette offre ? (10 caractères minimum, conservé dans l'historique)",
     cancel: 'Annuler',
     confirm: 'Retenir cette offre',
   },

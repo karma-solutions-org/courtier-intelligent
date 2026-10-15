@@ -10,7 +10,7 @@ type KnowledgeMode = 'known' | 'declared' | 'unknown';
 
 const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
   { mode: 'known', label: 'Valeur connue' },
-  { mode: 'declared', label: "L'assuré ne sait pas" },
+  { mode: 'declared', label: 'Le client ne sait pas' },
   { mode: 'unknown', label: 'À vérifier' },
 ];
 

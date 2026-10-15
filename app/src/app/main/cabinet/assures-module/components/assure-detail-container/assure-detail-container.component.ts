@@ -9,6 +9,7 @@ import {
   OnInit,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
@@ -18,6 +19,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { Router, RouterLink } from '@angular/router';
 import { Assure, AssureDocument, Dossier } from '@shared';
 import { combineLatest, of, switchMap } from 'rxjs';
+import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
 import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
 import { AssuresService } from '../../services/assures.service';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
@@ -509,7 +511,14 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AssureDetailContainerComponent implements OnInit {
+export class AssureDetailContainerComponent implements OnInit, HasUnsavedChanges {
+  private readonly _form = viewChild(AssureFormComponent);
+
+  /** Garde de sortie : fiche en cours de modification, pas enregistrée. */
+  hasUnsavedChanges(): boolean {
+    return this.editing() && !!this._form()?.hasUnsavedChanges();
+  }
+
   /** Lié au paramètre « :id » de la route (withComponentInputBinding). */
   readonly id = input.required<string>();
 
@@ -520,7 +529,7 @@ export class AssureDetailContainerComponent implements OnInit {
   protected readonly typeLabels = ASSURES_STRUCTURE.typeLabels;
   protected readonly listUrl = CabinetRouteContainerModel.CLIENTS_ROUTE.url;
   protected readonly newDossierUrl = CabinetRouteContainerModel.DOSSIER_NEW_ROUTE.url;
-  protected readonly duplicates = signal<Assure[]>([]);
+  protected readonly duplicates = this.store.duplicates;
   protected readonly nameOf = displayName;
   protected readonly pieceText = ASSURES_STRUCTURE.piece;
   private readonly _service = inject(AssuresService);
@@ -620,7 +629,7 @@ export class AssureDetailContainerComponent implements OnInit {
   }
 
   protected checkDuplicates(candidate: DuplicateCandidate): void {
-    this.duplicates.set(this.store.duplicatesOf(candidate, this.id()));
+    this.store.checkDuplicates({ candidate, excludeId: this.id() });
   }
 
   protected back(): void {

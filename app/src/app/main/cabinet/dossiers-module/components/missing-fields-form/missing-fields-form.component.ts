@@ -4,8 +4,8 @@ import { CanonicalData, CanonicalPath, CanonicalValue, isAnswered, MissingField,
 import { QuestionFieldComponent } from '../question-field/question-field.component';
 
 const TEXT = {
-  intro: 'L’extranet demande des informations absentes du dossier. Elles y seront enregistrées, puis l’extension reprendra.',
-  submit: 'Envoyer à l’extension',
+  intro: "L'extranet demande des informations absentes du dossier. Elles y seront enregistrées, puis l'extension reprendra.",
+  submit: "Envoyer à l'extension",
 } as const;
 
 /**

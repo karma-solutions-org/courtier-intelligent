@@ -1,14 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { UserRole } from '@shared';
-import {
-  createUserWithEmailAndPassword,
-  onIdTokenChanged,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-} from 'firebase/auth';
-import { catchError, from, map, Observable, of, throwError } from 'rxjs';
+import type { Auth } from 'firebase/auth';
+import { catchError, from, map, Observable, of, switchMap, throwError } from 'rxjs';
 import { FIREBASE_AUTH } from './firebase';
 
 export type { UserRole };
@@ -34,47 +27,62 @@ export abstract class AuthenticationProvider {
   abstract refreshToken(): Observable<void>;
 }
 
+/** SDK Firebase Auth chargé à la demande (hors du bundle initial). */
+const sdk = () => import('firebase/auth');
+
 @Injectable()
 export class FireauthProvider extends AuthenticationProvider {
   private readonly _auth = inject(FIREBASE_AUTH);
 
+  /** Exécute [action] avec l'instance Auth et le SDK, chargés à la première utilisation. */
+  private _with<T>(action: (auth: Auth, fb: Awaited<ReturnType<typeof sdk>>) => Promise<T>): Observable<T> {
+    return from(Promise.all([this._auth(), sdk()]).then(([auth, fb]) => action(auth, fb)));
+  }
+
   /** Utilisateur courant avec ses claims (cabinetId, role), réémis à chaque rafraîchissement du token. */
-  readonly user$ = new Observable<AuthUser | null>(subscriber =>
-    onIdTokenChanged(this._auth, async user => {
-      if (!user) {
-        subscriber.next(null);
-        return;
-      }
-      const { claims } = await user.getIdTokenResult();
-      subscriber.next({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        cabinetId: (claims['ci_cabinet_id'] as string | undefined) ?? null,
-        role: (claims['ci_role'] as UserRole | undefined) ?? null,
-        authTime: Number(claims['auth_time']) || null,
-      });
-    }),
+  readonly user$ = from(Promise.all([this._auth(), sdk()])).pipe(
+    switchMap(
+      ([auth, { onIdTokenChanged }]) =>
+        new Observable<AuthUser | null>(subscriber =>
+          onIdTokenChanged(auth, async user => {
+            if (!user) {
+              subscriber.next(null);
+              return;
+            }
+            const { claims } = await user.getIdTokenResult();
+            subscriber.next({
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+              cabinetId: (claims['ci_cabinet_id'] as string | undefined) ?? null,
+              role: (claims['ci_role'] as UserRole | undefined) ?? null,
+              authTime: Number(claims['auth_time']) || null,
+            });
+          }),
+        ),
+    ),
   );
 
   signIn(email: string, password: string): Observable<void> {
-    return from(signInWithEmailAndPassword(this._auth, email, password)).pipe(map(() => undefined));
+    return this._with((auth, fb) => fb.signInWithEmailAndPassword(auth, email, password)).pipe(map(() => undefined));
   }
 
   signUp(displayName: string, email: string, password: string): Observable<void> {
-    return from(
-      createUserWithEmailAndPassword(this._auth, email, password).then(({ user }) => updateProfile(user, { displayName })),
+    return this._with((auth, fb) =>
+      fb.createUserWithEmailAndPassword(auth, email, password).then(({ user }) => fb.updateProfile(user, { displayName })),
     );
   }
 
   signOut(): Observable<void> {
-    return from(signOut(this._auth));
+    return this._with((auth, fb) => fb.signOut(auth));
   }
 
   sendPasswordReset(email: string, continueUrl: string): Observable<void> {
-    // Email rédigé en français ; après le changement de mot de passe, le lien ramène à la connexion.
-    this._auth.languageCode = 'fr';
-    return from(sendPasswordResetEmail(this._auth, email, { url: continueUrl })).pipe(
+    return this._with((auth, fb) => {
+      // Email rédigé en français ; après le changement de mot de passe, le lien ramène à la connexion.
+      auth.languageCode = 'fr';
+      return fb.sendPasswordResetEmail(auth, email, { url: continueUrl });
+    }).pipe(
       catchError(error =>
         // Ne pas révéler si un compte existe pour cet email.
         (error as { code?: string })?.code === 'auth/user-not-found' ? of(undefined) : throwError(() => error),
@@ -83,7 +91,8 @@ export class FireauthProvider extends AuthenticationProvider {
   }
 
   refreshToken(): Observable<void> {
-    const user = this._auth.currentUser;
-    return user ? from(user.getIdToken(true)).pipe(map(() => undefined)) : of(undefined);
+    return this._with(async auth => {
+      await auth.currentUser?.getIdToken(true);
+    });
   }
 }

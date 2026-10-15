@@ -43,7 +43,7 @@ export const LANDING_PAGE_STRUCTURE = {
     eyebrow: 'Comment ça marche',
     title: 'Du premier contact à la souscription',
     items: [
-      { icon: 'folder_open', title: 'Saisir le dossier', text: "Identité de l'assuré, produit et questionnaire, dans un formulaire guidé qui signale ce qui manque." },
+      { icon: 'folder_open', title: 'Saisir le dossier', text: "Identité du client, produit et questionnaire, dans un formulaire guidé qui signale ce qui manque." },
       { icon: 'psychology', title: 'Analyser le besoin', text: 'Niveau de couverture, budget, franchise acceptable et garanties indispensables.' },
       { icon: 'bolt', title: 'Obtenir 3 tarifs', text: "L'extension remplit les extranets des assureurs étape par étape. Vous vérifiez et validez." },
       { icon: 'compare_arrows', title: 'Comparer et choisir', text: "Les offres côte à côte, avec les écarts au besoin mis en évidence. Vous justifiez votre choix." },

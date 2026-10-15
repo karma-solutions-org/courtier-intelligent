@@ -169,7 +169,7 @@ describe('NeedFormComponent', () => {
   describe('Validation du besoin', () => {
     beforeEach(() => tester.setInputs({ status: 'complet' }));
 
-    it('un seul bouton à l’étape « Complet » : Valider', async () => {
+    it("un seul bouton à l'étape « Complet » : Valider", async () => {
       tester.setInputs({ need: savedNeed() });
 
       await expect.element(tester.validate).toBeVisible();
@@ -216,7 +216,7 @@ describe('NeedFormComponent', () => {
     });
   });
 
-  it('est consultable seulement au-delà de l’analyse du besoin', async () => {
+  it("est consultable seulement au-delà de l'analyse du besoin", async () => {
     tester.setInputs({ need: savedNeed(), readonly: true, status: 'tarification' });
 
     await expect.element(tester.root.getByText(/consultable seulement/)).toBeVisible();

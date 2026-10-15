@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { analyzeForm } from './analyzer';
+import { analyzeForm, isAuthPage } from './analyzer';
 import { mountAssureurA } from './__fixtures__/assureur-a';
 
 describe('analyzeForm : extranet de l’assureur A, étape 1', () => {
@@ -143,5 +143,36 @@ describe('Empreinte du formulaire', () => {
     const serialized = JSON.stringify(analyzeForm(document).fields);
 
     expect(serialized).not.toContain('SecretDupont');
+  });
+});
+
+describe('isAuthPage : jamais de remplissage sur une page de connexion', () => {
+  it('formulaire identifiant + mot de passe', () => {
+    document.body.innerHTML = '<form><input name="user" /><input type="password" name="pwd" /><button>Valider</button></form>';
+    expect(isAuthPage(document)).toBe(true);
+  });
+
+  it('formulaire « connexion » sans mot de passe visible (étape identifiant seul)', () => {
+    document.body.innerHTML = '<form id="login-form"><input name="email" /><button>Continuer</button></form>';
+    expect(isAuthPage(document)).toBe(true);
+    document.body.innerHTML = '<form><input name="email" /><button>Se connecter</button></form>';
+    expect(isAuthPage(document)).toBe(true);
+  });
+
+  it('un questionnaire qui demande de créer un mot de passe n’est pas une page de connexion', () => {
+    mountAssureurA(document);
+    expect(isAuthPage(document)).toBe(false);
+  });
+});
+
+describe('analyzeForm : les champs de recherche du site sont ignorés', () => {
+  it('type search, zone role=search, nom « q » ou « recherche »', () => {
+    document.body.innerHTML = `
+      <div role="search"><input name="s" aria-label="Chercher" /></div>
+      <input type="search" name="x" />
+      <input name="q" />
+      <input name="recherche" placeholder="Rechercher" />
+      <label for="nom">Nom</label><input id="nom" name="nom" />`;
+    expect(analyzeForm(document).fields.map(f => f.name)).toEqual(['nom']);
   });
 });

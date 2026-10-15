@@ -43,7 +43,7 @@ export function describeJob(job: CurrentJob): { title: string; status: string; p
   const hasProgress = job.currentStep !== null && job.totalSteps !== null && job.totalSteps > 0;
   return {
     title: `Dossier ${reference} · ${insurer}`,
-    status: QUOTE_JOB_STATUS_LABELS[job.status],
-    progress: hasProgress ? `Étape ${job.currentStep} sur ${job.totalSteps}` : null,
+    status: job.status === 'cancelled' ? 'Tarification annulée' : QUOTE_JOB_STATUS_LABELS[job.status],
+    progress: hasProgress && job.status !== 'cancelled' ? `Étape ${job.currentStep} sur ${job.totalSteps}` : null,
   };
 }

@@ -93,7 +93,7 @@ describe('findDuplicates', () => {
     expect(findDuplicates(candidate, existing).map(a => a.id)).toEqual(['a1']);
   });
 
-  it('un homonyme né un autre jour n’est pas un doublon', () => {
+  it("un homonyme né un autre jour n'est pas un doublon", () => {
     expect(findDuplicates({ firstName: 'Jean', lastName: 'Dupont', birthDate: '1970-01-01' }, existing)).toEqual([]);
   });
 

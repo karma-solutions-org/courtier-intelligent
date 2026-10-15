@@ -174,7 +174,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
         <label>
           <span>{{ structure.extranetUrl }}</span>
           <input
-            type="url"
+            type="text" inputmode="url"
             placeholder="https://extranet.assureur.fr"
             [value]="url()"
             (input)="url.set($any($event.target).value)"
@@ -383,7 +383,7 @@ export class CatalogPanelComponent {
     if (!this.submitted()) return null;
     const name = this.name().trim();
     if (name.length < 2) return this.structure.errors.name;
-    if (!parseExtranetUrl(this.url())) return this.structure.errors.url;
+    if (!parseExtranetUrl(withScheme(this.url()))) return this.structure.errors.url;
     if (!this.formProducts().length) return this.structure.errors.products;
     return null;
   });
@@ -460,7 +460,7 @@ export class CatalogPanelComponent {
     if (this.formError()) return;
     const insurer: CabinetInsurerInput = {
       name: this.name().trim(),
-      extranetUrl: this.url().trim(),
+      extranetUrl: withScheme(this.url()),
       productsSupported: this.formProducts(),
     };
     const editing = this.editing();
@@ -482,4 +482,15 @@ export class CatalogPanelComponent {
 
 function toggle(ids: string[], id: string, checked: boolean): string[] {
   return checked ? [...new Set([...ids, id])] : ids.filter(x => x !== id);
+}
+
+/**
+ * Adresse saisie sans protocole (« extranet.assureur.fr », « localhost:8091 ») : https:// est ajouté, http:// pour un
+ * serveur local (démo). Le port est conservé (hôte[:port]).
+ */
+export function withScheme(raw: string): string {
+  const value = raw.trim();
+  if (!value || /^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return value;
+  const local = /^(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(value);
+  return `${local ? 'http' : 'https'}://${value}`;
 }

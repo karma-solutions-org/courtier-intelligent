@@ -3,6 +3,10 @@ export const DOSSIERS_STRUCTURE = {
     title: 'Dossiers',
     create: 'Nouveau dossier',
     mine: 'Mes dossiers',
+    search: 'Rechercher',
+    searchHint: 'Référence ou nom du client',
+    searching: 'Recherche…',
+    searchUnavailable: 'Recherche avancée indisponible : résultats limités aux éléments chargés.',
     filters: {
       status: 'Statut',
       product: 'Produit',
@@ -42,13 +46,13 @@ export const DOSSIERS_STRUCTURE = {
     next: 'Continuer',
     back: 'Retour',
     cancel: 'Annuler',
-    draftNote: 'Le dossier est enregistré en brouillon dès le passage à l’étape suivante.',
+    draftNote: "Le dossier est enregistré en brouillon dès le passage à l'étape suivante.",
     creating: 'Création du dossier…',
   },
   draft: {
     documentsTitle: 'Commencez par les documents',
     documentsHint:
-      'Importez la carte grise, le permis, la CIN ou le relevé d’information : les informations lues pré-remplissent le questionnaire, vous n’aurez plus qu’à compléter ce qui manque.',
+      "Importez la carte grise, le permis, la CIN ou le relevé d'information : les informations lues pré-remplissent le questionnaire, vous n'aurez plus qu'à compléter ce qui manque.",
     toQuestionnaire: 'Continuer vers le questionnaire',
     toDocuments: 'Documents',
     importDocument: 'Importer un document',
@@ -64,14 +68,14 @@ export const DOSSIERS_STRUCTURE = {
     complete: 'Toutes les informations obligatoires sont renseignées.',
     missingTitle: 'Informations obligatoires manquantes',
     missingHint:
-      'Le dossier ne peut pas passer en « complet » tant qu’elles ne sont pas renseignées.',
+      "Le dossier ne peut pas passer en « complet » tant qu'elles ne sont pas renseignées.",
     goTo: 'Renseigner',
     assure: 'Client',
     product: 'Produit',
     saving: 'Enregistrement…',
     saved: 'Brouillon enregistré',
     dirty: 'Modifications non enregistrées',
-    error: 'Échec de l’enregistrement',
+    error: "Échec de l'enregistrement",
     notFound: 'Dossier introuvable.',
   },
   detail: {
@@ -88,7 +92,7 @@ export const DOSSIERS_STRUCTURE = {
     assignedTo: 'Courtier en charge',
     resume: 'Reprendre le brouillon',
     save: 'Enregistrer les modifications',
-    readonlyNote: 'Ce dossier n’est plus modifiable à ce stade.',
+    readonlyNote: "Ce dossier n'est plus modifiable à ce stade.",
     missingBanner: 'Informations obligatoires manquantes :',
     closeHistory: "Fermer l'historique",
     statusActions: {

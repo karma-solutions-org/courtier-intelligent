@@ -40,13 +40,13 @@ describe('filterDossiers', () => {
     expect(ids({ status: 'brouillon', productId: 'habitation' })).toEqual([]);
   });
 
-  it('« Mes dossiers » ne garde que ceux de l’utilisateur connecté', () => {
+  it("« Mes dossiers » ne garde que ceux de l'utilisateur connecté", () => {
     expect(ids({ mine: true }, 'u1')).toEqual(['1', '3']);
     expect(ids({ mine: true }, 'u2')).toEqual(['2']);
     expect(ids({ mine: true }, null)).toEqual([]);
   });
 
-  it('« Mes dossiers » l’emporte sur le filtre par courtier', () => {
+  it("« Mes dossiers » l'emporte sur le filtre par courtier", () => {
     expect(ids({ mine: true, assignedTo: 'u2' }, 'u1')).toEqual(['1', '3']);
   });
 });
@@ -69,7 +69,7 @@ describe('Questionnaire', () => {
     { title: 'B', questions: [{ canonicalPath: 'vehicle.brand', label: 'Marque', type: 'text', required: true }] },
   ];
 
-  it('retrouve le libellé et la section d’un champ', () => {
+  it("retrouve le libellé et la section d'un champ", () => {
     expect(labelsByPath(schema).get('vehicle.brand')).toBe('Marque');
     expect(sectionIndexOf(schema, 'client.lastName')).toBe(0);
     expect(sectionIndexOf(schema, 'vehicle.brand')).toBe(1);

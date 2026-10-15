@@ -35,9 +35,17 @@ export interface JobContext {
   /** Données à remplir, par chemin canonique (`null` = non renseigné, niveaux de connaissance respectés). */
   quoteData: CanonicalData;
   missingFields: MissingField[];
+  /**
+   * Chemins de TOUTES les questions du produit du dossier (même masquées par une condition, donc absentes de quoteData) :
+   * un champ reconnu sur l'une d'elles n'est pas « nouveau ». Absent : produit illisible, on se rabat sur quoteData.
+   */
+  productPaths?: string[];
 }
 
 /** Modification du job écrite par l'extension (les règles Firestore n'autorisent que ces champs). */
+/** Réponse à UPDATE_JOB : la cause exacte d'un échec, affichée telle quelle dans le side panel. */
+export type UpdateJobResponse = { ok: true } | { ok: false; message: string; cancelled?: boolean };
+
 export interface JobUpdate {
   status: QuoteJobStatus;
   currentStep?: number | null;
@@ -100,7 +108,7 @@ export interface RunState {
    * Remplissage : analyzing, filling, waiting_user, awaiting_submit, error.
    * Capture du tarif : capturing (lecture), capture_review (à confirmer), captured, capture_failed.
    */
-  phase: 'analyzing' | 'filling' | 'waiting_user' | 'awaiting_submit' | 'error' | 'capturing' | 'capture_review' | 'captured' | 'capture_failed';
+  phase: 'cancelled' | 'analyzing' | 'filling' | 'waiting_user' | 'awaiting_submit' | 'error' | 'capturing' | 'capture_review' | 'captured' | 'capture_failed';
   insurerId: string;
   dossierId: string;
   step: { current: number | null; total: number | null };
@@ -198,4 +206,8 @@ export interface ActivePage {
 }
 
 /** Messages reçus depuis l'app Angular (chrome.runtime.onMessageExternal). */
-export type ExternalMessage = { type: 'PING' };
+export type ExternalMessage = {
+  type: 'PING';
+  /** Identifiant d'appareil de l'app : présenté par l'extension à `sessions-ouvrirExtension`. */
+  deviceId?: string;
+};

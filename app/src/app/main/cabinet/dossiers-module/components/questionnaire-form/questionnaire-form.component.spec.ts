@@ -104,7 +104,7 @@ describe('QuestionnaireFormComponent', () => {
     expect(tester.changes.at(-1)).toEqual({ path: 'vehicle.fiscalPower', value: null });
   });
 
-  it('émet la valeur d’un choix', async () => {
+  it("émet la valeur d'un choix", async () => {
     await tester.root.getByRole('combobox', { name: 'Usage *' }).click();
     await page.getByRole('option', { name: 'Professionnel' }).click();
 
@@ -141,8 +141,8 @@ describe('QuestionnaireFormComponent', () => {
       expect(tester.changes.at(-1)).toEqual({ path: 'insuranceHistory.claimsCount', value: { value: 2, knowledge: 'KNOWN' } });
     });
 
-    it("« L'assuré ne sait pas » est une réponse sans valeur", async () => {
-      await claims().getByRole('radio', { name: "L'assuré ne sait pas" }).click();
+    it("« Le client ne sait pas » est une réponse sans valeur", async () => {
+      await claims().getByRole('radio', { name: 'Le client ne sait pas' }).click();
 
       expect(tester.changes.at(-1)).toEqual({
         path: 'insuranceHistory.claimsCount',
@@ -162,7 +162,7 @@ describe('QuestionnaireFormComponent', () => {
       await expect.element(tester.root.getByRole('spinbutton', { name: 'Sinistres' })).toHaveValue(3);
     });
 
-    it('« Valeur connue » sans nombre efface la réponse précédente (rien d’enregistrable)', async () => {
+    it("« Valeur connue » sans nombre efface la réponse précédente (rien d'enregistrable)", async () => {
       tester.setInputs({ data: { 'insuranceHistory.claimsCount': { value: null, knowledge: 'DECLARED_UNKNOWN' } } });
 
       await claims().getByRole('radio', { name: 'Valeur connue' }).click();

@@ -22,7 +22,10 @@ import {
 } from '../util/dashboard.utils';
 
 interface DashboardState {
+  /** Dossiers hors corbeille (compteurs, listes). */
   dossiers: Dossier[];
+  /** Tous les dossiers, corbeille comprise : un dossier refusé puis supprimé compte dans la conversion. */
+  allDossiers: Dossier[];
   assures: Assure[];
   members: Member[];
   products: Product[];
@@ -34,6 +37,7 @@ interface DashboardState {
 export const DashboardStore = signalStore(
   withState<DashboardState>({
     dossiers: [],
+    allDossiers: [],
     assures: [],
     members: [],
     products: [],
@@ -47,8 +51,8 @@ export const DashboardStore = signalStore(
       counts: computed(() => countByStatus(store.dossiers())),
       toProcess: computed(() => dossiersToProcess(store.dossiers(), authStore.user()?.uid ?? null)),
       toFollowUp: computed(() => proposalsToFollowUp(store.dossiers(), Date.now())),
-      conversionByCourtier: computed(() => conversionRates(store.dossiers(), (d) => d.assignedTo)),
-      conversionByProduct: computed(() => conversionRates(store.dossiers(), (d) => d.productId)),
+      conversionByCourtier: computed(() => conversionRates(store.allDossiers(), (d) => d.assignedTo)),
+      conversionByProduct: computed(() => conversionRates(store.allDossiers(), (d) => d.productId)),
       memberNames: computed(
         () => new Map(store.members().map((m) => [m.id, m.displayName || m.email || m.id])),
       ),
@@ -64,8 +68,16 @@ export const DashboardStore = signalStore(
             cabinetId
               ? merge(
                   service
-                    .watchDossiers(cabinetId)
-                    .pipe(tap((dossiers) => patchState(store, { dossiers, loaded: true }))),
+                    .watchAllDossiers(cabinetId)
+                    .pipe(
+                      tap((allDossiers) =>
+                        patchState(store, {
+                          allDossiers,
+                          dossiers: allDossiers.filter((dossier) => !dossier.deletedAt),
+                          loaded: true,
+                        }),
+                      ),
+                    ),
                   assuresService
                     .watchAssures(cabinetId)
                     .pipe(tap((assures) => patchState(store, { assures }))),

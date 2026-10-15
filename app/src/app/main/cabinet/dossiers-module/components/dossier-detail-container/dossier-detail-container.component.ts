@@ -14,9 +14,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, RouterLink } from '@angular/router';
-import { DossierStatus, PROPOSAL_DOSSIER_STATUSES } from '@shared';
+import { DossierStatus, PROPOSAL_DOSSIER_STATUSES, TERMINAL_DOSSIER_STATUSES } from '@shared';
 import { toBackendErrorMessage } from '../../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
 import { DossiersService } from '../../services/dossiers.service';
@@ -35,6 +36,7 @@ import {
   AnswerChange,
   QuestionnaireFormComponent,
 } from '../questionnaire-form/questionnaire-form.component';
+import { SansSuiteDialogComponent, SansSuiteDialogData } from '../sans-suite-dialog/sans-suite-dialog.component';
 import { StatusChipComponent } from '../status-chip/status-chip.component';
 
 type Stage = 'infos' | 'need' | 'pricing' | 'comparison' | 'proposal';
@@ -50,6 +52,8 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
   proposition_envoyee: 'proposal',
   souscrit: 'proposal',
   refuse: 'proposal',
+  // Sans suite : l'étape réellement atteinte se déduit du dossier (voir currentStage).
+  sans_suite: 'infos',
 };
 
 /** Détail d'un dossier : en-tête (statut, courtier en charge, actions) et une seule navigation par étapes. */
@@ -81,6 +85,12 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
         <p class="trashed" role="status">
           <mat-icon aria-hidden="true">delete</mat-icon>
           Ce dossier est dans la corbeille. Un administrateur peut le restaurer depuis la page Corbeille.
+        </p>
+      }
+      @if (dossier.status === 'sans_suite') {
+        <p class="trashed" role="status">
+          <mat-icon aria-hidden="true">block</mat-icon>
+          Dossier classé sans suite{{ dossier.outcome?.motif ? ' : ' + dossier.outcome?.motif : '.' }}
         </p>
       }
       <header class="card header" [attr.data-status]="dossier.status">
@@ -150,6 +160,12 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
             <a mat-stroked-button [routerLink]="[listUrl, dossier.id, 'brouillon']">{{
               structure.resume
             }}</a>
+          }
+
+          @if (canClose(dossier.status) && !dossier.deletedAt) {
+            <button mat-stroked-button type="button" [disabled]="closing()" (click)="classerSansSuite(dossier.id, dossier.reference)">
+              <mat-icon>block</mat-icon>Classer sans suite
+            </button>
           }
 
           @if (isAdmin() && !dossier.deletedAt) {
@@ -575,6 +591,35 @@ export class DossierDetailContainerComponent implements OnInit, HasUnsavedChange
   protected readonly isAdmin = computed(() => this._auth.role() === 'admin');
   protected readonly confirmingDelete = signal(false);
   protected readonly deleting = signal(false);
+  protected readonly closing = signal(false);
+  private readonly _dialog = inject(MatDialog);
+
+  /** Un dossier se classe sans suite à toute étape, tant qu'il n'est pas clos. */
+  protected canClose(status: DossierStatus): boolean {
+    return !TERMINAL_DOSSIER_STATUSES.includes(status);
+  }
+
+  /** Demande le motif, puis classe le dossier sans suite (les tarifications en cours sont annulées par le serveur). */
+  protected classerSansSuite(dossierId: string, reference: string | null): void {
+    this._dialog
+      .open<SansSuiteDialogComponent, SansSuiteDialogData, string>(SansSuiteDialogComponent, { data: { reference } })
+      .afterClosed()
+      .subscribe((motif) => {
+        if (!motif) return;
+        this.closing.set(true);
+        this._dossiers.classerSansSuite(dossierId, motif).subscribe({
+          next: ({ cancelledJobs }) => {
+            this.closing.set(false);
+            const jobs = cancelledJobs ? ` ${cancelledJobs} tarification(s) annulée(s).` : '';
+            this._snackBar.open(`Dossier classé sans suite.${jobs}`, undefined, { duration: 4000 });
+          },
+          error: (error) => {
+            this.closing.set(false);
+            this._snackBar.open(toBackendErrorMessage(error), undefined, { duration: 5000 });
+          },
+        });
+      });
+  }
 
   /** Met le dossier dans la corbeille, puis revient à l'espace du client. */
   protected remove(dossierId: string): void {
@@ -612,6 +657,12 @@ export class DossierDetailContainerComponent implements OnInit, HasUnsavedChange
   protected readonly currentStage = computed<Stage>(() => {
     const status = this.store.dossier()?.status;
     if (!status) return 'infos';
+    if (status === 'sans_suite') {
+      const dossier = this.store.dossier()!;
+      if (dossier.decision || dossier.proposal) return 'proposal';
+      if (dossier.needAnalysis?.validatedAt) return 'pricing';
+      return dossier.completeness?.ok ? 'need' : 'infos';
+    }
     return STAGE_OF_STATUS[status];
   });
 
@@ -642,7 +693,7 @@ export class DossierDetailContainerComponent implements OnInit, HasUnsavedChange
   }
 
   protected isHalted(status: DossierStatus): boolean {
-    return status === 'refuse';
+    return status === 'refuse' || status === 'sans_suite';
   }
 
   /** Le comparatif s'ouvre dès la tarification (les offres arrivent au fil de l'eau). */
@@ -654,13 +705,18 @@ export class DossierDetailContainerComponent implements OnInit, HasUnsavedChange
       'proposition_envoyee',
       'souscrit',
       'refuse',
-    ].includes(this.store.dossier()?.status ?? ''),
+    ].includes(this.store.dossier()?.status ?? '') ||
+      (this.store.dossier()?.status === 'sans_suite' && !!this.store.dossier()?.needAnalysis?.validatedAt),
   );
 
   /** La proposition s'ouvre dès qu'une offre est retenue (sans suite : seulement si une décision existe). */
   protected readonly proposalEnabled = computed(() => {
     const dossier = this.store.dossier();
-    return !!dossier && PROPOSAL_DOSSIER_STATUSES.includes(dossier.status) && !!dossier.decision;
+    return (
+      !!dossier &&
+      (PROPOSAL_DOSSIER_STATUSES.includes(dossier.status) || dossier.status === 'sans_suite') &&
+      !!dossier.decision
+    );
   });
 
   protected readonly missingLabels = computed(() =>

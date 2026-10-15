@@ -23,6 +23,11 @@ export class PricingService {
     );
   }
 
+  /** Annule une tarification en cours (bloquée, ou devenue inutile) : elle pourra être relancée. */
+  cancel(dossierId: string, insurerId: string): Observable<{ status: 'cancelled' }> {
+    return this._backend.call('tarification-annuler', { dossierId, insurerId });
+  }
+
   /** Lance (ou relance après un échec) la tarification chez un assureur. Renvoie l'adresse de son extranet. */
   launch(
     dossierId: string,

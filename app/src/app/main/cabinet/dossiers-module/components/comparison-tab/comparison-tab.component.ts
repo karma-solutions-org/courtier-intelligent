@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { CurrencyPipe } from '@angular/common';
+import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ComparisonStore } from '../../store/comparison.store';
@@ -17,7 +19,7 @@ import { COMPARISON_STRUCTURE } from './comparison-tab.structure';
 /** Onglet Comparatif : offres côte à côte (analysées par le serveur) et choix justifié de l'offre retenue. */
 @Component({
   selector: 'app-comparison-tab',
-  imports: [MatIconModule, ComparisonTableComponent],
+  imports: [CurrencyPipe, MatButtonModule, MatIconModule, ComparisonTableComponent],
   providers: [ComparisonStore],
   template: `
     @if (store.error()) {
@@ -29,6 +31,13 @@ import { COMPARISON_STRUCTURE } from './comparison-tab.structure';
       <p class="hint">
         <mat-icon>info</mat-icon>{{ dossierStore.need() ? text.indicativeScore : text.noNeed }}
       </p>
+      @if (store.staleNames().length) {
+        <p class="error" role="status">
+          <mat-icon>warning</mat-icon>
+          Offres à refaire (informations du dossier modifiées depuis le tarif) : {{ store.staleNames().join(', ') }}.
+          Relancez-les depuis l'étape Tarification.
+        </p>
+      }
       @if (decision(); as decision) {
         <p class="decided" role="status">
           <mat-icon>check_circle</mat-icon>
@@ -40,7 +49,30 @@ import { COMPARISON_STRUCTURE } from './comparison-tab.structure';
               }}</strong
             >
             — {{ decision.justification }}
+            @if (decision.offerSnapshot; as snap) {
+              <br />
+              <small>
+                Offre retenue (figée au moment du choix) :
+                @if (snap.premiumAnnual !== null) {
+                  {{ snap.premiumAnnual | currency: 'EUR' : 'symbol' : '1.0-2' }} / an
+                }
+                @if (snap.premiumMonthly !== null) {
+                  · {{ snap.premiumMonthly | currency: 'EUR' : 'symbol' : '1.0-2' }} / mois
+                }
+                @if (snap.quoteNumber) {
+                  · devis {{ snap.quoteNumber }}
+                }
+                @if (snap.score !== null) {
+                  · score {{ snap.score }}
+                }
+              </small>
+            }
           </span>
+          @if (store.canReopen()) {
+            <button mat-stroked-button type="button" class="reopen" [disabled]="store.busy()" (click)="store.reopen()">
+              <mat-icon>undo</mat-icon>Revenir au comparatif
+            </button>
+          }
         </p>
       }
       <app-comparison-table
@@ -82,6 +114,11 @@ import { COMPARISON_STRUCTURE } from './comparison-tab.structure';
     .error {
       padding: 12px 14px;
       border-radius: 8px;
+    }
+
+    .reopen {
+      margin-left: auto;
+      flex-shrink: 0;
     }
 
     .decided {
