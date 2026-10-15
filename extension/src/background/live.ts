@@ -42,6 +42,9 @@ export function startLiveWatch(user: ExtensionUser, handlers: LiveHandlers): () 
     doc(firestore, `ci_cabinets/${user.cabinetId}/ci_members/${user.uid}`),
     () => handlers.onSessionMaybeChanged(),
     error => {
+      // Toujours visible dans la console du service worker : un index manquant (failed-precondition, avec le lien pour
+      // le créer) ou une règle absente ne doivent plus passer inaperçus derrière « Aucune tarification en cours ».
+      console.error('Courtier Intelligent : écoute Firestore impossible', error);
       if (error instanceof FirebaseError && error.code === 'permission-denied') handlers.onSessionMaybeChanged();
     },
   );
@@ -59,6 +62,9 @@ export function startLiveWatch(user: ExtensionUser, handlers: LiveHandlers): () 
       lastJobs.forEach(job => void loadInsurerName(job.insurerId));
     },
     error => {
+      // Toujours visible dans la console du service worker : un index manquant (failed-precondition, avec le lien pour
+      // le créer) ou une règle absente ne doivent plus passer inaperçus derrière « Aucune tarification en cours ».
+      console.error('Courtier Intelligent : écoute Firestore impossible', error);
       if (error instanceof FirebaseError && error.code === 'permission-denied') handlers.onSessionMaybeChanged();
     },
   );

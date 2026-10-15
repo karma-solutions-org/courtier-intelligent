@@ -23,6 +23,7 @@ import {
   NeedAnalysis,
   NeedInput,
   Product,
+  schemaForCabinet,
   suggestNeed,
 } from '@shared';
 import {
@@ -41,6 +42,7 @@ import {
 } from 'rxjs';
 import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
+import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-status.store';
 import { AnswerPatch, DossiersService } from '../services/dossiers.service';
 import { labelsByPath, manualTransitionsFrom } from '../util/dossiers.utils';
 
@@ -122,11 +124,14 @@ export const DossierStore = signalStore(
     error: null,
     successMessage: null,
   }),
-  withComputed((store) => {
+  withComputed((store, cabinetStatus = inject(CabinetStatusStore)) => {
     const product = computed(
       () => store.products().find((p) => p.id === store.dossier()?.productId) ?? null,
     );
-    const schema = computed(() => product()?.questionnaireSchema ?? []);
+    /** Sans les questions découvertes sur l'extranet d'un assureur que le cabinet n'utilise pas. */
+    const schema = computed(() =>
+      schemaForCabinet(product()?.questionnaireSchema ?? [], cabinetStatus.cabinet()?.enabledInsurers ?? []),
+    );
     const missing = computed<CanonicalPath[]>(() => computeMissing(schema(), store.answers()));
     return {
       product,

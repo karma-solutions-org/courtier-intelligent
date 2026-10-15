@@ -96,6 +96,25 @@ describe('pickJobForOrigin', () => {
     expect(pickJobForOrigin([job('assureur-a', status)], INSURERS, 'https://extranet.assureur-a.fr')).toBeNull();
   });
 
+  it('plusieurs assureurs sur le même domaine : prend le job de celui qui en a un (démos sur localhost)', () => {
+    const localInsurers: InsurerInfo[] = [
+      { id: 'assureur-test-local', name: 'Assureur Test', extranetDomains: ['localhost'] },
+      { id: 'cab-habitation-demo', name: 'Habitation Démo', extranetDomains: ['localhost'] },
+    ];
+    const picked = pickJobForOrigin([job('cab-habitation-demo', 'requested', 'd-hab')], localInsurers, 'http://localhost:8091/index.html', {
+      allowLocalhost: true,
+    });
+
+    expect(picked).toMatchObject({ insurerId: 'cab-habitation-demo', insurerName: 'Habitation Démo', dossierId: 'd-hab' });
+  });
+
+  it("l'application elle-même n'est jamais un extranet, même sur le domaine d'un extranet de démo", () => {
+    const localInsurers: InsurerInfo[] = [{ id: 'cab-habitation-demo', name: 'Habitation Démo', extranetDomains: ['localhost'] }];
+    const jobs = [job('cab-habitation-demo', 'requested', 'd-hab')];
+    expect(pickJobForOrigin(jobs, localInsurers, 'http://localhost:4200/espace/parametres', { allowLocalhost: true })).toBeNull();
+    expect(pickJobForOrigin(jobs, localInsurers, 'http://localhost:8091/devis-etape1.html', { allowLocalhost: true })).not.toBeNull();
+  });
+
   it('rien sur un site inconnu, ou sans job pour cet assureur', () => {
     expect(pickJobForOrigin([job('assureur-a', 'requested')], INSURERS, 'https://www.google.com')).toBeNull();
     expect(pickJobForOrigin([job('assureur-b', 'requested')], INSURERS, 'https://extranet.assureur-a.fr')).toBeNull();

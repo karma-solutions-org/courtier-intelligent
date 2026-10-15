@@ -71,20 +71,37 @@ export function extranetPatterns(domains: string[], options: MatchOptions = {}):
   return [...patterns];
 }
 
-/** L'assureur dont l'extranet est à cette adresse, s'il y en a un. */
+/** L'assureur dont l'extranet est à cette adresse, s'il y en a un (le premier, si plusieurs partagent le domaine). */
 export function insurerForOrigin(origin: string, insurers: InsurerInfo[], options: MatchOptions = {}): InsurerInfo | null {
+  return insurersForOrigin(origin, insurers, options)[0] ?? null;
+}
+
+/**
+ * Adresses de l'application Courtier Intelligent (mêmes que `externally_connectable` du manifest) : jamais un extranet.
+ * Sinon, avec un extranet de démo sur « localhost », l'app (localhost:4200) était prise pour un extranet et ses propres
+ * formulaires (paramètres, questionnaire…) étaient remplis et signalés comme de nouveaux champs.
+ */
+export const APP_ORIGINS: readonly string[] = [
+  'http://localhost:4200',
+  'https://courtier-intelligent-test.web.app',
+  'https://courtier-intelligent-test.firebaseapp.com',
+];
+
+/** Tous les assureurs dont l'extranet est à cette adresse. */
+export function insurersForOrigin(origin: string, insurers: InsurerInfo[], options: MatchOptions = {}): InsurerInfo[] {
   const allowLocalhost = options.allowLocalhost ?? DEV_BUILD;
   let hostname: string;
   try {
     const url = new URL(origin);
+    if (APP_ORIGINS.includes(url.origin)) return [];
     // L'extension ne remplit jamais une page non sécurisée (sauf localhost dans un build de développement).
     const devLocalhost = allowLocalhost && url.protocol === 'http:' && url.hostname === 'localhost';
-    if (url.protocol !== 'https:' && !devLocalhost) return null;
+    if (url.protocol !== 'https:' && !devLocalhost) return [];
     hostname = url.hostname;
   } catch {
-    return null;
+    return [];
   }
-  return insurers.find(insurer => insurer.extranetDomains.some(domain => hostMatchesDomain(hostname, domain, { allowLocalhost }))) ?? null;
+  return insurers.filter(insurer => insurer.extranetDomains.some(domain => hostMatchesDomain(hostname, domain, { allowLocalhost })));
 }
 
 /**
@@ -92,10 +109,15 @@ export function insurerForOrigin(origin: string, insurers: InsurerInfo[], option
  * encore à faire ET qui vise l'assureur de cet extranet. `null` si la page n'est pas un extranet connu ou s'il n'y a pas de job.
  */
 export function pickJobForOrigin(jobs: JobRecord[], insurers: InsurerInfo[], origin: string, options: MatchOptions = {}): JobContext | null {
-  const insurer = insurerForOrigin(origin, insurers, options);
-  if (!insurer) return null;
-  const job = jobs.find(j => j.insurerId === insurer.id && j.data.status !== undefined && RUNNABLE_STATUSES.includes(j.data.status));
+  // Plusieurs assureurs peuvent partager un domaine (ex. deux extranets de démonstration sur localhost) :
+  // la tâche est cherchée parmi tous les assureurs de cette adresse, pas seulement le premier.
+  const candidates = insurersForOrigin(origin, insurers, options);
+  if (!candidates.length) return null;
+  const job = jobs.find(
+    j => candidates.some(c => c.id === j.insurerId) && j.data.status !== undefined && RUNNABLE_STATUSES.includes(j.data.status),
+  );
   if (!job) return null;
+  const insurer = candidates.find(c => c.id === job.insurerId)!;
   return {
     dossierId: job.dossierId,
     insurerId: job.insurerId,

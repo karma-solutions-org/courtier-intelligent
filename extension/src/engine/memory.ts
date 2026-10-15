@@ -97,9 +97,14 @@ export function safeLabel(label: string): string | null {
 /**
  * Champs du formulaire restés sans équivalent (ni synonyme, ni mémoire, ni IA, ni correction du courtier) et qui sont
  * de vraies questions (ni captcha, ni CGU, ni champ caché…) : structure seulement, jamais de valeur saisie.
+ * `productPaths` : questions du produit du dossier. Un champ reconnu mais dont la question n'est pas dans ce produit
+ * (ex. « sinistres » reconnu comme une question Auto sur un extranet Habitation) compte aussi comme nouveau.
  */
-export function toDiscoveredFields(fields: FormField[], mappings: Mapping[]): DiscoveredFieldInput[] {
-  const mapped = new Set(mappings.filter(m => m.status === 'mapped' && m.canonicalPath !== null).map(m => m.fieldKey));
+export function toDiscoveredFields(fields: FormField[], mappings: Mapping[], productPaths?: readonly string[]): DiscoveredFieldInput[] {
+  const inProduct = (path: string) => !productPaths || productPaths.includes(path);
+  const mapped = new Set(
+    mappings.filter(m => m.status === 'mapped' && m.canonicalPath !== null && inProduct(m.canonicalPath)).map(m => m.fieldKey),
+  );
   return fields
     .filter(field => !mapped.has(field.key) && isRelevantField(field))
     .slice(0, DISCOVERED_MAX_FIELDS_PER_REPORT)

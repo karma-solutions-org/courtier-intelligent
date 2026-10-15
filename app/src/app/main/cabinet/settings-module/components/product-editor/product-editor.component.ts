@@ -106,7 +106,7 @@ let nextKey = 1;
                 (change)="updateQuestion(s, q, { type: $any($event.target).value })"
               >
                 @for (type of questionTypes; track type) {
-                  <option [value]="type">{{ text.types[type] }}</option>
+                  <option [value]="type" [selected]="type === question.type">{{ text.types[type] }}</option>
                 }
               </select>
               <label class="check">
@@ -151,7 +151,7 @@ let nextKey = 1;
           />
           <select [attr.aria-label]="text.guaranteeType" [value]="guarantee.type" (change)="updateGuarantee(g, { type: $any($event.target).value })">
             @for (type of guaranteeTypes; track type) {
-              <option [value]="type">{{ text.guaranteeTypes[type] }}</option>
+              <option [value]="type" [selected]="type === guarantee.type">{{ text.guaranteeTypes[type] }}</option>
             }
           </select>
           <button mat-icon-button type="button" class="danger-text" [attr.aria-label]="text.removeGuarantee" (click)="removeGuarantee(g)">

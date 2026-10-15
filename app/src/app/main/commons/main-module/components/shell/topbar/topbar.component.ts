@@ -30,13 +30,25 @@ import { ExtensionIndicatorComponent } from '../../../../extension-module/compon
       <app-extension-indicator class="extension" [ping]="extension()" />
 
       <button class="user-profile" type="button" [matMenuTriggerFor]="userMenu" [title]="displayName()" aria-label="Menu utilisateur">
-        <span class="avatar">{{ initials() }}</span>
+        <span class="avatar" [class.has-logo]="!!logoUrl()">
+          @if (logoUrl(); as logo) {
+            <img [src]="logo" alt="Logo du cabinet" />
+          } @else {
+            {{ initials() }}
+          }
+        </span>
       </button>
     </div>
 
     <mat-menu #userMenu="matMenu" xPosition="before" class="ci-menu-panel">
       <div class="menu-identity">
-        <span class="identity-avatar" aria-hidden="true">{{ initials() }}</span>
+        <span class="identity-avatar" [class.has-logo]="!!logoUrl()" aria-hidden="true">
+          @if (logoUrl(); as logo) {
+            <img [src]="logo" alt="" />
+          } @else {
+            {{ initials() }}
+          }
+        </span>
         <span class="identity-text">
           <span class="identity-name">{{ displayName() }}</span>
           <span class="identity-role">{{ roleLabel() }}</span>
@@ -183,6 +195,20 @@ import { ExtensionIndicatorComponent } from '../../../../extension-module/compon
       }
     }
 
+    /* Logo du cabinet à la place des initiales : l'image remplit le rond, sur fond blanc. */
+    .avatar.has-logo,
+    .identity-avatar.has-logo {
+      overflow: hidden;
+      padding: 0;
+      background: #fff;
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    }
+
     .menu-identity {
       display: flex;
       align-items: center;
@@ -249,6 +275,8 @@ export class TopbarComponent {
   /** Module de la page affichée (« Clients », « Corbeille »…). */
   readonly moduleTitle = input('');
   readonly displayName = input('');
+  /** Logo du cabinet (Paramètres → Cabinet) : affiché à la place des initiales quand il existe. */
+  readonly logoUrl = input<string | null>(null);
   readonly email = input<string | null>(null);
   readonly roleLabel = input('');
   readonly showMenuButton = input(false);

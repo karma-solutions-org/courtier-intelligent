@@ -68,6 +68,8 @@ export class FormRunner {
   private lastReported = '';
   /** Empreintes dont les champs obligatoires ont déjà été signalés. */
   private readonly requirementsReported = new Set<string>();
+  /** Étapes dont les champs sans équivalent ont déjà été signalés (une fois par empreinte). */
+  private readonly discoveredReported = new Set<string>();
   private observer: MutationObserver | null = null;
   private pending: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> = Promise.resolve();
@@ -239,6 +241,17 @@ export class FormRunner {
       }
     }
 
+    // Champs sans équivalent dans le questionnaire : signalés dès que l'étape est remplie sans échec. Le serveur les
+    // ajoute au questionnaire (obligatoires si l'extranet les exige). Indispensable sur les extranets qui rechargent la
+    // page entre deux étapes : l'apprentissage « en quittant l'étape » n'y a jamais lieu pour les étapes intermédiaires.
+    if (!this.discoveredReported.has(analysis.fingerprint) && ![...results.values()].some(r => r.status === 'failed')) {
+      const discovered = toDiscoveredFields(analysis.fields, this.mappings, this.allowedPaths);
+      if (discovered.length) {
+        this.discoveredReported.add(analysis.fingerprint);
+        void this.ports.reportDiscovered?.(analysis.fingerprint, discovered).catch(() => this.discoveredReported.delete(analysis.fingerprint));
+      }
+    }
+
     // 4. Avancement du job : champs manquants, étape en cours ou prêt à soumettre.
     await this.reportProgress(plan, hint);
     // Dernière étape remplie sans échec : la structure est apprise (le courtier valide ensuite sur l'extranet).
@@ -386,7 +399,8 @@ export class FormRunner {
       return;
     }
     // Après la mémoire (le serveur y rattache les nouvelles questions) : les champs restés sans équivalent.
-    const discovered = toDiscoveredFields(snapshot.fields, snapshot.mappings);
+    if (this.discoveredReported.has(snapshot.fingerprint)) return;
+    const discovered = toDiscoveredFields(snapshot.fields, snapshot.mappings, this.allowedPaths);
     if (discovered.length) await this.ports.reportDiscovered?.(snapshot.fingerprint, discovered).catch(() => undefined);
   }
 

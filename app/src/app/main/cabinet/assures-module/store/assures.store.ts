@@ -10,7 +10,7 @@ import {
 } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { Assure, Dossier } from '@shared';
-import { catchError, EMPTY, exhaustMap, pipe, switchMap, tap } from 'rxjs';
+import { catchError, debounceTime, EMPTY, exhaustMap, pipe, switchMap, tap } from 'rxjs';
 import {
   resetRequestStatus,
   setError,
@@ -47,6 +47,13 @@ interface AssuresState {
   hasMore: boolean;
   /** Une tranche supplémentaire est demandée et pas encore arrivée. */
   loadingMore: boolean;
+  /**
+   * Résultats de la recherche Elasticsearch (tout le portefeuille) ; null quand il n'y a pas de recherche ou que
+   * le service est indisponible : la recherche se fait alors sur la tranche chargée.
+   */
+  searchResults: Assure[] | null;
+  /** Recherche Elasticsearch en cours. */
+  searching: boolean;
   /** Fiche ouverte (lue à part : elle peut être hors de la tranche chargée) et ses dossiers. */
   selectedId: string | null;
   selected: Assure | null;
@@ -68,6 +75,8 @@ export const AssuresStore = signalStore(
     limit: PAGE_SIZE,
     hasMore: false,
     loadingMore: false,
+    searchResults: null,
+    searching: false,
     selectedId: null,
     selected: null,
     dossiers: [],
@@ -76,17 +85,20 @@ export const AssuresStore = signalStore(
     successMessage: null,
   }),
   withRequestStatus(),
-  withComputed(({ assures, query, filters }) => {
+  withComputed(({ assures, query, filters, searchResults }) => {
     const filtered = computed(() => {
       const text = query();
       const { type } = filters();
-      const kept = assures().filter(
-        (assure) =>
-          matchesSearch(assure, text) &&
-          (type === 'all' || assure.type === type),
-      );
-      // L'ordre (nom ou plus récents) est appliqué par Firestore.
-      return kept;
+      const results = searchResults();
+      // Clients déjà chargés qui correspondent : toujours affichés, même si Elasticsearch ne les connaît pas encore
+      // (index en retard, client jamais indexé) ou ne répond pas.
+      const local = assures().filter((assure) => matchesSearch(assure, text));
+      // Recherche : résultats d'Elasticsearch d'abord (ordre de pertinence, tout le portefeuille), puis les correspondances
+      // locales qu'il n'a pas renvoyées.
+      const ids = new Set(results?.map((assure) => assure.id));
+      const source = text.trim() && results ? [...results, ...local.filter((assure) => !ids.has(assure.id))] : local;
+      // L'ordre (nom ou plus récents) est appliqué par Firestore hors recherche.
+      return source.filter((assure) => type === 'all' || assure.type === type);
     });
     return {
       filtered,
@@ -114,9 +126,9 @@ export const AssuresStore = signalStore(
           ...(resort ? { limit: PAGE_SIZE, loaded: false } : {}),
         });
       },
-      /** Fin du défilement : demande la tranche suivante. */
+      /** Fin du défilement : demande la tranche suivante (pas pendant une recherche : elle couvre déjà tout). */
       loadMore: () => {
-        if (store.hasMore() && !store.loadingMore()) {
+        if (store.hasMore() && !store.loadingMore() && !store.searchResults()) {
           patchState(store, { limit: store.limit() + PAGE_SIZE, loadingMore: true });
         }
       },
@@ -204,6 +216,28 @@ export const AssuresStore = signalStore(
           ),
         ),
       ),
+      /** Recherche Elasticsearch, 300 ms après la dernière frappe ; en cas d'échec, recherche sur la tranche chargée. */
+      _search: rxMethod<{ cabinetId: string | null; query: string }>(
+        pipe(
+          debounceTime(300),
+          switchMap(({ cabinetId, query }) => {
+            const text = query.trim();
+            if (!cabinetId || text.length < 2) {
+              patchState(store, { searchResults: null, searching: false });
+              return EMPTY;
+            }
+            patchState(store, { searching: true });
+            return service.search(text).pipe(
+              switchMap((ids) => service.watchAssuresByIds(cabinetId, ids)),
+              tap((searchResults) => patchState(store, { searchResults, searching: false })),
+              catchError(() => {
+                patchState(store, { searchResults: null, searching: false });
+                return EMPTY;
+              }),
+            );
+          }),
+        ),
+      ),
       _listenSelected: rxMethod<{ cabinetId: string | null; assureId: string | null }>(
         pipe(
           switchMap(({ cabinetId, assureId }) =>
@@ -250,6 +284,12 @@ export const AssuresStore = signalStore(
         { equal: (a, b) => a.cabinetId === b.cabinetId && a.assureId === b.assureId },
       );
       store._listenSelected(selection);
+      store._search(
+        computed(
+          () => ({ cabinetId: authStore.cabinetId(), query: store.query() }),
+          { equal: (a, b) => a.cabinetId === b.cabinetId && a.query.trim() === b.query.trim() },
+        ),
+      );
       store._listenDossiers(selection);
     },
   }),

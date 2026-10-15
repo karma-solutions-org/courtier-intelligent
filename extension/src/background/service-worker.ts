@@ -355,7 +355,19 @@ async function catalogPatterns(): Promise<string[]> {
  * Enregistre le content script pour les extranets du catalogue auxquels le courtier a donné accès (permissions
  * d'hôte optionnelles) ; le retire sinon. Appelé à la connexion, au réveil et quand une permission change.
  */
-async function syncContentScripts(): Promise<void> {
+/**
+ * Synchronisations en file : connexion, réveil et changements d'autorisation peuvent la demander au même moment.
+ * Deux exécutions simultanées enregistraient deux fois le même script (« Duplicate script ID 'extranets' ») ;
+ * chacune attend maintenant la fin de la précédente, et repart de l'état réellement enregistré.
+ */
+let contentScriptsSync: Promise<void> = Promise.resolve();
+
+function syncContentScripts(): Promise<void> {
+  contentScriptsSync = contentScriptsSync.then(syncContentScriptsNow, syncContentScriptsNow);
+  return contentScriptsSync;
+}
+
+async function syncContentScriptsNow(): Promise<void> {
   try {
     const patterns = await catalogPatterns();
     const granted: string[] = [];

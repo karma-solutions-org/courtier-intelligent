@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { Assure, AssureDocument, AssureDocumentType, AssureOcrValues, Dossier } from '@shared';
-import { map, Observable } from 'rxjs';
+import { combineLatest, map, Observable, of } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
 import { StorageProvider } from '../../../../core/providers/storage.provider';
@@ -56,6 +56,24 @@ export class AssuresService {
         limit,
       })
       .pipe(map((assures) => ({ assures: assures.filter((assure) => !assure.deletedAt), hasMore: assures.length >= limit })));
+  }
+
+  /**
+   * Recherche Elasticsearch (function recherche-clients) : identifiants des clients du cabinet correspondant au texte,
+   * dans l'ordre de pertinence. Couvre tout le portefeuille, pas seulement la tranche chargée.
+   */
+  search(query: string, size = 50): Observable<string[]> {
+    return this._backend
+      .call<{ q: string; size: number }, { ids: string[] }>('recherche-clients', { q: query, size })
+      .pipe(map((result) => result.ids));
+  }
+
+  /** Fiches des clients trouvés, en direct et dans l'ordre donné (clients dans la corbeille ou disparus écartés). */
+  watchAssuresByIds(cabinetId: string, ids: string[]): Observable<Assure[]> {
+    if (!ids.length) return of([]);
+    return combineLatest(ids.map((id) => this.watchAssure(cabinetId, id))).pipe(
+      map((assures) => assures.filter((assure): assure is Assure => !!assure && !assure.deletedAt)),
+    );
   }
 
   watchAssure(cabinetId: string, assureId: string): Observable<Assure | null> {

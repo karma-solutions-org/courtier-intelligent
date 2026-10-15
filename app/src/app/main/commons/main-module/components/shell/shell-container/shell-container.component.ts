@@ -22,6 +22,7 @@ import { TopbarComponent } from '../topbar/topbar.component';
       <app-topbar
         [moduleTitle]="moduleTitle()"
         [displayName]="displayName()"
+        [logoUrl]="cabinetStatus.cabinet()?.logoPath ?? null"
         [email]="authStore.user()?.email ?? null"
         [roleLabel]="roleLabel()"
         [showMenuButton]="isMobile()"

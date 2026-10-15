@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Dossier, Product } from '@shared';
+import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-status.store';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
 import { DossiersService } from '../services/dossiers.service';
@@ -90,6 +91,7 @@ describe('DossierStore', () => {
     TestBed.configureTestingModule({
       providers: [
         DossierStore,
+        { provide: CabinetStatusStore, useValue: { cabinet: signal(null) } },
         {
           provide: DossiersService,
           useValue: {
