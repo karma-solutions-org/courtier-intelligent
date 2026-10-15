@@ -60,6 +60,6 @@ describe('describeJob', () => {
 
   it('traduit chaque statut en français', () => {
     expect(describeJob({ ...base, status: 'needs_info' }).status).toBe('Informations manquantes');
-    expect(describeJob({ ...base, status: 'awaiting_submit' }).status).toBe('À valider sur l’extranet');
+    expect(describeJob({ ...base, status: 'awaiting_submit' }).status).toBe("À valider sur l'extranet");
   });
 });
