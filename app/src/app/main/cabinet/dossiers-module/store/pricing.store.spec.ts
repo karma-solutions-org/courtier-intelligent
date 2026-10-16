@@ -65,6 +65,7 @@ describe('PricingStore', () => {
           useValue: {
             selectedId: signal('d1'),
             dossier,
+            product: signal(null),
             insurers: signal([
               insurer('a'),
               insurer('b'),

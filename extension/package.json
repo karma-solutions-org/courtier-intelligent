@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "demo:extranet": "npx --yes http-server@14.1.1 demo-extranet -p 8090 -c-1",
-    "demo:extranet-habitation": "npx --yes http-server@14.1.1 demo-extranet-habitation -p 8091 -c-1"
+    "demo:extranet-habitation": "npx --yes http-server@14.1.1 demo-extranet-habitation -p 8091 -c-1",
+    "demo:extranet-habitation-2": "npx --yes http-server@14.1.1 demo-extranet-habitation-2 -p 8092 -c-1"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.4",

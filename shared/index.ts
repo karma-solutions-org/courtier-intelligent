@@ -16,3 +16,4 @@ export * from './assure-documents';
 export * from './discovered-fields';
 export * from './cabinet-insurers';
 export * from './cabinet-products';
+export * from './vehicle-lookup';

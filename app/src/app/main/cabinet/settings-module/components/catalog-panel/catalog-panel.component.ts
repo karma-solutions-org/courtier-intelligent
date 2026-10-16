@@ -72,30 +72,31 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
             </mat-checkbox>
             @if (product.custom) {
               <span class="badge">{{ structure.customBadge }}</span>
-              <span class="domain">{{ questionCount(product) }} {{ structure.questionsCount }}</span>
-              <span class="spacer"></span>
-              @if (confirmingArchive() === product.id) {
-                <span class="confirm">
-                  {{ structure.archiveProductConfirm }}
-                  <button mat-button type="button" (click)="confirmingArchive.set(null)">{{ structure.cancel }}</button>
-                  <button mat-flat-button class="danger" type="button" [disabled]="isPending()" (click)="archiveProduct(product.id)">
-                    {{ structure.archive }}
-                  </button>
-                </span>
-              } @else {
-                <button mat-icon-button type="button" [attr.aria-label]="structure.edit + ' ' + product.name" (click)="openProductEditor(product.id)">
-                  <mat-icon>edit</mat-icon>
+            }
+            <span class="domain">{{ questionCount(product) }} {{ structure.questionsCount }}</span>
+            <span class="spacer"></span>
+            <!-- Tous les produits : un produit du catalogue modifié ou retiré l'est pour ce cabinet seulement. -->
+            @if (confirmingArchive() === product.id) {
+              <span class="confirm">
+                {{ structure.archiveProductConfirm }}
+                <button mat-button type="button" (click)="confirmingArchive.set(null)">{{ structure.cancel }}</button>
+                <button mat-flat-button class="danger" type="button" [disabled]="isPending()" (click)="archiveProduct(product.id)">
+                  {{ structure.archive }}
                 </button>
-                <button
-                  mat-icon-button
-                  type="button"
-                  class="danger-text"
-                  [attr.aria-label]="structure.archive + ' ' + product.name"
-                  (click)="confirmingArchive.set(product.id)"
-                >
-                  <mat-icon>delete</mat-icon>
-                </button>
-              }
+              </span>
+            } @else {
+              <button mat-icon-button type="button" [attr.aria-label]="structure.edit + ' ' + product.name" (click)="openProductEditor(product.id)">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button
+                mat-icon-button
+                type="button"
+                class="danger-text"
+                [attr.aria-label]="structure.archive + ' ' + product.name"
+                (click)="confirmingArchive.set(product.id)"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
             }
           </div>
         }
@@ -126,30 +127,31 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
             </mat-checkbox>
             @if (insurer.custom) {
               <span class="badge">{{ structure.customBadge }}</span>
-              <span class="domain">{{ insurer.extranetDomains[0] }}</span>
-              <span class="spacer"></span>
-              @if (confirmingArchive() === insurer.id) {
-                <span class="confirm">
-                  {{ structure.archiveConfirm }}
-                  <button mat-button type="button" (click)="confirmingArchive.set(null)">{{ structure.cancel }}</button>
-                  <button mat-flat-button class="danger" type="button" [disabled]="isPending()" (click)="archive(insurer.id)">
-                    {{ structure.archive }}
-                  </button>
-                </span>
-              } @else {
-                <button mat-icon-button type="button" [attr.aria-label]="structure.edit + ' ' + insurer.name" (click)="openForm(insurer)">
-                  <mat-icon>edit</mat-icon>
+            }
+            <span class="domain">{{ insurer.extranetDomains[0] }}</span>
+            <span class="spacer"></span>
+            <!-- Tous les assureurs : un assureur du catalogue modifié ou retiré l'est pour ce cabinet seulement. -->
+            @if (confirmingArchive() === insurer.id) {
+              <span class="confirm">
+                {{ structure.archiveConfirm }}
+                <button mat-button type="button" (click)="confirmingArchive.set(null)">{{ structure.cancel }}</button>
+                <button mat-flat-button class="danger" type="button" [disabled]="isPending()" (click)="archive(insurer.id)">
+                  {{ structure.archive }}
                 </button>
-                <button
-                  mat-icon-button
-                  type="button"
-                  class="danger-text"
-                  [attr.aria-label]="structure.archive + ' ' + insurer.name"
-                  (click)="confirmingArchive.set(insurer.id)"
-                >
-                  <mat-icon>delete</mat-icon>
-                </button>
-              }
+              </span>
+            } @else {
+              <button mat-icon-button type="button" [attr.aria-label]="structure.edit + ' ' + insurer.name" (click)="openForm(insurer)">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button
+                mat-icon-button
+                type="button"
+                class="danger-text"
+                [attr.aria-label]="structure.archive + ' ' + insurer.name"
+                (click)="confirmingArchive.set(insurer.id)"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
             }
           </div>
         }
@@ -447,8 +449,10 @@ export class CatalogPanelComponent {
     this.editing.set(insurer?.id ?? 'new');
     this.name.set(insurer?.name ?? '');
     this.url.set(insurer?.extranetUrl ?? '');
-    // Par défaut, un nouvel assureur tarifie les produits actifs du cabinet.
-    this.formProducts.set(insurer?.productsSupported ?? this.selectedProducts());
+    // Par défaut, un nouvel assureur tarifie les produits actifs du cabinet. Un produit supprimé depuis (archivé, donc
+    // absent de la liste) est retiré : invisible, il resterait coché et le serveur refuserait l'enregistrement.
+    const available = new Set(this.products().map(product => product.id));
+    this.formProducts.set((insurer?.productsSupported ?? this.selectedProducts()).filter(id => available.has(id)));
   }
 
   protected closeForm(): void {

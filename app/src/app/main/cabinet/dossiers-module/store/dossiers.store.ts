@@ -9,7 +9,7 @@ import {
   withState,
 } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import { Assure, Dossier, Member, Product } from '@shared';
+import { Assure, Dossier, Member, Product, replacedProductIds } from '@shared';
 import { catchError, debounceTime, EMPTY, exhaustMap, map, merge, pipe, switchMap, tap } from 'rxjs';
 import {
   resetRequestStatus,
@@ -115,9 +115,11 @@ export const DossiersStore = signalStore(
       /** Produits que le cabinet peut utiliser : actifs au catalogue et activés par l'admin (tous, tant qu'il n'a rien choisi). */
       availableProducts: computed(() => {
         const enabled = cabinetStatus.cabinet()?.enabledProducts ?? [];
+        // Produit du catalogue modifié ou retiré par le cabinet : remplacé par sa fiche du cabinet.
+        const replaced = replacedProductIds(store.products());
         return store
           .products()
-          .filter((p) => p.active && !p.archived && (enabled.length === 0 || enabled.includes(p.id)));
+          .filter((p) => p.active && !p.archived && !replaced.has(p.id) && (enabled.length === 0 || enabled.includes(p.id)));
       }),
       /** Assurés proposés à l'étape 1 : les plus proches de la recherche. */
       assureResults: computed(() =>

@@ -120,14 +120,22 @@ let nextKey = 1;
                 <mat-icon>close</mat-icon>
               </button>
               @if (question.type === 'choice') {
-                <textarea
-                  class="choices"
-                  rows="3"
-                  [attr.aria-label]="text.choices"
-                  [placeholder]="text.choicesHint"
-                  [value]="question.choicesText"
-                  (input)="updateQuestion(s, q, { choicesText: $any($event.target).value })"
-                ></textarea>
+                <div class="choices">
+                  @for (choice of choiceLines(question); track $index; let c = $index) {
+                    <div class="choice">
+                      <input
+                        [attr.aria-label]="text.choices"
+                        [placeholder]="text.choicePlaceholder"
+                        [value]="choice"
+                        (input)="updateChoice(s, q, c, $any($event.target).value)"
+                      />
+                      <button mat-icon-button type="button" class="danger-text" [attr.aria-label]="text.removeChoice" (click)="removeChoice(s, q, c)">
+                        <mat-icon>close</mat-icon>
+                      </button>
+                    </div>
+                  }
+                  <button mat-button type="button" (click)="addChoice(s, q)"><mat-icon>add</mat-icon>{{ text.addChoice }}</button>
+                </div>
               }
             </div>
           }
@@ -266,6 +274,21 @@ let nextKey = 1;
 
     .choices {
       flex: 1 1 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .choice {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      width: 100%;
+    }
+
+    .choice input {
+      flex: 1 1 auto;
     }
 
     .check {
@@ -390,6 +413,29 @@ export class ProductEditorComponent implements OnInit {
     this.sections.update((sections) =>
       sections.map((section, i) => (i === s ? { ...section, questions: section.questions.filter((_, j) => j !== q) } : section)),
     );
+  }
+
+  /** Les options restent stockées une par ligne dans `choicesText` ; chaque ligne a son propre champ. */
+  protected choiceLines(question: DraftQuestion): string[] {
+    // Texte vide = un champ vide affiché : sinon « [''] » redevient « '' » et l'ajout de la 1re option ne fait rien.
+    return question.choicesText.split('\n');
+  }
+
+  private setChoiceLines(s: number, q: number, lines: string[]): void {
+    this.updateQuestion(s, q, { choicesText: lines.join('\n') });
+  }
+
+  protected updateChoice(s: number, q: number, c: number, value: string): void {
+    const question = this.sections()[s].questions[q];
+    this.setChoiceLines(s, q, this.choiceLines(question).map((line, i) => (i === c ? value.replace(/\n/g, ' ') : line)));
+  }
+
+  protected addChoice(s: number, q: number): void {
+    this.setChoiceLines(s, q, [...this.choiceLines(this.sections()[s].questions[q]), '']);
+  }
+
+  protected removeChoice(s: number, q: number, c: number): void {
+    this.setChoiceLines(s, q, this.choiceLines(this.sections()[s].questions[q]).filter((_, i) => i !== c));
   }
 
   protected moveQuestion(s: number, q: number, delta: number): void {

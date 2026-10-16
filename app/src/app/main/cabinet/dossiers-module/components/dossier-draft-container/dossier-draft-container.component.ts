@@ -86,6 +86,8 @@ import {
           [data]="store.answers()"
           [showMissing]="showMissing()"
           (answerChanged)="onAnswer($event)"
+          [vehicleLookup]="store.vehicleLookup()"
+          (vehicleLookupRequested)="store.lookupVehicle($event)"
         />
         <div class="actions">
           <button

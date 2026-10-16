@@ -134,6 +134,9 @@ const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
       @if (invalid()) {
         <span class="missing" role="alert">Ce champ est obligatoire</span>
       }
+      @if (prefilled()) {
+        <span class="prefilled">Pré-rempli d'après l'immatriculation : vérifiez et corrigez si besoin.</span>
+      }
     </div>
   `,
   styles: `
@@ -161,6 +164,11 @@ const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
       color: var(--mat-sys-error);
     }
 
+    .prefilled {
+      font-size: 12px;
+      color: var(--ci-accent-ink);
+    }
+
     .invalid .label {
       color: var(--mat-sys-error);
     }
@@ -173,6 +181,8 @@ export class QuestionFieldComponent {
   readonly readonly = input(false);
   /** Signale ce champ s'il est obligatoire et vide. */
   readonly showMissing = input(false);
+  /** Valeur remplie par la recherche du véhicule (signalée au courtier, qui peut la corriger). */
+  readonly prefilled = input(false);
   /** Nouvelle valeur ; `null` efface la réponse. */
   readonly changed = output<CanonicalValue | null>();
 

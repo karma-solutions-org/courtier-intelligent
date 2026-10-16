@@ -62,8 +62,10 @@ export async function loadInsurers(): Promise<InsurerInfo[]> {
     getDocs(collection(firestore, 'ci_insurers')),
     cabinetId ? getDocs(collection(firestore, `ci_cabinets/${cabinetId}/ci_insurers`)).catch(() => null) : Promise.resolve(null),
   ]);
+  // Assureurs du catalogue modifiés ou retirés par le cabinet : remplacés par sa fiche (champ `replaces`).
+  const replaced = new Set(cabinet?.docs.map(d => d.get('replaces') as string | undefined).filter(Boolean) ?? []);
   const value = [
-    ...global.docs.map(toInsurerInfo),
+    ...global.docs.filter(d => !replaced.has(d.id)).map(toInsurerInfo),
     ...(cabinet?.docs.filter(d => d.get('archived') !== true).map(toInsurerInfo) ?? []),
   ];
   await chrome.storage.session.set({ [INSURERS_CACHE_KEY]: { at: Date.now(), cabinetId, value } });

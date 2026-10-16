@@ -93,7 +93,8 @@ export class SettingsService {
     return this._backend.call('produits-creer', { name, baseProductId });
   }
 
-  updateProduct(product: CabinetProductInput): Observable<{ ok: boolean }> {
+  /** Un produit du catalogue global est copié dans le cabinet : l'identifiant renvoyé est celui de la copie. */
+  updateProduct(product: CabinetProductInput): Observable<{ ok: boolean; id: string }> {
     return this._backend.call('produits-modifier', product);
   }
 
@@ -114,7 +115,8 @@ export class SettingsService {
     return this._backend.call('assureurs-ajouter', insurer);
   }
 
-  updateInsurer(id: string, insurer: CabinetInsurerInput): Observable<{ ok: boolean }> {
+  /** Un assureur du catalogue global est copié dans le cabinet : l'identifiant renvoyé est celui de la copie. */
+  updateInsurer(id: string, insurer: CabinetInsurerInput): Observable<{ ok: boolean; id: string }> {
     return this._backend.call('assureurs-modifier', { id, ...insurer });
   }
 

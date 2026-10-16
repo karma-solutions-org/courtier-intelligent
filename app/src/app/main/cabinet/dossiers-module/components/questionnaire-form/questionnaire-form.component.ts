@@ -1,6 +1,17 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CanonicalData, CanonicalPath, CanonicalValue, isQuestionVisible, Question, QuestionnaireSection } from '@shared';
 import { QuestionFieldComponent } from '../question-field/question-field.component';
+
+/** Recherche du véhicule par sa plaque : affichée sous l'immatriculation quand le questionnaire s'y prête. */
+export interface VehicleLookupView {
+  loading: boolean;
+  error: string | null;
+  /** Champs remplis par la recherche et pas encore corrigés. */
+  prefilled: CanonicalPath[];
+}
 
 export interface AnswerChange {
   path: CanonicalPath;
@@ -14,7 +25,7 @@ export interface AnswerChange {
  */
 @Component({
   selector: 'app-questionnaire-form',
-  imports: [QuestionFieldComponent],
+  imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, QuestionFieldComponent],
   template: `
     @for (section of sections(); track section.title) {
       <section class="card">
@@ -22,14 +33,44 @@ export interface AnswerChange {
         <div class="grid">
           @for (question of section.questions; track question.canonicalPath) {
             @if (isVisible(question)) {
-              <app-question-field
-                [class.wide]="question.type === 'boolean' || question.withKnowledge"
-                [question]="question"
-                [value]="data()[question.canonicalPath]"
-                [readonly]="readonly()"
-                [showMissing]="showMissing()"
-                (changed)="answerChanged.emit({ path: question.canonicalPath, value: $event })"
-              />
+              @let lookup = vehicleLookup();
+              @if (lookup && !readonly() && question.canonicalPath === 'vehicle.registration') {
+                <div class="plate">
+                  <app-question-field
+                    [question]="question"
+                    [value]="data()[question.canonicalPath]"
+                    [showMissing]="showMissing()"
+                    (changed)="answerChanged.emit({ path: question.canonicalPath, value: $event })"
+                    (focusout)="vehicleLookupRequested.emit({ force: false })"
+                  />
+                  <div class="plate-actions">
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      [disabled]="lookup.loading"
+                      (click)="vehicleLookupRequested.emit({ force: true })"
+                    >
+                      <mat-icon>search</mat-icon>Rechercher le véhicule
+                    </button>
+                    @if (lookup.loading) {
+                      <mat-spinner diameter="20" aria-label="Recherche du véhicule" />
+                    }
+                  </div>
+                  @if (lookup.error) {
+                    <span class="plate-error" role="alert">{{ lookup.error }}</span>
+                  }
+                </div>
+              } @else {
+                <app-question-field
+                  [class.wide]="question.type === 'boolean' || question.withKnowledge"
+                  [question]="question"
+                  [value]="data()[question.canonicalPath]"
+                  [readonly]="readonly()"
+                  [showMissing]="showMissing()"
+                  [prefilled]="!readonly() && !!lookup?.prefilled?.includes(question.canonicalPath)"
+                  (changed)="answerChanged.emit({ path: question.canonicalPath, value: $event })"
+                />
+              }
             }
           }
         </div>
@@ -64,6 +105,23 @@ export interface AnswerChange {
 
     .wide {
       grid-column: 1 / -1;
+    }
+
+    .plate {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .plate-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .plate-error {
+      font-size: 12px;
+      color: var(--mat-sys-error);
     }
 
     @media (max-width: 700px) {
@@ -112,6 +170,10 @@ export class QuestionnaireFormComponent {
   /** Signale les champs obligatoires vides (après un clic sur « Suivant », par exemple). */
   readonly showMissing = input(false);
   readonly answerChanged = output<AnswerChange>();
+  /** Recherche par plaque (produit Auto et ses copies) ; `null` : pas de recherche pour ce questionnaire. */
+  readonly vehicleLookup = input<VehicleLookupView | null>(null);
+  /** `force` : bouton « Rechercher » ; sinon la plaque vient d'être quittée (pas de nouvelle recherche si elle n'a pas changé). */
+  readonly vehicleLookupRequested = output<{ force: boolean }>();
 
   /** Une question conditionnelle n'apparaît que si sa condition est remplie par les réponses actuelles. */
   protected isVisible(question: Question): boolean {

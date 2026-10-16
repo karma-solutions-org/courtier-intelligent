@@ -22,9 +22,13 @@ import {
   Member,
   NeedAnalysis,
   NeedInput,
+  normalizeRegistration,
+  prefillAnswers,
   Product,
   schemaForCabinet,
   suggestNeed,
+  supportsVehicleLookup,
+  vehicleInfoToAnswers,
 } from '@shared';
 import {
   catchError,
@@ -44,6 +48,7 @@ import { toBackendErrorMessage } from '../../../../core/utils/backend-error.util
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
 import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-status.store';
 import { AnswerPatch, DossiersService } from '../services/dossiers.service';
+import type { VehicleLookupView } from '../components/questionnaire-form/questionnaire-form.component';
 import { labelsByPath, manualTransitionsFrom } from '../util/dossiers.utils';
 
 /** Délai sans frappe avant d'enregistrer le brouillon. */
@@ -97,6 +102,14 @@ interface DossierState {
   saveStatus: SaveStatus;
   error: string | null;
   successMessage: string | null;
+  /** Recherche du véhicule par sa plaque en cours. */
+  vehicleLoading: boolean;
+  /** Erreur de la recherche (plaque invalide ou inconnue), affichée sous l'immatriculation. */
+  vehicleError: string | null;
+  /** Dernière plaque recherchée : quitter le champ sans la changer ne relance pas la recherche. */
+  vehiclePlate: string | null;
+  /** Champs remplis par la recherche et pas encore modifiés par le courtier. */
+  prefilled: CanonicalPath[];
 }
 
 /** Store d'un dossier (fourni par la route) : données, questionnaire, saisie avec sauvegarde automatique, statut, assignation. */
@@ -123,6 +136,10 @@ export const DossierStore = signalStore(
     saveStatus: 'idle',
     error: null,
     successMessage: null,
+    vehicleLoading: false,
+    vehicleError: null,
+    vehiclePlate: null,
+    prefilled: [],
   }),
   withComputed((store, cabinetStatus = inject(CabinetStatusStore)) => {
     const product = computed(
@@ -157,6 +174,15 @@ export const DossierStore = signalStore(
       ),
       editable: computed(() =>
         EDITABLE_DOSSIER_STATUSES.includes(store.dossier()?.status ?? 'souscrit'),
+      ),
+      /**
+       * Recherche par plaque, pour le produit Auto ou une copie du cabinet : décidé par les questions
+       * (plaque, marque…), pas par l'id du produit. `null` : pas de recherche (autre produit, dossier figé).
+       */
+      vehicleLookup: computed<VehicleLookupView | null>(() =>
+        supportsVehicleLookup(schema()) && EDITABLE_DOSSIER_STATUSES.includes(store.dossier()?.status ?? 'souscrit')
+          ? { loading: store.vehicleLoading(), error: store.vehicleError(), prefilled: store.prefilled() }
+          : null,
       ),
       transitions: computed(() => {
         const status = store.dossier()?.status;
@@ -306,6 +332,10 @@ export const DossierStore = signalStore(
           pending: {},
           saveStatus: 'idle',
           error: null,
+          vehicleLoading: false,
+          vehicleError: null,
+          vehiclePlate: null,
+          prefilled: [],
         }),
       setAutosave: (autosave: boolean) => patchState(store, { autosave }),
       /** Fin du défilement de l'historique : demande la tranche suivante. */
@@ -342,7 +372,64 @@ export const DossierStore = signalStore(
           pending: { ...store.pending(), [path]: value },
           editTick: store.editTick() + 1,
           saveStatus: 'dirty',
+          // Corrigé par le courtier : ce n'est plus une valeur pré-remplie.
+          prefilled: store.prefilled().filter((p) => p !== path),
         }),
+
+      /**
+       * Recherche le véhicule de la plaque saisie et remplit SEULEMENT les champs vides du questionnaire
+       * (une réponse déjà saisie n'est jamais écrasée). `force` : bouton « Rechercher » (sinon, perte de focus).
+       */
+      lookupVehicle: rxMethod<{ force: boolean }>(
+        pipe(
+          switchMap(({ force }) => {
+            const raw = store.answers()['vehicle.registration'];
+            if (typeof raw !== 'string' || !raw.trim()) {
+              patchState(store, { vehicleError: force ? "Saisissez d'abord l'immatriculation." : null });
+              return EMPTY;
+            }
+            const normalized = normalizeRegistration(raw);
+            if (!normalized) {
+              patchState(store, {
+                vehicleError: "Plaque d'immatriculation invalide (formats acceptés : AB-123-CD ou 1234 AB 75).",
+              });
+              return EMPTY;
+            }
+            if (!force && normalized.plate === store.vehiclePlate()) {
+              return EMPTY;
+            }
+            const dossierId = store.selectedId();
+            patchState(store, { vehicleLoading: true, vehicleError: null, vehiclePlate: normalized.plate });
+            return service.lookupVehicle(normalized.plate).pipe(
+              tap((vehicle) => {
+                if (store.selectedId() !== dossierId) return;
+                // Calculé à la réponse : ce que le courtier a saisi pendant la recherche est respecté.
+                const answers = store.answers();
+                const patch: AnswerPatch = prefillAnswers(store.schema(), answers, vehicleInfoToAnswers(vehicle));
+                // La plaque est enregistrée sous sa forme normalisée.
+                if (raw !== normalized.plate) patch['vehicle.registration'] = normalized.plate;
+                const filled = Object.keys(patch).filter((p) => p !== 'vehicle.registration') as CanonicalPath[];
+                patchState(store, {
+                  answers: { ...answers, ...patch },
+                  pending: { ...store.pending(), ...patch },
+                  editTick: store.editTick() + 1,
+                  saveStatus: 'dirty',
+                  prefilled: [...new Set([...store.prefilled(), ...filled])],
+                  vehicleError: filled.length
+                    ? null
+                    : "Véhicule trouvé, mais tous ses champs étaient déjà remplis : rien n'a été modifié.",
+                });
+              }),
+              catchError((error) => {
+                // Une nouvelle tentative reste possible sur la même plaque.
+                patchState(store, { vehicleError: toBackendErrorMessage(error), vehiclePlate: null });
+                return EMPTY;
+              }),
+              finalize(() => patchState(store, { vehicleLoading: false })),
+            );
+          }),
+        ),
+      ),
 
       /** Toutes les écritures passent par cette file, une à la fois. */
       _run: rxMethod<Operation>(

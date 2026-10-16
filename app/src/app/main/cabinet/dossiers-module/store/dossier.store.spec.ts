@@ -28,6 +28,19 @@ const PRODUCT = {
           type: 'number',
           required: true,
         },
+        { canonicalPath: 'vehicle.brand', label: 'Marque', type: 'text', required: false },
+        { canonicalPath: 'vehicle.model', label: 'Modèle', type: 'text', required: false },
+        {
+          canonicalPath: 'vehicle.energyType',
+          label: 'Énergie',
+          type: 'choice',
+          required: false,
+          // Copie du cabinet : l'électrique n'est pas proposé, la recherche ne doit pas l'imposer.
+          choices: [
+            { value: 'essence', label: 'Essence' },
+            { value: 'diesel', label: 'Diesel' },
+          ],
+        },
       ],
     },
     {
@@ -59,6 +72,15 @@ const dossier = (overrides: Partial<Dossier> = {}): Dossier =>
     ...overrides,
   }) as Dossier;
 
+const PEUGEOT = {
+  plate: 'AB-123-CD',
+  brand: 'Peugeot',
+  model: '208',
+  fiscalPower: 5,
+  energyType: 'essence',
+  firstRegistrationDate: '2021-03-15',
+};
+
 const SAVE_RESULT = { status: 'brouillon', completeness: { ok: false, missing: [] } };
 
 describe('DossierStore', () => {
@@ -69,6 +91,7 @@ describe('DossierStore', () => {
     assign: ReturnType<typeof vi.fn>;
     saveNeed: ReturnType<typeof vi.fn>;
     validateNeed: ReturnType<typeof vi.fn>;
+    lookupVehicle: ReturnType<typeof vi.fn>;
   };
   let store: InstanceType<typeof DossierStore>;
 
@@ -87,6 +110,7 @@ describe('DossierStore', () => {
       assign: vi.fn(() => of({ success: true })),
       saveNeed: vi.fn(() => of({ status: 'complet', changed: ['budgetMax'] })),
       validateNeed: vi.fn(() => of({ status: 'besoin_valide' })),
+      lookupVehicle: vi.fn(() => of(PEUGEOT)),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -353,6 +377,9 @@ describe('DossierStore', () => {
       expect(store.quoteData()).toEqual({
         'vehicle.registration': 'AB-123-CD',
         'vehicle.fiscalPower': 0,
+        'vehicle.brand': null,
+        'vehicle.model': null,
+        'vehicle.energyType': null,
         'insuranceHistory.claimsCount': { value: null, knowledge: 'DECLARED_UNKNOWN' },
       });
     });
@@ -447,6 +474,70 @@ describe('DossierStore', () => {
       expect(suggestion.coverageLevel).toBe('tous_risques');
       expect(suggestion.mandatoryGuarantees).toEqual([]); // le produit de test n'a pas de référentiel de garanties
       expect(suggestion).not.toHaveProperty('budgetMax');
+    });
+  });
+
+  describe('Recherche du véhicule par sa plaque', () => {
+    beforeEach(() => dossier$.next(dossier({ data: { 'vehicle.registration': 'ab 123 cd', 'vehicle.brand': 'Peugeot (saisi)' } })));
+
+    it('est proposée pour un questionnaire qui demande la plaque et le véhicule, même copié par le cabinet', () => {
+      expect(store.vehicleLookup()).toEqual({ loading: false, error: null, prefilled: [] });
+    });
+
+    it("remplit seulement les champs vides, sans écraser une réponse saisie, et normalise la plaque", () => {
+      store.lookupVehicle({ force: true });
+
+      expect(service.lookupVehicle).toHaveBeenCalledWith('AB-123-CD');
+      expect(store.answers()).toEqual({
+        'vehicle.registration': 'AB-123-CD',
+        'vehicle.brand': 'Peugeot (saisi)',
+        'vehicle.model': '208',
+        'vehicle.fiscalPower': 5,
+        'vehicle.energyType': 'essence',
+      });
+      // Pas de date : le questionnaire ne la demande pas.
+      expect(store.prefilled()).toEqual(['vehicle.fiscalPower', 'vehicle.model', 'vehicle.energyType']);
+      expect(store.saveStatus()).toBe('dirty');
+    });
+
+    it('ignore une valeur absente des choix du questionnaire', () => {
+      service.lookupVehicle.mockReturnValue(of({ ...PEUGEOT, energyType: 'electrique' }));
+      store.lookupVehicle({ force: true });
+
+      expect(store.answers()['vehicle.energyType']).toBeUndefined();
+    });
+
+    it("un champ corrigé par le courtier n'est plus signalé comme pré-rempli", () => {
+      store.lookupVehicle({ force: true });
+      store.edit('vehicle.model', '2008');
+
+      expect(store.prefilled()).not.toContain('vehicle.model');
+    });
+
+    it("quitter la plaque sans la changer ne relance pas la recherche", () => {
+      store.lookupVehicle({ force: false });
+      store.lookupVehicle({ force: false });
+
+      expect(service.lookupVehicle).toHaveBeenCalledTimes(1);
+    });
+
+    it("une plaque invalide est signalée sans appeler le serveur", () => {
+      store.edit('vehicle.registration', 'AB-12');
+      store.lookupVehicle({ force: true });
+
+      expect(service.lookupVehicle).not.toHaveBeenCalled();
+      expect(store.vehicleLookup()?.error).toContain('invalide');
+    });
+
+    it('une plaque inconnue affiche le message du serveur et ne modifie rien', () => {
+      service.lookupVehicle.mockReturnValue(
+        throwError(() => ({ code: 'functions/not-found', message: 'Aucun véhicule trouvé pour la plaque AB-123-CD.' })),
+      );
+      store.lookupVehicle({ force: true });
+
+      expect(store.vehicleLookup()?.error).toBe('Aucun véhicule trouvé pour la plaque AB-123-CD.');
+      expect(store.answers()['vehicle.model']).toBeUndefined();
+      expect(store.vehicleLookup()?.loading).toBe(false);
     });
   });
 });
