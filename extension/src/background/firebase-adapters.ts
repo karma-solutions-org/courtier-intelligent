@@ -1,5 +1,5 @@
 import { FirebaseError } from 'firebase/app';
-import { getIdTokenResult, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
+import { getIdTokenResult, signInWithCustomToken, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getFirebase } from '../shared/firebase';
@@ -23,6 +23,12 @@ export const firebaseAuthPort: AuthPort = {
   async signIn(email, password) {
     const { auth } = getFirebase();
     const { user } = await signInWithEmailAndPassword(auth, email, password);
+    return toAuthedUser(user);
+  },
+
+  async signInWithToken(token) {
+    const { auth } = getFirebase();
+    const { user } = await signInWithCustomToken(auth, token);
     return toAuthedUser(user);
   },
 

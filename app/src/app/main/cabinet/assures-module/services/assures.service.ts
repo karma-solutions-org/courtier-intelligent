@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { Assure, AssureDocument, AssureDuplicateReason, AssureDocumentType, AssureOcrValues, Dossier } from '@shared';
+import { Assure, AssureDocument, AssureDuplicateReason, AssureDocumentType, AssureOcrValues, AssureReadableType, Dossier } from '@shared';
 import { combineLatest, map, Observable, of } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
@@ -25,7 +25,7 @@ export class AssuresService {
   }
 
   /** Lecture de la pièce par l'IA : valeurs proposées pour la fiche, rien n'est écrit. */
-  readPiece(type: AssureDocumentType, storagePath: string): Observable<{ values: AssureOcrValues; readable: boolean }> {
+  readPiece(type: AssureReadableType, storagePath: string): Observable<{ values: AssureOcrValues; readable: boolean }> {
     return this._backend.call('assures-lirePiece', { type, storagePath });
   }
 

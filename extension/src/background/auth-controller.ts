@@ -18,6 +18,8 @@ export interface AuthedUser {
 /** Connexion Firebase (adaptée par `firebase-adapters.ts`). */
 export interface AuthPort {
   signIn(email: string, password: string): Promise<AuthedUser>;
+  /** Connexion par jeton personnalisé émis par le serveur à l'app (`sessions-emettreJetonExtension`). */
+  signInWithToken(token: string): Promise<AuthedUser>;
   signOut(): Promise<void>;
   /** Utilisateur restauré depuis le stockage (le service worker redémarre souvent), ou null. */
   currentUser(): Promise<AuthedUser | null>;
@@ -52,6 +54,7 @@ export const MESSAGES = {
   wrongDevice: 'L’extension doit être utilisée sur l’appareil où Courtier Intelligent est ouvert. Ouvrez l’application dans ce navigateur, puis réessayez.',
   sessionClosed: 'Votre session a été fermée sur cet appareil (déconnexion de l’application, nouvelle connexion ou compte désactivé). Reconnectez-vous.',
   generic: 'Connexion impossible pour le moment. Réessayez.',
+  autoConnectExpired: 'La connexion automatique a expiré : rechargez Courtier Intelligent, ou connectez-vous ci-dessous.',
   sessionExpired: 'Session expirée : reconnectez-vous à l’extension.',
   permissionDenied: 'Autorisation manquante : votre compte n’a pas accès à ce dossier ou à cette action. Reconnectez-vous ou contactez l’administrateur du cabinet.',
   aiUnavailable: 'IA indisponible pour le moment : les champs non reconnus sont à compléter à la main (ou réessayez plus tard).',
@@ -76,6 +79,8 @@ const FIREBASE_AUTH_MESSAGES: Record<string, string> = {
   'auth/too-many-requests': MESSAGES.tooManyRequests,
   'auth/user-disabled': MESSAGES.disabled,
   'auth/network-request-failed': MESSAGES.network,
+  'auth/invalid-custom-token': MESSAGES.autoConnectExpired,
+  'auth/custom-token-mismatch': MESSAGES.autoConnectExpired,
 };
 
 /** Message lisible pour une erreur de connexion (Firebase Auth ou Cloud Function). */
@@ -139,6 +144,22 @@ export function createAuthController(ports: { auth: AuthPort; backend: BackendPo
   /** L'utilisateur est « utilisable » s'il a un cabinet (les claims sont posés par le serveur). */
   const isMember = (user: AuthedUser | null): user is AuthedUser => !!user && !!user.cabinetId;
 
+  /** Suite commune des connexions (mot de passe ou jeton) : cabinet obligatoire, puis ouverture de la session d'extension. */
+  const finishSignIn = async (user: AuthedUser): Promise<AuthState> => {
+    if (!isMember(user)) {
+      await ports.auth.signOut().catch(() => undefined);
+      throw new UserFacingError(MESSAGES.noCabinet);
+    }
+    try {
+      await ports.backend.openExtensionSession();
+    } catch (error) {
+      await ports.auth.signOut().catch(() => undefined);
+      throw new UserFacingError(toUserMessage(error));
+    }
+    notice = null;
+    return publish({ status: 'signed_in', user: toExtensionUser(user) });
+  };
+
   return {
     onChange(listener: (state: AuthState) => void): () => void {
       listeners.add(listener);
@@ -162,18 +183,21 @@ export function createAuthController(ports: { auth: AuthPort; backend: BackendPo
       } catch (error) {
         throw new UserFacingError(toUserMessage(error));
       }
-      if (!isMember(user)) {
-        await ports.auth.signOut().catch(() => undefined);
-        throw new UserFacingError(MESSAGES.noCabinet);
-      }
+      return finishSignIn(user);
+    },
+
+    /**
+     * Connexion automatique : l'app (déjà connectée) a obtenu du serveur un jeton pour CE compte et le transmet.
+     * Mêmes règles que `signIn` ensuite (cabinet, session de l'app, appareil).
+     */
+    async signInWithToken(token: string): Promise<AuthState> {
+      let user: AuthedUser;
       try {
-        await ports.backend.openExtensionSession();
+        user = await ports.auth.signInWithToken(token);
       } catch (error) {
-        await ports.auth.signOut().catch(() => undefined);
         throw new UserFacingError(toUserMessage(error));
       }
-      notice = null;
-      return publish({ status: 'signed_in', user: toExtensionUser(user) });
+      return finishSignIn(user);
     },
 
     async signOut(): Promise<AuthState> {

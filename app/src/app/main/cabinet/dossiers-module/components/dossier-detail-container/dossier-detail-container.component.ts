@@ -212,8 +212,6 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
                 [readonly]="!store.editable()"
                 [showMissing]="true"
                 (answerChanged)="onAnswer($event)"
-                [vehicleLookup]="store.vehicleLookup()"
-                (vehicleLookupRequested)="store.lookupVehicle($event)"
               />
               @if (store.editable()) {
                 <div class="actions">

@@ -11,7 +11,7 @@ describe('ExtensionIndicatorComponent', () => {
   };
 
   it('affiche « Extension installée » avec sa version', async () => {
-    const root = render({ status: 'installed', version: '0.1.0' });
+    const root = render({ status: 'installed', version: '0.1.0', signedIn: false, uid: null });
 
     await expect.element(root.getByText('Extension installée')).toBeVisible();
     await expect.element(root.getByRole('status')).toHaveAttribute('title', 'Version 0.1.0');

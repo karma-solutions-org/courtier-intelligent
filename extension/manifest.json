@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "description": "Remplit les extranets des assureurs à partir des dossiers Courtier Intelligent.",
   "minimum_chrome_version": "116",
-  "optional_host_permissions": [
+  "host_permissions": [
     "https://*/*",
     "http://localhost/*"
   ],

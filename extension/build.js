@@ -17,7 +17,7 @@ const isLocalhost = pattern => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d
 
 /**
  * Manifest du build : le source garde les entrées localhost (développement) ; hors `--emulators` et `--demo`, elles sont retirées
- * de `externally_connectable.matches` et `optional_host_permissions` (le service worker lit la liste via getManifest()).
+ * de `externally_connectable.matches` et `host_permissions` (le service worker lit la liste via getManifest()).
  */
 function buildManifest() {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
@@ -25,8 +25,8 @@ function buildManifest() {
     if (manifest.externally_connectable?.matches) {
       manifest.externally_connectable.matches = manifest.externally_connectable.matches.filter(p => !isLocalhost(p));
     }
-    if (manifest.optional_host_permissions) {
-      manifest.optional_host_permissions = manifest.optional_host_permissions.filter(p => !isLocalhost(p));
+    if (manifest.host_permissions) {
+      manifest.host_permissions = manifest.host_permissions.filter(p => !isLocalhost(p));
     }
   }
   return manifest;

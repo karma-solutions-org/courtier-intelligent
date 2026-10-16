@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, OnInit, s
 import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
+import { catchError, forkJoin, map, of } from 'rxjs';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { AssureFormModel } from '../../models/assure-form.model';
 import { AssuresService } from '../../services/assures.service';
@@ -17,7 +18,7 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
   imports: [AssureFormComponent, AssureDocumentImportComponent],
   template: `
     <h1>{{ structure.createTitle }}</h1>
-    <app-assure-document-import (pieceRead)="piece.set($event)" />
+    <app-assure-document-import (pieceRead)="pieces.update(list => [...list, $event])" />
     <app-assure-form
       [prefill]="prefill()"
       mode="create"
@@ -59,14 +60,20 @@ export class NewAssureContainerComponent implements OnInit, HasUnsavedChanges {
   private readonly _service = inject(AssuresService);
   private readonly _snackBar = inject(MatSnackBar);
 
-  /** Dernière pièce lue : elle pré-remplit le formulaire et sera rangée avec le client. */
-  protected readonly piece = signal<ReadPiece | null>(null);
+  /** Pièces lues (recto, verso…) : elles pré-remplissent le formulaire et seront rangées avec le client. */
+  protected readonly pieces = signal<ReadPiece[]>([]);
   protected readonly prefill = computed<Partial<AssureFormModel> | null>(() => {
-    const piece = this.piece();
-    if (!piece) return null;
-    const { civilite, ...values } = piece.values;
+    const pieces = this.pieces();
+    if (!pieces.length) return null;
+    // Une valeur lue sur une pièce n'est pas écrasée par une suivante : celle-ci ne complète que les champs manquants.
+    const merged: Record<string, unknown> = {};
+    for (const piece of pieces) {
+      for (const [key, value] of Object.entries(piece.values)) {
+        if (merged[key] === undefined && value !== undefined && value !== null && value !== '') merged[key] = value;
+      }
+    }
     // Un Kbis, c'est une société : le client devient professionnel.
-    return { ...values, ...(civilite ? { civilite } : {}), ...(piece.type === 'kbis' ? { type: 'pro' as const } : {}) };
+    return { ...(merged as Partial<AssureFormModel>), ...(pieces.some(piece => piece.type === 'kbis') ? { type: 'pro' as const } : {}) };
   });
 
   constructor() {
@@ -75,18 +82,23 @@ export class NewAssureContainerComponent implements OnInit, HasUnsavedChanges {
       if (!createdId) return;
       const open = () => this._router.navigate([CabinetRouteContainerModel.CLIENTS_ROUTE.url, createdId]);
       // Lu sans dépendance : remettre la pièce à null ne doit pas relancer l'effet (double navigation).
-      const piece = untracked(() => this.piece());
-      if (!piece) {
+      const pieces = untracked(() => this.pieces());
+      if (!pieces.length) {
         open();
         return;
       }
-      this.piece.set(null);
-      this._service.attachPiece({ assureId: createdId, ...piece }).subscribe({
-        next: open,
-        error: () => {
-          this._snackBar.open(ASSURES_STRUCTURE.piece.attachFailed, undefined, { duration: 5000 });
-          open();
-        },
+      this.pieces.set([]);
+      // Chaque pièce est rangée avec le client ; un échec n'empêche pas les autres.
+      forkJoin(
+        pieces.map(piece =>
+          this._service.attachPiece({ assureId: createdId, ...piece }).pipe(
+            map(() => true),
+            catchError(() => of(false)),
+          ),
+        ),
+      ).subscribe(results => {
+        if (results.includes(false)) this._snackBar.open(ASSURES_STRUCTURE.piece.attachFailed, undefined, { duration: 5000 });
+        open();
       });
     });
   }

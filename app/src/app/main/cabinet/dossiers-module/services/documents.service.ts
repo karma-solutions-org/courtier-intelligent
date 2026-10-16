@@ -30,6 +30,11 @@ export class DocumentsService {
     return this._backend.call('documents-analyser', { dossierId, documentId });
   }
 
+  /** Copie dans le dossier les pièces rangées avec son client (une seule fois chacune) : renvoie les documents créés. */
+  takeClientPieces(dossierId: string): Observable<{ documents: { documentId: string; type: DossierDocumentType }[] }> {
+    return this._backend.call('documents-reprendrePiecesClient', { dossierId });
+  }
+
   downloadUrl(storagePath: string): Observable<string> {
     return this._storage.getUrl(storagePath);
   }

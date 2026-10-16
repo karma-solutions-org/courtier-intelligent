@@ -1,5 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -20,7 +20,7 @@ import {
   OcrField,
   safeDocumentFileName,
 } from '@shared';
-import { catchError, EMPTY, finalize, map, of, switchMap, tap } from 'rxjs';
+import { catchError, concatMap, EMPTY, finalize, from, map, of, switchMap, tap } from 'rxjs';
 import { toBackendErrorMessage } from '../../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
 import { DocumentsService } from '../../services/documents.service';
@@ -64,17 +64,41 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
               }
             </mat-select>
           </mat-form-field>
-          <input #picker type="file" hidden [accept]="acceptedTypes" (change)="pickFile(picker.files); picker.value = ''" />
-          <button mat-stroked-button type="button" (click)="picker.click()">
-            <mat-icon>attach_file</mat-icon>{{ file()?.name ?? text.chooseFile }}
+          <input #picker type="file" multiple hidden [accept]="acceptedTypes" (change)="pickFiles(picker.files); picker.value = ''" />
+          <button mat-stroked-button type="button" [disabled]="!!busy()" (click)="picker.click()">
+            <mat-icon>attach_file</mat-icon>{{ text.chooseFile }}
           </button>
-          <button mat-flat-button type="button" [disabled]="!file() || busy()" (click)="importFile()">
-            {{ analyzable() ? text.upload : text.uploadOnly }}
+          <button mat-flat-button type="button" [disabled]="!files().length || busy()" (click)="importFiles()">
+            {{ anyAnalyzable() ? text.upload : text.uploadOnly }}
           </button>
         </div>
+        @if (files().length) {
+          <ul class="picked">
+            @for (picked of files(); track picked.id) {
+              <li>
+                <span class="name">{{ picked.file.name }}</span>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                  <mat-select [ngModel]="picked.type" (ngModelChange)="setFileType(picked.id, $event)" [disabled]="!!busy()">
+                    @for (t of types; track t) {
+                      <mat-option [value]="t">{{ text.types[t] }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <button mat-icon-button type="button" [attr.aria-label]="text.removeFile" [disabled]="!!busy()" (click)="removeFile(picked.id)">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </li>
+            }
+          </ul>
+        }
         </div>
         @if (busy()) {
-          <p class="status" role="status">{{ busy() === 'analyze' ? text.analyzing : text.uploading }}</p>
+          <p class="status" role="status">
+            {{ busy() === 'client' ? text.clientPieces : busy() === 'analyze' ? text.analyzing : text.uploading }}
+            @if (progress(); as p) {
+              ({{ p.done + 1 }}/{{ p.total }})
+            }
+          </p>
           <mat-progress-bar mode="indeterminate" />
         }
       }
@@ -300,6 +324,27 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
       }
     }
 
+    .picked {
+      margin: 12px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .picked li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 0;
+    }
+
+    .picked .name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .dz-icon {
       width: 40px;
       height: 40px;
@@ -395,14 +440,32 @@ export class DocumentImportContainerComponent {
   protected readonly canAnalyze = (document: DossierDocument) => isAnalyzableDocumentType(document.type);
 
   protected readonly type = signal<DossierDocumentType>('carte_grise');
-  protected readonly file = signal<File | null>(null);
-  protected readonly busy = signal<'upload' | 'analyze' | null>(null);
+  /** Fichiers choisis, chacun avec son type (pré-rempli avec le type du menu au moment du choix). */
+  protected readonly files = signal<PickedFile[]>([]);
+  protected readonly busy = signal<'upload' | 'analyze' | 'client' | null>(null);
+  /** Import de plusieurs fichiers : position dans la file (affichée « 2/5 »). */
+  protected readonly progress = signal<{ done: number; total: number } | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly message = signal<string | null>(null);
   protected readonly proposal = signal<{ documentId: string; fields: OcrField[] } | null>(null);
   protected readonly selection = signal<Partial<Record<CanonicalPath, boolean>>>({});
 
-  protected readonly analyzable = computed(() => isAnalyzableDocumentType(this.type()));
+  /** Dossiers dont les pièces du client ont déjà été reprises pendant cette visite. */
+  private readonly _clientPiecesTaken = new Set<string>();
+
+  constructor() {
+    // Pièces importées à la création du client : reprises dans le dossier, lues, et rangées dans les champs vides.
+    effect(() => {
+      const key = this._key();
+      const ready = this.editable() && !!this.store.product();
+      if (!key || !ready || this._clientPiecesTaken.has(key.dossierId)) return;
+      this._clientPiecesTaken.add(key.dossierId);
+      untracked(() => this.takeClientPieces(key.dossierId));
+    });
+  }
+
+  protected readonly anyAnalyzable = computed(() => this.files().some(picked => isAnalyzableDocumentType(picked.type)));
+  private _nextFileId = 0;
   protected readonly selectedCount = computed(() => Object.keys(selectedOcrAnswers(this.proposal()?.fields ?? [], this.selection())).length);
 
   private readonly _key = computed(() => {
@@ -420,42 +483,116 @@ export class DocumentImportContainerComponent {
     { initialValue: [] as DossierDocument[] },
   );
 
-  protected pickFile(files: FileList | null): void {
-    const file = files?.item(0) ?? null;
+  /** Ajoute les fichiers choisis à la liste ; les fichiers refusés (format, taille) sont écartés avec un message. */
+  protected pickFiles(list: FileList | null): void {
+    const picked = Array.from(list ?? []);
     this.message.set(null);
-    if (file && (!DOSSIER_DOCUMENT_MIME_TYPES.includes(file.type) || file.size > DOSSIER_DOCUMENT_MAX_BYTES)) {
-      this.file.set(null);
-      this.error.set(this.text.badFile);
-      return;
-    }
-    this.error.set(null);
-    this.file.set(file);
+    const accepted = picked.filter(file => DOSSIER_DOCUMENT_MIME_TYPES.includes(file.type) && file.size <= DOSSIER_DOCUMENT_MAX_BYTES);
+    this.error.set(accepted.length < picked.length ? this.text.badFile : null);
+    const type = this.type();
+    this.files.update(files => [...files, ...accepted.map(file => ({ id: this._nextFileId++, file, type }))]);
   }
 
-  /** Envoi dans Storage (nom de fichier sûr et unique), enregistrement par le serveur, puis lecture si le type s'y prête. */
-  protected importFile(): void {
-    const file = this.file();
+  protected setFileType(id: number, type: DossierDocumentType): void {
+    this.files.update(files => files.map(picked => (picked.id === id ? { ...picked, type } : picked)));
+  }
+
+  protected removeFile(id: number): void {
+    this.files.update(files => files.filter(picked => picked.id !== id));
+  }
+
+  /**
+   * Envoie les fichiers l'un après l'autre : Storage (nom sûr et unique), enregistrement par le serveur, puis lecture
+   * par l'IA si le type s'y prête. Les valeurs lues sont regroupées en une seule proposition. Un fichier en échec
+   * n'arrête pas les suivants ; il reste dans la liste pour réessayer.
+   */
+  protected importFiles(): void {
+    const queue = this.files();
     const key = this._key();
-    if (!file || !key) return;
-    const type = this.type();
-    const storagePath = `${dossierDocumentsFolder(key.cabinetId, key.dossierId)}/${type}-${Date.now()}-${safeDocumentFileName(file.name)}`;
+    if (!queue.length || !key) return;
     this.error.set(null);
     this.message.set(null);
-    this.busy.set('upload');
-    this._service
-      .upload(storagePath, file)
+    this.proposal.set(null);
+    const fields: OcrField[] = [];
+    const failed: string[] = [];
+    let lastDocumentId: string | null = null;
+    let analyzed = 0;
+    from(queue)
       .pipe(
-        switchMap(() => this._service.register(key.dossierId, type, storagePath, file.name)),
-        tap(() => this.file.set(null)),
-        catchError(error => {
-          this.error.set(toBackendErrorMessage(error));
-          return EMPTY;
+        concatMap((picked, index) => {
+          this.progress.set(queue.length > 1 ? { done: index, total: queue.length } : null);
+          this.busy.set('upload');
+          const storagePath = `${dossierDocumentsFolder(key.cabinetId, key.dossierId)}/${picked.type}-${Date.now()}-${safeDocumentFileName(picked.file.name)}`;
+          return this._service.upload(storagePath, picked.file).pipe(
+            switchMap(() => this._service.register(key.dossierId, picked.type, storagePath, picked.file.name)),
+            tap(() => this.removeFile(picked.id)),
+            switchMap(({ documentId }) => {
+              if (!isAnalyzableDocumentType(picked.type)) return of(null);
+              this.busy.set('analyze');
+              return this._service.analyze(key.dossierId, documentId).pipe(
+                tap(({ status, ocrFields }) => {
+                  if (status === 'failed') {
+                    failed.push(picked.file.name);
+                    return;
+                  }
+                  analyzed++;
+                  lastDocumentId = documentId;
+                  fields.push(...ocrFields);
+                }),
+              );
+            }),
+            catchError(() => {
+              failed.push(picked.file.name);
+              return of(null);
+            }),
+          );
         }),
-        finalize(() => this.busy.set(null)),
+        finalize(() => {
+          this.busy.set(null);
+          this.progress.set(null);
+        }),
       )
-      .subscribe(({ documentId }) => {
-        if (isAnalyzableDocumentType(type)) this.analyze(documentId);
+      .subscribe({
+        complete: () => {
+          if (failed.length) this.error.set(`${this.text.someFailed} ${failed.join(', ')}`);
+          if (analyzed && lastDocumentId) this.propose(lastDocumentId, mergeOcrFields(fields));
+        },
       });
+  }
+
+  /**
+   * Reprend les pièces du client (une seule fois chacune, côté serveur), les fait lire, puis écrit les valeurs sûres
+   * (confiance suffisante) dans les champs encore VIDES : rien de ce que le courtier a saisi n'est écrasé.
+   */
+  private takeClientPieces(dossierId: string): void {
+    const fields: OcrField[] = [];
+    this.busy.set('client');
+    this._service
+      .takeClientPieces(dossierId)
+      .pipe(
+        switchMap(({ documents }) => from(documents.filter(document => isAnalyzableDocumentType(document.type)))),
+        concatMap(document =>
+          this._service.analyze(dossierId, document.documentId).pipe(
+            tap(({ status, ocrFields }) => {
+              if (status === 'analyzed') fields.push(...ocrFields);
+            }),
+            catchError(() => of(null)),
+          ),
+        ),
+        catchError(() => EMPTY),
+        finalize(() => {
+          this.busy.set(null);
+          if (this.store.selectedId() !== dossierId) return;
+          const toFill = mergeOcrFields(fields).filter(
+            field => !needsConfirmation(field) && this.currentValue(field.canonicalPath) === null,
+          );
+          if (!toFill.length) return;
+          for (const field of toFill) this.store.edit(field.canonicalPath, field.value);
+          this.store.saveNow({ event: true });
+          this.message.set(`${toFill.length} ${this.text.clientPiecesApplied}`);
+        }),
+      )
+      .subscribe();
   }
 
   protected analyze(documentId: string): void {
@@ -529,4 +666,20 @@ export class DocumentImportContainerComponent {
     this.proposal.set({ documentId, fields });
     this.selection.set(defaultOcrSelection(fields));
   }
+}
+
+interface PickedFile {
+  id: number;
+  file: File;
+  type: DossierDocumentType;
+}
+
+/** Même champ lu sur plusieurs documents (recto et verso…) : on garde la lecture la plus sûre. */
+function mergeOcrFields(fields: OcrField[]): OcrField[] {
+  const best = new Map<CanonicalPath, OcrField>();
+  for (const field of fields) {
+    const current = best.get(field.canonicalPath);
+    if (!current || field.confidence > current.confidence) best.set(field.canonicalPath, field);
+  }
+  return [...best.values()];
 }

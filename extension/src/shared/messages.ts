@@ -206,8 +206,26 @@ export interface ActivePage {
 }
 
 /** Messages reçus depuis l'app Angular (chrome.runtime.onMessageExternal). */
-export type ExternalMessage = {
-  type: 'PING';
-  /** Identifiant d'appareil de l'app : présenté par l'extension à `sessions-ouvrirExtension`. */
-  deviceId?: string;
-};
+export type ExternalMessage =
+  | {
+      type: 'PING';
+      /** Identifiant d'appareil de l'app : présenté par l'extension à `sessions-ouvrirExtension`. */
+      deviceId?: string;
+    }
+  | {
+      /** Connexion automatique : jeton émis par `sessions-emettreJetonExtension` à l'app connectée. */
+      type: 'CONNECT';
+      token: string;
+      deviceId: string;
+    };
+
+/** Réponse à `PING` : l'extension est là, et connectée (à quel compte) ou non. */
+export interface PongResponse {
+  type: 'PONG';
+  version: string;
+  signedIn: boolean;
+  uid: string | null;
+}
+
+/** Réponse à `CONNECT`. `message` : raison affichable du refus. */
+export type ConnectResponse = { type: 'CONNECTED'; uid: string } | { type: 'CONNECT_FAILED'; message: string };

@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { Assure, CanonicalPath, NeedInput, CanonicalValue, Dossier, DossierEvent, DossierStatus, Insurer, Member, Product, VehicleInfo } from '@shared';
+import { Assure, CanonicalPath, NeedInput, CanonicalValue, Dossier, DossierEvent, DossierStatus, Insurer, Member, Product } from '@shared';
 import { combineLatest, map, Observable, of } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
@@ -126,13 +126,6 @@ export class DossiersService {
   /** Valide le besoin : le dossier passe en « besoin validé ». */
   validateNeed(dossierId: string): Observable<{ status: DossierStatus }> {
     return this._backend.call('dossiers-validerBesoin', { dossierId });
-  }
-
-  /** Véhicule correspondant à une plaque (SIV ou FNI) : rien n'est enregistré, l'app pré-remplit le questionnaire. */
-  lookupVehicle(plate: string): Observable<VehicleInfo> {
-    return this._backend
-      .call<{ plate: string }, { vehicle: VehicleInfo }>('vehicules-rechercher', { plate })
-      .pipe(map((result) => result.vehicle));
   }
 
   assign(dossierId: string, uid: string): Observable<{ success: boolean }> {

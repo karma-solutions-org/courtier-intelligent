@@ -13,19 +13,23 @@
     </header>
 
     <main>
-      <!-- Connexion : compte de l'application (email et mot de passe) -->
+      <!-- Connexion : automatique depuis l'application ouverte ; email et mot de passe en secours -->
       <section id="login" class="card" hidden>
         <p class="label">Connexion</p>
         <p id="login-notice" class="notice" role="status" hidden></p>
-        <form id="login-form" novalidate>
-          <label for="email">Email</label>
-          <input id="email" name="email" type="email" autocomplete="username" required />
-          <label for="password">Mot de passe</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required />
-          <p id="login-error" class="error" role="alert" hidden></p>
-          <button id="login-submit" type="submit">Se connecter</button>
-        </form>
-        <p class="muted small">Utilisez le compte de l'application. Courtier Intelligent doit être ouvert et connecté dans votre navigateur.</p>
+        <p>Ouvrez Courtier Intelligent dans ce navigateur et connectez-vous : l'extension se connecte automatiquement avec le même compte.</p>
+        <details class="login-fallback">
+          <summary class="muted small">Se connecter avec email et mot de passe</summary>
+          <form id="login-form" novalidate>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="username" required />
+            <label for="password">Mot de passe</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+            <p id="login-error" class="error" role="alert" hidden></p>
+            <button id="login-submit" type="submit">Se connecter</button>
+          </form>
+          <p class="muted small">Utilisez le compte de l'application. Courtier Intelligent doit être ouvert et connecté dans votre navigateur.</p>
+        </details>
       </section>
 
       <!-- Courtier connecté -->

@@ -137,6 +137,7 @@ export const SETTINGS_STRUCTURE = {
       connexion_refusee_appareil: 'Connexion refusée : appareil non autorisé',
       appareil_lie: 'Appareil lié au compte',
       extension_connexion: "Extension Chrome connectée",
+      extension_jeton_emis: "Connexion automatique de l'extension autorisée",
       appareil_reinitialise: 'Appareil réinitialisé par un administrateur',
       reinitialisation_refusee_quota: 'Réinitialisation refusée : quota mensuel atteint',
     },

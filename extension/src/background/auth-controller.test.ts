@@ -35,6 +35,11 @@ function setup() {
       state.user = state.signInResult;
       return state.signInResult;
     }),
+    signInWithToken: vi.fn(async () => {
+      if (state.signInResult instanceof Error) throw state.signInResult;
+      state.user = state.signInResult;
+      return state.signInResult;
+    }),
     signOut: vi.fn(async () => {
       state.user = null;
     }),
@@ -109,6 +114,46 @@ describe('Connexion (E6-1)', () => {
     t.state.signInResult = Object.assign(new Error('x'), { code: 'auth/network-request-failed' });
 
     await expect(t.controller.signIn('a@b.fr', 'x')).rejects.toBeInstanceOf(UserFacingError);
+  });
+});
+
+describe('Connexion automatique par jeton de l’app', () => {
+  let t: ReturnType<typeof setup>;
+  beforeEach(() => {
+    t = setup();
+  });
+
+  it('connecte avec le jeton transmis par l’app et ouvre la session d’extension', async () => {
+    const result = await t.controller.signInWithToken('jeton-app');
+
+    expect(t.auth.signInWithToken).toHaveBeenCalledWith('jeton-app');
+    expect(t.auth.signIn).not.toHaveBeenCalled();
+    expect(t.backend.openExtensionSession).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ status: 'signed_in', user: { uid: 'u1', cabinetId: 'cabinet-1' } });
+    expect(t.changes).toEqual(['signed_in']);
+  });
+
+  it('refuse un compte sans cabinet, et le déconnecte', async () => {
+    t.state.signInResult = { ...courtier, cabinetId: null, role: null };
+
+    await expect(t.controller.signInWithToken('jeton-app')).rejects.toThrow(MESSAGES.noCabinet);
+    expect(t.backend.openExtensionSession).not.toHaveBeenCalled();
+    expect(t.auth.signOut).toHaveBeenCalledOnce();
+  });
+
+  it('refuse si l’extension n’est pas sur l’appareil de l’app, et déconnecte', async () => {
+    t.state.openError = { code: 'functions/failed-precondition', message: 'x', details: { reason: 'device_mismatch' } };
+
+    await expect(t.controller.signInWithToken('jeton-app')).rejects.toThrow(MESSAGES.wrongDevice);
+    expect(t.auth.signOut).toHaveBeenCalledOnce();
+    expect(t.changes).toEqual([]);
+  });
+
+  it('un jeton expiré ou invalide donne un message affichable', async () => {
+    t.state.signInResult = Object.assign(new Error('x'), { code: 'auth/invalid-custom-token' });
+
+    await expect(t.controller.signInWithToken('perime')).rejects.toThrow(MESSAGES.autoConnectExpired);
+    expect(t.backend.openExtensionSession).not.toHaveBeenCalled();
   });
 });
 
