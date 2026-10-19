@@ -35,6 +35,8 @@ const SELECTABLE_TEXT_PATHS: ReadonlySet<CanonicalPath> = new Set<CanonicalPath>
   'vehicle.model',
   'vehicle.version',
   'client.address.country',
+  'driver.birthCountry',
+  'driver.licenseCountry',
   'client.address.city',
   'driver.profession',
   'vehicle.parkingCity',

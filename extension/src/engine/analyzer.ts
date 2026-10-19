@@ -27,6 +27,8 @@ export interface FormField {
   options: FieldOption[];
   pattern: string | null;
   maxLength: number | null;
+  /** Valeur saisie en plusieurs cases : nombre de caractères de chaque case (téléphone 2/2/2/2/2, plaque 2/3/2…). */
+  segments?: number[] | null;
 }
 
 export interface FormAnalysis {
@@ -100,6 +102,13 @@ function labelOf(element: HTMLElement): string {
     const text = textOf(previous);
     if (text && text.length < 80) return text;
   }
+  // Libellé à côté du bloc qui contient le champ (ex. « Date de naissance » à gauche des cases jour / mois / année).
+  const container = element.parentElement;
+  const beside = container && container.querySelectorAll('input, select, textarea').length <= 3 ? container.previousElementSibling : null;
+  if (beside && !beside.querySelector('input, select, textarea')) {
+    const text = textOf(beside);
+    if (text && text.length < 80) return text;
+  }
   return cleanLabel(element.getAttribute('placeholder') ?? element.getAttribute('title') ?? element.getAttribute('name') ?? '');
 }
 
@@ -141,7 +150,29 @@ function sectionOf(element: HTMLElement, headings: Element[]): string | null {
   return section ? textOf(section) || null : null;
 }
 
+/**
+ * Contrôles qui ne sont pas des champs HTML : liste déroulante maison (div ou bouton + liste), boutons radio et
+ * interrupteurs dessinés (rôles ARIA). Une liste maison qui contient un vrai <input> est analysée par cet input.
+ */
+const CUSTOM_CONTROL_SELECTOR =
+  '[role="combobox"]:not(input), button[aria-haspopup="listbox"], [role="radio"]:not(input), [role="switch"]:not(input), [role="checkbox"]:not(input)';
+const CONTROL_SELECTOR = `input, select, textarea, ${CUSTOM_CONTROL_SELECTOR}`;
+
+const isCustomControl = (element: HTMLElement) =>
+  !(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement);
+
+/** Valeur d'une option dessinée (bouton radio ARIA, option de liste maison) : data-value, sinon son texte. */
+export function customValueOf(element: HTMLElement): string {
+  return (element.getAttribute('data-value') ?? element.getAttribute('aria-label') ?? textOf(element)).trim();
+}
+
 function kindOf(element: HTMLElement): { kind: FieldKind; inputType: string } {
+  if (isCustomControl(element)) {
+    const role = element.getAttribute('role');
+    if (role === 'radio') return { kind: 'radio', inputType: 'aria-radio' };
+    if (role === 'switch' || role === 'checkbox') return { kind: 'checkbox', inputType: 'aria-checkbox' };
+    return { kind: 'select', inputType: 'custom-select' };
+  }
   if (element instanceof HTMLSelectElement) return { kind: 'select', inputType: 'select' };
   if (element instanceof HTMLTextAreaElement) return { kind: 'textarea', inputType: 'textarea' };
   const input = element as HTMLInputElement;
@@ -161,6 +192,9 @@ function optionsOf(element: HTMLElement, group: HTMLElement[]): FieldOption[] {
       .filter(option => option.value !== '' || option.textContent?.trim())
       .map(option => ({ value: option.value, label: cleanLabel(option.textContent ?? '') }))
       .filter(option => !/^(choisir|selectionner|sélectionner|-+|\.\.\.)/i.test(option.label) || option.value !== '');
+  }
+  if (element.getAttribute('role') === 'radio' && isCustomControl(element)) {
+    return group.map(radio => ({ value: customValueOf(radio), label: customValueOf(radio) }));
   }
   if ((element as HTMLInputElement).type === 'radio') {
     return group.map(radio => ({ value: (radio as HTMLInputElement).value, label: labelOf(radio) || (radio as HTMLInputElement).value }));
@@ -214,16 +248,44 @@ export function isAuthPage(root: Document | HTMLElement = document): boolean {
   });
 }
 
+/** Libellé d'un groupe de cases : celui de la première case, sauf s'il ne nomme que la case (« Jour ») ; alors celui du bloc. */
+function segmentGroupLabel(parts: HTMLElement[]): string {
+  const own = labelOf(parts[0]);
+  if (own.length > 4 && !Object.values(PART_HINTS).some(hint => hint.test(own))) return own;
+  for (let node = parts[0].parentElement; node && node !== parts[0].ownerDocument.body; node = node.parentElement) {
+    if (!parts.every(part => node!.contains(part))) continue;
+    const beside = node.previousElementSibling;
+    if (beside && !beside.querySelector('input, select, textarea')) {
+      const text = textOf(beside);
+      if (text && text.length < 80) return text;
+    }
+  }
+  return own;
+}
+
+const radioGroupIds = new WeakMap<HTMLElement, string>();
+let nextRadioGroupId = 0;
+
+/** Identifiant d'un groupe de boutons radio ARIA : son id, sinon un identifiant stable pour la page. */
+function radioGroupId(group: HTMLElement): string {
+  if (group.id) return group.id;
+  let id = radioGroupIds.get(group);
+  if (!id) radioGroupIds.set(group, (id = `aria-radiogroup-${nextRadioGroupId++}`));
+  return id;
+}
+
 export function analyzeForm(root: Document | HTMLElement = document): FormAnalysis {
   const doc = root instanceof Document ? root : root.ownerDocument;
   const scope = root instanceof Document ? root.body : root;
   const headings = [...scope.querySelectorAll(HEADING_SELECTOR)];
 
-  const candidates = [...scope.querySelectorAll<HTMLElement>('input, select, textarea')].filter(element => {
+  const candidates = [...scope.querySelectorAll<HTMLElement>(CONTROL_SELECTOR)].filter(element => {
     const type = (element.getAttribute('type') ?? 'text').toLowerCase();
     return (
       !(element instanceof HTMLInputElement && IGNORED_INPUT_TYPES.has(type)) &&
       !(element as HTMLInputElement).disabled &&
+      element.getAttribute('aria-disabled') !== 'true' &&
+      !(isCustomControl(element) && element.querySelector('input, select, textarea')) &&
       element.getAttribute('aria-hidden') !== 'true' &&
       !isSearchField(element) &&
       isVisible(element)
@@ -234,6 +296,8 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
   const elements = new Map<string, HTMLElement[]>();
   const usedKeys = new Map<string, number>();
   const radioGroups = new Map<string, HTMLElement[]>();
+  const segmentGroups = findSegmentGroups(candidates);
+  const inSegmentGroup = new Set([...segmentGroups.values()].flatMap(({ parts }) => parts.slice(1)));
 
   const uniqueKey = (base: string): string => {
     const count = (usedKeys.get(base) ?? 0) + 1;
@@ -242,11 +306,17 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
   };
 
   for (const element of candidates) {
-    const { kind, inputType } = kindOf(element);
-    let group: HTMLElement[] = [element];
+    if (inSegmentGroup.has(element)) continue; // case déjà comptée avec la première de son groupe
+    const segments = segmentGroups.get(element);
+    const { kind, inputType } = segments
+      ? { kind: segments.inputType === 'segmented' ? ('text' as const) : ('date' as const), inputType: segments.inputType }
+      : kindOf(element);
+    let group: HTMLElement[] = segments ? segments.parts : [element];
 
     if (kind === 'radio') {
-      const name = (element as HTMLInputElement).name || element.id || `radio-${fields.length}`;
+      const name = isCustomControl(element)
+        ? radioGroupId(element.closest<HTMLElement>('[role="radiogroup"]') ?? element.parentElement ?? element)
+        : (element as HTMLInputElement).name || element.id || `radio-${fields.length}`;
       const groupKey = `${name}@${element.closest('form')?.id ?? ''}`;
       const existing = radioGroups.get(groupKey);
       if (existing) {
@@ -257,7 +327,7 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
       radioGroups.set(groupKey, group);
     }
 
-    const label = kind === 'radio' ? groupLabelOf(element) : labelOf(element);
+    const label = kind === 'radio' ? groupLabelOf(element) : segments ? segmentGroupLabel(segments.parts) : labelOf(element);
     const name = element.getAttribute('name');
     const base = `${kind}:${normalize(name ?? element.id ?? label).replace(/ /g, '-').slice(0, 80) || fields.length}`;
     const key = uniqueKey(base);
@@ -277,7 +347,8 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
       order: fields.length,
       options: [],
       pattern: element.getAttribute('pattern'),
-      maxLength: (element as HTMLInputElement).maxLength > 0 ? (element as HTMLInputElement).maxLength : null,
+      maxLength: !segments && (element as HTMLInputElement).maxLength > 0 ? (element as HTMLInputElement).maxLength : null,
+      segments: segments?.inputType === 'segmented' ? segments.widths : null,
     });
   }
 
@@ -288,6 +359,108 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
   }
 
   return { fields, elements, fingerprint: fingerprintOf(fields, doc) };
+}
+
+// ── Saisie en plusieurs cases (date, téléphone, plaque, code…) ──────────────
+
+/** Ordre des cases d'une date saisie en trois parties : `split-dmy` (jour, mois, année) ou `split-ymd`. */
+export type SplitDateOrder = 'split-dmy' | 'split-ymd';
+
+const PART_HINTS: Record<'d' | 'm' | 'y', RegExp> = {
+  d: /(^|[^a-z])(jour|day|jj|dd)([^a-z]|$)|_j$|jour$/i,
+  m: /(^|[^a-z])(mois|month|mm)([^a-z]|$)|_m$|mois$/i,
+  y: /(^|[^a-z])(annee|année|an|year|aaaa|yyyy)([^a-z]|$)|_a$|annee$/i,
+};
+
+/** Une case ne dépasse pas cette taille : au-delà, c'est un champ à part entière (nom, adresse…). */
+const MAX_SEGMENT_WIDTH = 6;
+
+/** Rôle d'une case de date d'après son nom / id / placeholder. */
+function partOf(element: HTMLElement): 'd' | 'm' | 'y' | null {
+  const input = element as HTMLInputElement;
+  const hints = [input.name, input.id, input.getAttribute('placeholder'), input.getAttribute('title')].filter(Boolean).join(' ');
+  for (const part of ['d', 'm', 'y'] as const) if (PART_HINTS[part].test(hints)) return part;
+  return null;
+}
+
+function widthOf(element: HTMLElement): number | null {
+  const input = element as HTMLInputElement;
+  if (input.maxLength > 0) return input.maxLength;
+  const size = Number(input.getAttribute('size'));
+  return size > 0 ? size : null;
+}
+
+const isTextBox = (element: HTMLElement) =>
+  element instanceof HTMLInputElement && ['text', 'tel', 'number', ''].includes((element.getAttribute('type') ?? 'text').toLowerCase());
+
+/** Les cases sont-elles côte à côte (même parent, ou chacune seule dans des parents frères) ? */
+function sideBySide(parts: HTMLElement[]): boolean {
+  const parents = parts.map(p => p.parentElement);
+  if (parents.every(p => p === parents[0])) return true;
+  const grand = parents.map(p => p?.parentElement);
+  return !!grand[0] && grand.every(g => g === grand[0]) && parents.every(p => (p?.querySelectorAll('input').length ?? 0) === 1);
+}
+
+/**
+ * Le champ a-t-il un libellé à lui (label for, label englobant, aria-label, aria-labelledby) ? Un libellé qui ne fait que
+ * nommer la case (« Jour », « MM », « AAAA ») ne compte pas : il fait partie du groupe.
+ */
+function hasOwnLabel(element: HTMLElement): boolean {
+  const doc = element.ownerDocument;
+  const texts = [
+    element.getAttribute('aria-label'),
+    labelledBy(element),
+    element.closest('label') ? labelText(element.closest('label')!) : null,
+    element.id ? ([...doc.querySelectorAll<HTMLLabelElement>('label[for]')].find(label => label.htmlFor === element.id) ?? null) : null,
+  ].map(item => (item instanceof HTMLLabelElement ? labelText(item) : (item ?? '').trim()));
+  return texts.some(text => !!text && text.length > 4 && !Object.values(PART_HINTS).some(hint => hint.test(text)));
+}
+
+/** Ordre d'un trio de cases s'il forme une date (2/2/4 ou 4/2/2 caractères, ou noms jour/mois/année), sinon null. */
+function splitDateOrder(parts: HTMLElement[]): SplitDateOrder | null {
+  if (parts.length !== 3) return null;
+  const widths = parts.map(widthOf).join('/');
+  if (widths === '2/2/4') return 'split-dmy';
+  if (widths === '4/2/2') return 'split-ymd';
+  const roles = parts.map(partOf).join('');
+  if (roles === 'dmy') return 'split-dmy';
+  if (roles === 'ymd') return 'split-ymd';
+  return null;
+}
+
+/** Groupe de cases qui forment UNE valeur : date (`split-dmy` / `split-ymd`) ou valeur découpée (`segmented`). */
+export interface SegmentGroup {
+  parts: HTMLElement[];
+  inputType: SplitDateOrder | 'segmented';
+  /** Nombre de caractères de chaque case (valeur découpée). */
+  widths: number[];
+}
+
+/**
+ * Cases courtes et côte à côte qui forment une seule valeur : une date en trois cases, un téléphone en cinq, une plaque
+ * en trois… Chaque case a une taille connue (maxlength ou size) d'au plus 6 caractères. Première case → groupe.
+ */
+function findSegmentGroups(candidates: HTMLElement[]): Map<HTMLElement, SegmentGroup> {
+  const found = new Map<HTMLElement, SegmentGroup>();
+  for (let i = 0; i < candidates.length; i++) {
+    const run: HTMLElement[] = [];
+    for (let j = i; j < candidates.length; j++) {
+      const candidate = candidates[j];
+      const width = widthOf(candidate);
+      const short = isTextBox(candidate) && ((width !== null && width <= MAX_SEGMENT_WIDTH) || partOf(candidate) !== null);
+      // Une case qui a son propre libellé est un champ à part (« Champ A » / « Champ B »), pas la suite du groupe.
+      if (!short || (run.length && (hasOwnLabel(candidate) || !sideBySide([...run, candidate])))) break;
+      run.push(candidate);
+    }
+    if (run.length < 2) continue;
+    const date = splitDateOrder(run);
+    const widths = run.map(widthOf);
+    if (date) found.set(run[0], { parts: run, inputType: date, widths: widths.map(w => w ?? 0) });
+    else if (widths.every((w): w is number => w !== null)) found.set(run[0], { parts: run, inputType: 'segmented', widths });
+    else continue;
+    i += run.length - 1;
+  }
+  return found;
 }
 
 /** Empreinte de la structure (types, noms, libellés, nombre d'options) : jamais de valeurs saisies. */

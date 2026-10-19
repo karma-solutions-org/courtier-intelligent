@@ -5,11 +5,14 @@ import { analyzeForm, FormAnalysis, isAuthPage } from './analyzer';
 import { detectResultPage, extractFromDom, hasPremium, hasResultHeading, parseAmounts, visibleText } from './capture';
 import { captureWithAi, mergeOffers } from './capture-ai';
 import { expectsDate } from './field-synonyms';
-import { fillField, FillResult, registrationFor } from './filler';
+import { fillField, FillResult, parseRange, registrationFor } from './filler';
 import { asCanonicalPath, isCompatible, Mapping, mapFields } from './mapping';
 import { applyMemory, MemoryPort, toDiscoveredFields, toMemoryFields, toRequiredPaths } from './memory';
-import { FillPlan, planFill } from './plan';
+import { FillPlan, FillValue, planFill, valueOf } from './plan';
 import { detectStepHint, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
+
+/** Champs d'adresse : les extranets y proposent souvent des suggestions à choisir (adresse normalisée, commune). */
+const SUGGEST_PATHS: ReadonlySet<string> = new Set(['client.address.street', 'client.address.city', 'vehicle.parkingCity']);
 
 /** Échec d'écriture de l'avancement, avec la cause exacte (`cancelled` : le job a été annulé). */
 export class JobUpdateError extends Error {
@@ -475,17 +478,32 @@ export class FormRunner {
     const results = new Map<string, FillResult>();
     for (const { field, value: planned, path } of plan.instructions) {
       const elements = analysis.elements.get(field.key) ?? [];
-      const value = path === 'vehicle.registration' ? registrationFor(field, elements[0], planned) : planned;
+      const value = path === 'vehicle.registration' ? registrationFor(field, elements[0], planned) : this.withSeniority(path, field, planned);
       const signature = `${String(value)}`;
       if (this.written.get(field.key) === signature) {
         results.set(field.key, { fieldKey: field.key, status: 'filled' });
         continue;
       }
-      const result = await fillField(field, elements, value, { date: expectsDate(path, value), version: path === 'vehicle.version' });
+      const result = await fillField(field, elements, value, {
+        date: expectsDate(path, value),
+        version: path === 'vehicle.version',
+        suggest: SUGGEST_PATHS.has(path),
+      });
       results.set(field.key, result);
       if (result.status === 'filled') this.written.set(field.key, signature);
     }
     return results;
+  }
+
+  /**
+   * « Avez-vous été assuré ? » proposé en durées (« moins de 9 mois », « 24 mois et plus ») : un simple « oui » ne
+   * choisit pas, l'ancienneté du dossier (en mois) le fait.
+   */
+  private withSeniority(path: CanonicalPath, field: FormAnalysis['fields'][number], planned: FillValue): FillValue {
+    if (path !== 'insuranceHistory.currentlyInsured' || planned !== true) return planned;
+    if (!field.options.some(option => parseRange(option.label) !== null)) return planned;
+    const months = valueOf(this.job.quoteData['insuranceHistory.seniority']);
+    return typeof months === 'number' ? months : planned;
   }
 
   private async reportProgress(plan: FillPlan, hint: StepHint): Promise<void> {

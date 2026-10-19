@@ -319,3 +319,202 @@ describe('matchVersion (désignation la plus proche)', () => {
     expect(matchVersion(opt('FOURGON CONFORT', 'FOURGON GRAND CONFORT'), VERSION)).toBeNull();
   });
 });
+
+describe('Extranet type Oyat : date en trois cases, adresse à suggestions', () => {
+  const dateRow = (name: string, sizes = [2, 2, 4]) =>
+    `<div class="row"><span>Date de naissance : *</span><span>${sizes
+      .map((size, i) => `<input type="text" name="${name}${i}" maxlength="${size}" />`)
+      .join('')}</span></div>`;
+
+  it('regroupe jour / mois / année en un seul champ date et remplit chaque case', async () => {
+    const { fields, fill } = setup(dateRow('naiss'));
+
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ kind: 'date', inputType: 'split-dmy', label: expect.stringMatching(/date de naissance/i) });
+    expect(await fill(0, '1985-10-16')).toMatchObject({ status: 'filled' });
+    const values = [...document.querySelectorAll('input')].map(input => input.value);
+    expect(values).toEqual(['16', '10', '1985']);
+  });
+
+  it('reconnaît l’ordre année / mois / jour', async () => {
+    const { fields, fill } = setup(dateRow('d', [4, 2, 2]));
+
+    expect(fields[0].inputType).toBe('split-ymd');
+    await fill(0, '2014-03-18');
+    expect([...document.querySelectorAll('input')].map(input => input.value)).toEqual(['2014', '03', '18']);
+  });
+
+  it('ne regroupe pas trois champs de texte ordinaires', () => {
+    const { fields } = setup('<p><input name="nom" /><input name="prenom" /><input name="ville" /></p>');
+    expect(fields.map(f => f.kind)).toEqual(['text', 'text', 'text']);
+  });
+
+  it('choisit la suggestion d’adresse proposée après la saisie', async () => {
+    const { fields, elements } = setup('<label for="a">Adresse</label><input id="a" name="adresse" /><ul id="s"></ul>');
+    const input = document.getElementById('a') as HTMLInputElement;
+    const list = document.getElementById('s')!;
+    let picked = '';
+    input.addEventListener('input', () => {
+      list.innerHTML = '<li>225 Boulevard paul claudel 13010 Marseille</li><li>Boulevard paul claudel 13009 Marseille</li>';
+      list.querySelectorAll('li').forEach(li =>
+        li.addEventListener('click', () => {
+          picked = li.textContent ?? '';
+          input.value = picked;
+        }),
+      );
+    });
+
+    const result = await fillField(fields[0], elements.get(fields[0].key)!, '225 BOULEVARD PAUL CLAUDEL', { suggest: true, suggestionTimeoutMs: 300 });
+
+    expect(result.status).toBe('filled');
+    expect(picked).toBe('225 Boulevard paul claudel 13010 Marseille');
+  });
+
+  it('sans suggestion, garde le texte saisi', async () => {
+    const { fields, elements } = setup('<label for="a">Adresse</label><input id="a" name="adresse" />');
+    const result = await fillField(fields[0], elements.get(fields[0].key)!, '1 rue de Paris', { suggest: true, suggestionTimeoutMs: 100 });
+    expect(result.status).toBe('filled');
+    expect((document.getElementById('a') as HTMLInputElement).value).toBe('1 rue de Paris');
+  });
+});
+
+describe('Saisie en plusieurs cases', () => {
+  const boxes = (label: string, name: string, widths: number[]) =>
+    `<div><span>${label}</span><span>${widths.map((w, i) => `<input type="text" name="${name}${i}" maxlength="${w}" />`).join('')}</span></div>`;
+  const values = () => [...document.querySelectorAll('input')].map(input => input.value);
+
+  it('découpe un téléphone en cinq cases, et repasse +33 au format national', async () => {
+    const { fields, fill } = setup(boxes('Téléphone portable', 'tel', [2, 2, 2, 2, 2]));
+
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ kind: 'text', inputType: 'segmented', segments: [2, 2, 2, 2, 2] });
+    expect(await fill(0, '+33 6 12 34 56 78')).toMatchObject({ status: 'filled' });
+    expect(values()).toEqual(['06', '12', '34', '56', '78']);
+  });
+
+  it('découpe une plaque en trois cases (2/3/2), sans les tirets', async () => {
+    const { fill } = setup(boxes('Immatriculation', 'plaque', [2, 3, 2]));
+    expect(await fill(0, 'CM-359-VC')).toMatchObject({ status: 'filled' });
+    expect(values()).toEqual(['CM', '359', 'VC']);
+  });
+
+  it('refuse une valeur de mauvaise longueur au lieu de remplir à moitié', async () => {
+    const { fill } = setup(boxes('Téléphone', 'tel', [2, 2, 2, 2, 2]));
+    expect(await fill(0, '0612')).toMatchObject({ status: 'failed' });
+    expect(values()).toEqual(['', '', '', '', '']);
+  });
+
+  it('ne regroupe pas des champs longs côte à côte (nom, prénom)', () => {
+    const { fields } = setup('<p><input name="nom" maxlength="50" /><input name="prenom" maxlength="50" /></p>');
+    expect(fields.map(f => f.inputType)).toEqual(['text', 'text']);
+  });
+});
+
+describe('Contrôles dessinés (rôles ARIA)', () => {
+  it('coche un bouton radio dessiné Oui / Non', async () => {
+    const { fields, fill } = setup(`
+      <div role="radiogroup" aria-label="Conducteur déjà assuré">
+        <div role="radio" aria-checked="false" tabindex="0">Oui</div>
+        <div role="radio" aria-checked="false" tabindex="0">Non</div>
+      </div>`);
+    document.querySelectorAll<HTMLElement>('[role="radio"]').forEach(radio =>
+      radio.addEventListener('click', () => {
+        document.querySelectorAll('[role="radio"]').forEach(r => r.setAttribute('aria-checked', 'false'));
+        radio.setAttribute('aria-checked', 'true');
+      }),
+    );
+
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ kind: 'radio', inputType: 'aria-radio', label: 'Conducteur déjà assuré' });
+    expect(fields[0].options.map(o => o.label)).toEqual(['Oui', 'Non']);
+    expect(await fill(0, false)).toMatchObject({ status: 'filled' });
+    expect(document.querySelectorAll('[role="radio"]')[1].getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('bascule un interrupteur dessiné', async () => {
+    const { fields, fill } = setup('<span id="l">Garage fermé</span><div role="switch" aria-labelledby="l" aria-checked="false"></div>');
+    const toggle = document.querySelector<HTMLElement>('[role="switch"]')!;
+    toggle.addEventListener('click', () => toggle.setAttribute('aria-checked', String(toggle.getAttribute('aria-checked') !== 'true')));
+
+    expect(fields[0]).toMatchObject({ kind: 'checkbox', inputType: 'aria-checkbox', label: 'Garage fermé' });
+    expect(await fill(0, true)).toMatchObject({ status: 'filled' });
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('ouvre une liste déroulante maison et choisit l’option', async () => {
+    const { fields, fill } = setup(`
+      <span id="lbl">Usage du véhicule</span>
+      <div role="combobox" aria-labelledby="lbl" aria-controls="lst" tabindex="0">Choisir</div>
+      <ul role="listbox" id="lst" hidden></ul>`);
+    const combo = document.querySelector<HTMLElement>('[role="combobox"]')!;
+    const list = document.getElementById('lst')!;
+    combo.addEventListener('click', () => {
+      list.hidden = false;
+      list.innerHTML = '<li role="option">Privé</li><li role="option">Domicile-travail</li><li role="option">Professionnel</li>';
+      list.querySelectorAll<HTMLElement>('[role="option"]').forEach(option =>
+        option.addEventListener('click', () => {
+          combo.textContent = option.textContent;
+          list.hidden = true;
+        }),
+      );
+    });
+
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ kind: 'select', inputType: 'custom-select', label: 'Usage du véhicule' });
+    expect(await fill(0, 'prive_trajet')).toMatchObject({ status: 'filled' });
+    expect(combo.textContent).toBe('Domicile-travail');
+  });
+});
+
+describe('Cases avec leur propre petit libellé', () => {
+  it('regroupe quand même une date dont chaque case est libellée Jour / Mois / Année', () => {
+    const { fields } = setup(`<div><span>Date d'effet</span><span>
+      <input aria-label="Jour" maxlength="2" /><input aria-label="Mois" maxlength="2" /><input aria-label="Année" maxlength="4" /></span></div>`);
+    expect(fields).toHaveLength(1);
+    expect(fields[0].inputType).toBe('split-dmy');
+    expect(fields[0].label).toBe("Date d'effet");
+  });
+});
+
+describe('Liste dépendante (villes du code postal)', () => {
+  it('attend que la liste des villes se charge après la saisie du code postal (au keyup)', async () => {
+    const { fields, elements } = setup(`
+      <label for="cp">Code postal</label><input id="cp" name="cp" />
+      <label for="ville">Ville</label><select id="ville" name="ville"><option value="">Sélectionner une ville...</option></select>`);
+    const ville = document.getElementById('ville') as HTMLSelectElement;
+    document.getElementById('cp')!.addEventListener('keyup', () =>
+      setTimeout(() => (ville.innerHTML += '<option value="13210">MARSEILLE</option><option value="13299">MARSEILLE CEDEX</option>'), 300),
+    );
+
+    await fillField(fields[0], elements.get(fields[0].key)!, '13010');
+    const result = await fillField(fields[1], elements.get(fields[1].key)!, 'MARSEILLE', { listTimeoutMs: 1500 });
+
+    expect(result.status).toBe('filled');
+    expect(ville.value).toBe('13210');
+  });
+});
+
+describe('Réponses en tranches (ancienneté d’assurance)', () => {
+  const OYAT = ['Non, aucune assurance', 'Oui, moins de 9 mois', 'Oui, de 9 à 23 mois', 'Oui, 24 mois et plus'].map((label, i) => ({ value: String(i), label }));
+
+  it.each([
+    [0, 'Non, aucune assurance'],
+    [5, 'Oui, moins de 9 mois'],
+    [9, 'Oui, de 9 à 23 mois'],
+    [23, 'Oui, de 9 à 23 mois'],
+    [36, 'Oui, 24 mois et plus'],
+  ])('%i mois → « %s »', (months, label) => {
+    expect(matchOption(OYAT, months)?.label).toBe(label);
+  });
+
+  it('« non » choisit « Non, aucune assurance » ; « oui » seul ne choisit rien au hasard', () => {
+    expect(matchOption(OYAT, false)?.label).toBe('Non, aucune assurance');
+    expect(matchOption(OYAT, true)).toBeNull();
+  });
+
+  it('lit aussi les tranches en années (converties en mois)', () => {
+    const years = ['Moins de 2 ans', 'De 2 à 5 ans', '5 ans et plus'].map((label, i) => ({ value: String(i), label }));
+    expect(matchOption(years, 30)?.label).toBe('De 2 à 5 ans');
+    expect(matchOption(years, 12)?.label).toBe('Moins de 2 ans');
+  });
+});
