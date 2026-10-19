@@ -276,8 +276,8 @@ chrome.runtime.onConnect.addListener(port => {
   } catch {
     origin = '';
   }
-  // Seul le cadre principal d'un onglet (content script) ouvre ce port.
-  if (tabId === undefined || (port.sender?.frameId ?? 0) !== 0 || !origin) {
+  // Content script d'un onglet (cadre principal, ou iframe de l'extranet qui porte le formulaire).
+  if (tabId === undefined || !origin) {
     port.disconnect();
     return;
   }
@@ -454,7 +454,7 @@ async function syncContentScriptsNow(): Promise<void> {
     if (registered.length) await chrome.scripting.unregisterContentScripts({ ids: [CONTENT_SCRIPT_ID] });
     if (granted.length === 0) return;
     await chrome.scripting.registerContentScripts([
-      { id: CONTENT_SCRIPT_ID, matches: granted, js: [CONTENT_SCRIPT_FILE], runAt: 'document_idle', allFrames: false, persistAcrossSessions: true },
+      { id: CONTENT_SCRIPT_ID, matches: granted, js: [CONTENT_SCRIPT_FILE], runAt: 'document_idle', allFrames: true, persistAcrossSessions: true },
     ]);
   } catch (error) {
     console.error('Enregistrement du content script impossible', error);
@@ -481,7 +481,7 @@ async function onAccessGranted(): Promise<boolean> {
   const origin = originOnly(tab?.url);
   if (tab?.id === undefined || !origin || !insurerForOrigin(origin, await loadInsurers())) return false;
   try {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: [CONTENT_SCRIPT_FILE] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: [CONTENT_SCRIPT_FILE] });
     return true;
   } catch {
     return false;
@@ -509,7 +509,7 @@ async function ensureInjected(tabId: number, url: string | undefined): Promise<v
   if (pagesByTab.has(tabId)) return;
   const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [CONTENT_SCRIPT_ID] });
   if (!registered.length) await syncContentScripts();
-  await chrome.scripting.executeScript({ target: { tabId }, files: [CONTENT_SCRIPT_FILE] }).catch(error => {
+  await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: [CONTENT_SCRIPT_FILE] }).catch(error => {
     console.error('Injection du content script impossible', error);
   });
 }

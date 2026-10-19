@@ -131,26 +131,27 @@ async function startRunner(job: JobContext): Promise<void> {
 }
 
 /** Répond toujours : `false` sans remplissage en cours ou si l'action échoue (l'appelant n'attend jamais en vain). */
-function respond(action: Promise<unknown> | undefined, sendResponse: (response: boolean) => void): true {
-  if (!action) sendResponse(false);
-  else action.then(() => sendResponse(true), () => sendResponse(false));
+function respond(action: Promise<unknown>, sendResponse: (response: boolean) => void): true {
+  action.then(() => sendResponse(true), () => sendResponse(false));
   return true;
 }
 
 chrome.runtime.onMessage.addListener((message: TabMessage, sender, sendResponse) => {
   // Seul le service worker de cette extension nous parle (jamais un autre onglet).
   if (sender.id !== chrome.runtime.id || sender.tab) return false;
+  // Le message est envoyé à tous les cadres de l'onglet : seul celui qui remplit répond (les autres laissent la main).
+  if (!runner) return false;
   switch (message.type) {
     case 'MANUAL_MAP':
-      return respond(runner?.manualMap(message.fieldKey, message.canonicalPath), sendResponse);
+      return respond(runner.manualMap(message.fieldKey, message.canonicalPath), sendResponse);
     case 'REFILL':
-      return respond(runner?.refill(), sendResponse);
+      return respond(runner.refill(), sendResponse);
     case 'JOB_CHANGED':
-      return respond(runner?.updateJob(message.job), sendResponse);
+      return respond(runner.updateJob(message.job), sendResponse);
     case 'CAPTURE_NOW':
-      return respond(runner?.captureNow(), sendResponse);
+      return respond(runner.captureNow(), sendResponse);
     case 'CAPTURE_DONE':
-      runner?.stop();
+      runner.stop();
       sendResponse(true);
       return false;
   }
@@ -171,11 +172,35 @@ async function findJob(): Promise<JobContext | null> {
   return null;
 }
 
-// Page analysée (side panel), puis : y a-t-il un job de tarification pour l'assureur de cet extranet ?
-send({ type: 'PAGE_DETECTED', origin: location.origin, title: document.title, fieldCount: countVisibleFields() }).catch(() => {
-  // Le service worker peut être en cours de redémarrage : rien à faire.
-});
-void findJob()
-  .then(job => (job ? startRunner(job) : undefined))
-  .catch(() => undefined);
+/** Attend que des champs apparaissent (formulaire chargé après coup) ; false si rien au bout de `timeoutMs`. */
+async function waitForFields(timeoutMs = 15_000): Promise<boolean> {
+  for (let waited = 0; countVisibleFields() === 0; waited += 1_000) {
+    if (waited >= timeoutMs) return false;
+    await delay(1_000);
+  }
+  return true;
+}
+
+/**
+ * Le script tourne dans chaque cadre de l'extranet. Seul le cadre qui porte le formulaire remplit : une iframe sans
+ * champ (publicité, menu…) reste muette ; la page principale qui ne fait qu'inclure le formulaire dans une iframe aussi.
+ */
+async function main(): Promise<void> {
+  const isTopFrame = window === window.top;
+  const detect = () =>
+    send({ type: 'PAGE_DETECTED', origin: location.origin, title: document.title, fieldCount: countVisibleFields() }).catch(() => {
+      // Le service worker peut être en cours de redémarrage : rien à faire.
+    });
+  if (isTopFrame) void detect();
+  const hasFrames = document.querySelector('iframe, frame') !== null;
+  if (!isTopFrame || hasFrames) {
+    if (!(await waitForFields())) return;
+    if (!isTopFrame) void detect();
+  }
+  // Y a-t-il un job de tarification pour l'assureur de cet extranet ?
+  const job = await findJob();
+  if (job) await startRunner(job);
+}
+
+void main().catch(() => undefined);
 }

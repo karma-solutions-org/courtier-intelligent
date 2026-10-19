@@ -54,9 +54,13 @@ export function isPanelSender(sender: Sender, panelPrefix: string, extensionId: 
   return !sender.tab && sender.id === extensionId && !!sender.url?.startsWith(panelPrefix);
 }
 
-/** Origine de la page d'un onglet qui envoie le message (cadre principal seulement), ou null. */
+/**
+ * Origine du cadre d'un onglet qui envoie le message, ou null. Cadre principal ou iframe : beaucoup d'extranets placent
+ * leur formulaire dans une iframe. L'origine est celle du cadre lui-même (jamais celle de la page qui l'inclut), et le
+ * content script n'est injecté que dans les cadres des extranets autorisés.
+ */
 export function tabSenderOrigin(sender: Sender, extensionId: string): { tabId: number; origin: string } | null {
-  if (sender.tab?.id === undefined || sender.id !== extensionId || (sender.frameId ?? 0) !== 0 || !sender.url) return null;
+  if (sender.tab?.id === undefined || sender.id !== extensionId || !sender.url) return null;
   try {
     const origin = new URL(sender.url).origin;
     return origin && origin !== 'null' ? { tabId: sender.tab.id, origin } : null;
