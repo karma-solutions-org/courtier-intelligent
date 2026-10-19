@@ -25,9 +25,13 @@ export class DocumentsService {
     return this._backend.call('documents-enregistrer', { dossierId, type, storagePath, fileName });
   }
 
-  /** Lecture par l'IA : renvoie les valeurs proposées (rien n'est écrit dans le dossier). */
-  analyze(dossierId: string, documentId: string): Observable<{ status: DossierDocumentStatus; ocrFields: OcrField[]; remaining: number }> {
-    return this._backend.call('documents-analyser', { dossierId, documentId });
+  /** Lecture par l'IA : renvoie les valeurs proposées (rien n'est écrit dans le dossier). `detectType` : l'IA reconnaît aussi le type. */
+  analyze(
+    dossierId: string,
+    documentId: string,
+    detectType = false,
+  ): Observable<{ status: DossierDocumentStatus; ocrFields: OcrField[]; documentType?: DossierDocumentType; remaining: number }> {
+    return this._backend.call('documents-analyser', { dossierId, documentId, ...(detectType ? { detectType } : {}) });
   }
 
   /** Copie dans le dossier les pièces rangées avec son client (une seule fois chacune) : renvoie les documents créés. */

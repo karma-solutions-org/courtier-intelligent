@@ -59,7 +59,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>{{ text.type }}</mat-label>
             <mat-select [ngModel]="type()" (ngModelChange)="type.set($event)">
-              @for (t of types; track t) {
+              @for (t of pickTypes; track t) {
                 <mat-option [value]="t">{{ text.types[t] }}</mat-option>
               }
             </mat-select>
@@ -79,7 +79,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
                 <span class="name">{{ picked.file.name }}</span>
                 <mat-form-field appearance="outline" subscriptSizing="dynamic">
                   <mat-select [ngModel]="picked.type" (ngModelChange)="setFileType(picked.id, $event)" [disabled]="!!busy()">
-                    @for (t of types; track t) {
+                    @for (t of pickTypes; track t) {
                       <mat-option [value]="t">{{ text.types[t] }}</mat-option>
                     }
                   </mat-select>
@@ -439,7 +439,9 @@ export class DocumentImportContainerComponent {
   protected readonly toConfirm = needsConfirmation;
   protected readonly canAnalyze = (document: DossierDocument) => isAnalyzableDocumentType(document.type);
 
-  protected readonly type = signal<DossierDocumentType>('carte_grise');
+  /** Choix proposés à l'import : « auto » laisse l'IA reconnaître le type de chaque fichier. */
+  protected readonly pickTypes: PickedType[] = ['auto', ...DOSSIER_DOCUMENT_TYPES];
+  protected readonly type = signal<PickedType>('auto');
   /** Fichiers choisis, chacun avec son type (pré-rempli avec le type du menu au moment du choix). */
   protected readonly files = signal<PickedFile[]>([]);
   protected readonly busy = signal<'upload' | 'analyze' | null>(null);
@@ -450,7 +452,7 @@ export class DocumentImportContainerComponent {
   protected readonly proposal = signal<{ documentId: string; fields: OcrField[] } | null>(null);
   protected readonly selection = signal<Partial<Record<CanonicalPath, boolean>>>({});
 
-  protected readonly anyAnalyzable = computed(() => this.files().some(picked => isAnalyzableDocumentType(picked.type)));
+  protected readonly anyAnalyzable = computed(() => this.files().some(picked => willAnalyze(picked.type)));
   private _nextFileId = 0;
   protected readonly selectedCount = computed(() => Object.keys(selectedOcrAnswers(this.proposal()?.fields ?? [], this.selection())).length);
 
@@ -479,7 +481,7 @@ export class DocumentImportContainerComponent {
     this.files.update(files => [...files, ...accepted.map(file => ({ id: this._nextFileId++, file, type }))]);
   }
 
-  protected setFileType(id: number, type: DossierDocumentType): void {
+  protected setFileType(id: number, type: PickedType): void {
     this.files.update(files => files.map(picked => (picked.id === id ? { ...picked, type } : picked)));
   }
 
@@ -508,14 +510,16 @@ export class DocumentImportContainerComponent {
         concatMap((picked, index) => {
           this.progress.set(queue.length > 1 ? { done: index, total: queue.length } : null);
           this.busy.set('upload');
-          const storagePath = `${dossierDocumentsFolder(key.cabinetId, key.dossierId)}/${picked.type}-${Date.now()}-${safeDocumentFileName(picked.file.name)}`;
+          // Type inconnu tant que l'IA ne l'a pas reconnu : enregistré comme « autre », corrigé par la lecture.
+          const registeredType: DossierDocumentType = picked.type === 'auto' ? 'autre' : picked.type;
+          const storagePath = `${dossierDocumentsFolder(key.cabinetId, key.dossierId)}/${registeredType}-${Date.now()}-${safeDocumentFileName(picked.file.name)}`;
           return this._service.upload(storagePath, picked.file).pipe(
-            switchMap(() => this._service.register(key.dossierId, picked.type, storagePath, picked.file.name)),
+            switchMap(() => this._service.register(key.dossierId, registeredType, storagePath, picked.file.name)),
             tap(() => this.removeFile(picked.id)),
             switchMap(({ documentId }) => {
-              if (!isAnalyzableDocumentType(picked.type)) return of(null);
+              if (!willAnalyze(picked.type)) return of(null);
               this.busy.set('analyze');
-              return this._service.analyze(key.dossierId, documentId).pipe(
+              return this._service.analyze(key.dossierId, documentId, picked.type === 'auto').pipe(
                 tap(({ status, ocrFields }) => {
                   if (status === 'failed') {
                     failed.push(picked.file.name);
@@ -619,8 +623,12 @@ export class DocumentImportContainerComponent {
   }
 }
 
+type PickedType = DossierDocumentType | 'auto';
+
+const willAnalyze = (type: PickedType): boolean => type === 'auto' || isAnalyzableDocumentType(type);
+
 interface PickedFile {
   id: number;
   file: File;
-  type: DossierDocumentType;
+  type: PickedType;
 }

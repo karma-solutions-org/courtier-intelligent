@@ -246,8 +246,11 @@ export class AssureDocumentImportComponent {
             this._service.uploadImport(picked.storagePath, picked.file).pipe(
               switchMap(() =>
                 this._service.recognizePiece(picked.storagePath).pipe(
-                  // IA indisponible ou quota atteint : le fichier est bien envoyé, le courtier choisit le type.
-                  catchError(() => of({ type: null })),
+                  // IA indisponible ou quota atteint : le fichier est bien envoyé, le courtier choisit le type (raison affichée).
+                  catchError(error => {
+                    this.error.set(toBackendErrorMessage(error));
+                    return of({ type: null });
+                  }),
                 ),
               ),
               map(({ type }) => this.update(picked.id, { type: type ?? 'autre', status: 'ready' })),
