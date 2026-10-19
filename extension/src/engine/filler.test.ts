@@ -518,3 +518,4 @@ describe('Réponses en tranches (ancienneté d’assurance)', () => {
     expect(matchOption(years, 12)?.label).toBe('Moins de 2 ans');
   });
 });
+

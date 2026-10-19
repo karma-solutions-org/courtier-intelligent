@@ -1,4 +1,4 @@
-import { isFixedCanonicalPath, type CanonicalPath, type FixedCanonicalPath } from '@shared';
+import { CANONICAL_PATHS, isFixedCanonicalPath, parseClaimPath, type CanonicalPath, type ClaimField, type ClaimPath, type FixedCanonicalPath } from '@shared';
 import type { FieldKind } from './analyzer';
 
 /**
@@ -6,6 +6,8 @@ import type { FieldKind } from './analyzer';
  * (`extra.kilometrage_annuel`), son code en clair (« kilometrage annuel »).
  */
 export function pathExample(path: CanonicalPath): string {
+  const claim = parseClaimPath(path);
+  if (claim) return `${FIELD_SYNONYMS[path as ClaimPath].labels[0]} (sinistre ${claim.index})`;
   return isFixedCanonicalPath(path) ? FIELD_SYNONYMS[path].labels[0] : path.slice('extra.'.length).replace(/_/g, ' ');
 }
 
@@ -17,7 +19,18 @@ export function expectsDate(path: CanonicalPath, value: unknown): boolean {
 /** Type de réponse attendu pour un chemin canonique : détermine les champs HTML compatibles. */
 export type Expected = 'text' | 'date' | 'number' | 'boolean' | 'choice';
 
+/** Même valeur pour la rubrique (type, responsabilité, date) de chacun des sinistres détaillés. */
+function perClaim<T>(byField: Record<ClaimField, T>): Record<ClaimPath, T> {
+  return Object.fromEntries(
+    CANONICAL_PATHS.flatMap(path => {
+      const claim = parseClaimPath(path);
+      return claim ? [[path, byField[claim.field]]] : [];
+    }),
+  ) as Record<ClaimPath, T>;
+}
+
 export const PATH_EXPECTED: Record<FixedCanonicalPath, Expected> = {
+  ...perClaim<Expected>({ type: 'choice', responsibility: 'choice', date: 'date' }),
   'client.firstName': 'text',
   'client.lastName': 'text',
   'client.nationalId': 'text',
@@ -86,6 +99,12 @@ export interface FieldSynonyms {
 }
 
 export const FIELD_SYNONYMS: Record<FixedCanonicalPath, FieldSynonyms> = {
+  // Une ligne du tableau « Sinistres » : seul le champ de la ligne n vise le sinistre n (voir scoreCandidate).
+  ...perClaim<FieldSynonyms>({
+    type: { labels: ['type de sinistre', 'nature du sinistre', 'type', 'nature', 'nature de sinistre', 'type du sinistre'], names: ['typesinistre', 'naturesinistre', 'claimtype'] },
+    responsibility: { labels: ['responsabilite', 'taux de responsabilite', 'part de responsabilite', 'pourcentage de responsabilite', 'responsable', 'responsabilite engagee'], names: ['responsabilite', 'responsibility', 'tauxresponsabilite'] },
+    date: { labels: ['date du sinistre', 'date de survenance', 'date', 'date de survenance du sinistre', 'survenu le', 'date de l accident'], names: ['datesinistre', 'datesurvenance', 'claimdate'] },
+  }),
   'client.firstName': { labels: ['prenom', 'votre prenom', 'prenom du souscripteur', 'prenom du titulaire'], names: ['prenom', 'firstname', 'givenname'], autocomplete: ['given-name'] },
   'client.lastName': { labels: ['nom', 'votre nom', 'nom de famille', 'nom du souscripteur', 'nom du titulaire', 'nom d usage'], names: ['nom', 'lastname', 'familyname', 'surname'], autocomplete: ['family-name'] },
   'client.nationalId': { labels: ['numero de securite sociale', 'n securite sociale', 'numero d identification', 'numero insee', 'piece d identite'], names: ['nir', 'secu', 'insee'] },

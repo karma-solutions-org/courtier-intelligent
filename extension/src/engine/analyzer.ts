@@ -29,6 +29,8 @@ export interface FormField {
   maxLength: number | null;
   /** Valeur saisie en plusieurs cases : nombre de caractères de chaque case (téléphone 2/2/2/2/2, plaque 2/3/2…). */
   segments?: number[] | null;
+  /** Rang (1, 2…) de la ligne d'un tableau de saisie à colonnes titrées (ex. une ligne par sinistre) ; absent sinon. */
+  row?: number;
 }
 
 export interface FormAnalysis {
@@ -89,6 +91,9 @@ function labelOf(element: HTMLElement): string {
   const aria = element.getAttribute('aria-label')?.trim();
   if (aria) return cleanLabel(aria);
 
+  // Tableau à une ligne par élément (sinistres…) : le libellé est le titre de la colonne.
+  const column = tableColumnOf(element);
+  if (column) return column.header;
   // Tableau de saisie : le libellé est dans la cellule qui précède.
   const cell = element.closest('td');
   const previousCell = cell?.previousElementSibling;
@@ -112,6 +117,25 @@ function labelOf(element: HTMLElement): string {
   return cleanLabel(element.getAttribute('placeholder') ?? element.getAttribute('title') ?? element.getAttribute('name') ?? '');
 }
 
+/**
+ * Tableau de saisie à colonnes titrées, une ligne par élément (tableau « Sinistres » : type, responsabilité, date…) :
+ * titre de la colonne du champ et rang de sa ligne parmi les lignes de saisie (1, 2…). Null hors d'un tel tableau
+ * (un tableau « libellé | champ » n'a pas de ligne d'en-têtes).
+ */
+function tableColumnOf(element: HTMLElement): { header: string; row: number } | null {
+  const cell = element.closest('td');
+  const row = cell?.parentElement;
+  const table = row?.closest('table');
+  if (!cell || !row || !table) return null;
+  const rows: Element[] = [...table.querySelectorAll('tr')].filter(tr => tr.closest('table') === table);
+  const headerRow = rows.find(tr => tr.querySelector('th') && !tr.querySelector(CONTROL_SELECTOR));
+  if (!headerRow || rows.indexOf(headerRow) > rows.indexOf(row)) return null;
+  const header = textOf(headerRow.children[[...row.children].indexOf(cell)]);
+  if (!header) return null;
+  const entryRows = rows.filter(tr => tr !== headerRow && tr.querySelector(CONTROL_SELECTOR));
+  return { header, row: entryRows.indexOf(row) + 1 };
+}
+
 /** Libellé d'un groupe de boutons radio : légende du fieldset, rôle radiogroup, ou titre juste avant. */
 function groupLabelOf(first: HTMLElement): string {
   const fieldset = first.closest('fieldset');
@@ -122,6 +146,8 @@ function groupLabelOf(first: HTMLElement): string {
     const aria = labelledBy(group) ?? group.getAttribute('aria-label');
     if (aria) return cleanLabel(aria);
   }
+  const column = tableColumnOf(first);
+  if (column) return column.header;
   const container = first.closest('div, p, li, td');
   const heading = container
     ? [...container.children].find(child => child.matches('label, span, p, strong') && !child.querySelector('input, select, textarea'))
@@ -250,6 +276,8 @@ export function isAuthPage(root: Document | HTMLElement = document): boolean {
 
 /** Libellé d'un groupe de cases : celui de la première case, sauf s'il ne nomme que la case (« Jour ») ; alors celui du bloc. */
 function segmentGroupLabel(parts: HTMLElement[]): string {
+  const column = tableColumnOf(parts[0]);
+  if (column) return column.header;
   const own = labelOf(parts[0]);
   if (own.length > 4 && !Object.values(PART_HINTS).some(hint => hint.test(own))) return own;
   for (let node = parts[0].parentElement; node && node !== parts[0].ownerDocument.body; node = node.parentElement) {
@@ -331,6 +359,7 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
     const name = element.getAttribute('name');
     const base = `${kind}:${normalize(name ?? element.id ?? label).replace(/ /g, '-').slice(0, 80) || fields.length}`;
     const key = uniqueKey(base);
+    const tableRow = tableColumnOf(element)?.row;
 
     elements.set(key, group);
     fields.push({
@@ -349,6 +378,7 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
       pattern: element.getAttribute('pattern'),
       maxLength: !segments && (element as HTMLInputElement).maxLength > 0 ? (element as HTMLInputElement).maxLength : null,
       segments: segments?.inputType === 'segmented' ? segments.widths : null,
+      ...(tableRow ? { row: tableRow } : {}),
     });
   }
 

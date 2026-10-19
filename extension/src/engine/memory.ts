@@ -1,4 +1,5 @@
 import { CanonicalData, CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, type DiscoveredFieldInput, isRelevantField } from '@shared';
+import { normalize } from './text';
 import type { FormField } from './analyzer';
 import { isCompatible, Mapping } from './mapping';
 
@@ -113,7 +114,7 @@ const DATE = /\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b/;
 const normalizeValue = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
 /** Valeurs du dossier (texte de 3 caractères et plus) : une option qui les reprend est une donnée client. */
-function clientValues(quoteData: CanonicalData | undefined): Set<string> {
+export function clientValues(quoteData: CanonicalData | undefined): Set<string> {
   const values = new Set<string>();
   for (const raw of Object.values(quoteData ?? {})) {
     const plain = raw !== null && typeof raw === 'object' && 'value' in raw ? (raw as { value: unknown }).value : raw;
@@ -126,7 +127,7 @@ function clientValues(quoteData: CanonicalData | undefined): Set<string> {
 }
 
 /** Le texte ressemble-t-il à une donnée client (valeur du dossier, e-mail, plaque, téléphone, date, long numéro) ? */
-function looksLikeClientData(text: string, values: Set<string>): boolean {
+export function looksLikeClientData(text: string, values: Set<string>): boolean {
   const trimmed = text.trim();
   if (!trimmed) return false;
   if (values.has(normalizeValue(trimmed))) return true;
@@ -179,7 +180,18 @@ export function toDiscoveredFields(
       required: field.required,
     }))
     // Libellé illisible ou qui ressemble à une donnée client : le champ n'est pas signalé du tout.
-    .filter(field => field.label !== '');
+    .filter(field => field.label !== '')
+    // Lecture ratée de l'extranet (options identiques, ou qui ne sont que le nom technique du champ) : jamais une question.
+    .filter(field => !misreadOptions(field.options, field.name));
+}
+
+/** Options lues de travers : libellés en double, ou recopie du nom technique (« oSexe », « oSexe »). */
+export function misreadOptions(options: { value: string; label: string }[], name: string | null | undefined): boolean {
+  if (options.length < 2) return false;
+  const labels = options.map(option => normalize(option.label));
+  if (new Set(labels).size < labels.length) return true;
+  const technical = name ? normalize(name) : null;
+  return labels.some(label => label === '' || (technical !== null && label === technical));
 }
 
 /** Chemins des champs obligatoires de l'extranet qui ont un équivalent dans l'application. */

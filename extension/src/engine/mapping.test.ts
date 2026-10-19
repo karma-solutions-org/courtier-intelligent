@@ -1,4 +1,4 @@
-import { CANONICAL_PATHS } from '@shared';
+import { CANONICAL_PATHS, parseClaimPath } from '@shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { mountAssureurA } from './__fixtures__/assureur-a';
 import { analyzeForm, FormField } from './analyzer';
@@ -35,7 +35,8 @@ describe('Dictionnaire', () => {
     for (const path of CANONICAL_PATHS) {
       const label = FIELD_SYNONYMS[path].labels[0];
       const kind = PATH_EXPECTED[path] === 'boolean' ? 'radio' : PATH_EXPECTED[path] === 'choice' ? 'select' : PATH_EXPECTED[path] === 'date' ? 'date' : PATH_EXPECTED[path] === 'number' ? 'number' : 'text';
-      const mapping = best({ label, kind, inputType: kind === 'date' ? 'date' : kind === 'number' ? 'number' : 'text' });
+      const row = parseClaimPath(path)?.index; // un sinistre n'est reconnu que sur sa ligne du tableau
+      const mapping = best({ label, kind, inputType: kind === 'date' ? 'date' : kind === 'number' ? 'number' : 'text', ...(row ? { row } : {}) });
       expect(mapping.canonicalPath, `${path} ← « ${label} »`).toBe(path);
     }
   });

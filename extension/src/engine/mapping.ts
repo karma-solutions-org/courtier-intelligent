@@ -1,4 +1,4 @@
-import { CANONICAL_PATHS, CanonicalPath, isCanonicalPath, isExtraPath, isFixedCanonicalPath } from '@shared';
+import { CANONICAL_PATHS, CanonicalPath, isCanonicalPath, isExtraPath, isFixedCanonicalPath, parseClaimPath } from '@shared';
 import type { FormField } from './analyzer';
 import { COMPATIBLE_KINDS, FIELD_SYNONYMS, INHERITED_LABELS, PATH_EXPECTED, PREFIX_KEYWORDS } from './field-synonyms';
 import { containsPhrase, normalize, words } from './text';
@@ -82,6 +82,9 @@ function contextPrefixes(field: FormField): Set<string> {
 export function scoreCandidate(field: FormField, path: CanonicalPath): number {
   // Les questions ajoutées depuis un extranet n'ont pas de synonymes : seule la mémoire les associe à un champ.
   if (!isFixedCanonicalPath(path) || !isCompatible(field, path)) return 0;
+  // Sinistre n : uniquement un champ de la ligne n d'un tableau de sinistres.
+  const claim = parseClaimPath(path);
+  if (claim && field.row !== claim.index) return 0;
   const spec = FIELD_SYNONYMS[path];
   const label = normalize(field.label).replace(CONFIRMATION_WORDS, ' ').replace(/\s+/g, ' ').trim();
   const prefixes = contextPrefixes(field);

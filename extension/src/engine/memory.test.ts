@@ -182,3 +182,12 @@ describe('toDiscoveredFields : jamais de donnée client, peu de bruit', () => {
     expect(toDiscoveredFields(fields, mappings, ['client.lastName'])).toHaveLength(1);
   });
 });
+
+describe('Questions découvertes : lecture ratée jamais signalée', () => {
+  it('écarte des options identiques ou qui recopient le nom technique', async () => {
+    const { misreadOptions } = await import('./memory');
+    expect(misreadOptions([{ value: 'H', label: 'oSexe' }, { value: 'F', label: 'oSexe' }], 'oSexe')).toBe(true);
+    expect(misreadOptions([{ value: '1', label: 'Oui' }, { value: '0', label: 'Oui' }], 'x')).toBe(true);
+    expect(misreadOptions([{ value: 'H', label: 'Homme' }, { value: 'F', label: 'Femme' }], 'oSexe')).toBe(false);
+  });
+});

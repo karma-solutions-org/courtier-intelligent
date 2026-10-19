@@ -106,6 +106,12 @@ const CHOICE_SYNONYMS: Record<string, string[]> = {
   fausse_declaration: ['fausse declaration', 'declaration inexacte'],
   alcoolemie: ['alcool', 'alcoolemie', 'stupefiants'],
   autre: ['autre', 'autres'],
+  // Type de sinistre.
+  materiel: ['materiel', 'dommages materiels', 'accident materiel', 'dommage materiel'],
+  corporel: ['corporel', 'dommages corporels', 'accident corporel', 'dommage corporel'],
+  bris_de_glace: ['bris de glace', 'bris de glaces', 'bdg', 'vitrage'],
+  vol: ['vol', 'vol du vehicule', 'tentative de vol'],
+  incendie: ['incendie', 'feu'],
   // Énergie du véhicule : les extranets reprennent souvent les codes de la carte grise (P.3).
   diesel: ['diesel', 'gazole', 'gasoil', 'go'],
   essence: ['essence', 'es', 'sans plomb', 'super'],

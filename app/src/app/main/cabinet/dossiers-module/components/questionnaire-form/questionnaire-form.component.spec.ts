@@ -111,6 +111,49 @@ describe('QuestionnaireFormComponent', () => {
     expect(tester.changes.at(-1)).toEqual({ path: 'vehicle.usage', value: 'professionnel' });
   });
 
+  it('permet de saisir le détail d’un sinistre (type, responsabilité, date)', async () => {
+    tester.setInputs({
+      sections: [
+        {
+          title: 'Détail des sinistres',
+          questions: [
+            {
+              canonicalPath: 'insuranceHistory.claims.1.type',
+              label: 'Sinistre 1 : type',
+              type: 'choice',
+              required: false,
+              choices: [
+                { value: 'materiel', label: 'Matériel' },
+                { value: 'bris_de_glace', label: 'Bris de glace' },
+              ],
+            },
+            {
+              canonicalPath: 'insuranceHistory.claims.1.responsibility',
+              label: 'Sinistre 1 : responsabilité',
+              type: 'choice',
+              required: false,
+              choices: [
+                { value: '0', label: '0 %' },
+                { value: '50', label: '50 %' },
+                { value: '100', label: '100 %' },
+              ],
+            },
+            { canonicalPath: 'insuranceHistory.claims.1.date', label: 'Sinistre 1 : date', type: 'date', required: false },
+          ],
+        },
+      ],
+    });
+
+    await tester.root.getByRole('combobox', { name: 'Sinistre 1 : type' }).click();
+    await page.getByRole('option', { name: 'Bris de glace' }).click();
+    expect(tester.changes.at(-1)).toEqual({ path: 'insuranceHistory.claims.1.type', value: 'bris_de_glace' });
+
+    await tester.root.getByRole('combobox', { name: 'Sinistre 1 : responsabilité' }).click();
+    await page.getByRole('option', { name: '50 %' }).click();
+    expect(tester.changes.at(-1)).toEqual({ path: 'insuranceHistory.claims.1.responsibility', value: '50' });
+    await expect.element(tester.root.getByLabelText('Sinistre 1 : date', { exact: true })).toBeVisible();
+  });
+
   it('émet oui / non pour une question booléenne', async () => {
     await tester.root.getByRole('radio', { name: 'Non' }).click();
 
