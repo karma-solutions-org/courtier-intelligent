@@ -14,7 +14,7 @@ export interface AiRequest {
 }
 
 /** Usage de l'IA : chacun a son prompt système fixe. */
-export type AiPurpose = 'mapping' | 'capture';
+export type AiPurpose = 'mapping' | 'capture' | 'layout';
 
 /** Envoie la requête au proxy d'IA et renvoie le texte de la réponse. */
 export type AskAi = (request: AiRequest) => Promise<string>;

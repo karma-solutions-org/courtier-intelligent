@@ -147,7 +147,7 @@ export type ExtensionMessage =
   | { type: 'GET_JOB_FOR_ORIGIN'; origin: string }
   | { type: 'UPDATE_JOB'; dossierId: string; insurerId: string; update: JobUpdate }
   | { type: 'RUN_STATE'; state: RunState | null }
-  | { type: 'ASK_AI'; purpose: 'mapping' | 'capture'; messages: { role: 'user'; content: string }[]; maxTokens: number }
+  | { type: 'ASK_AI'; purpose: 'mapping' | 'capture' | 'layout'; messages: { role: 'user'; content: string }[]; maxTokens: number }
   | { type: 'REPORT_ISSUE'; insurerId: string; origin: string; step: ExtensionReportStep; issue: ExtensionReportIssue }
   // Side panel → service worker : capture du tarif de l'onglet actif
   | { type: 'CONFIRM_CAPTURE'; edits: CaptureEdits }

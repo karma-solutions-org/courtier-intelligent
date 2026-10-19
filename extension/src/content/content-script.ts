@@ -1,4 +1,5 @@
 import { JobUpdateError } from '../engine/runner';
+import type { FormLayout } from '../engine/layout-ai';
 import { LoadedMemory, MemoryPort, type MemorySaveOutcome } from '../engine/memory';
 import { FormRunner } from '../engine/runner';
 import { AskAiResponse, ExtensionMessage, JobContext, JobUpdate, RUNNER_PORT, type UpdateJobResponse, RunState, TabMessage } from '../shared/messages';
@@ -104,6 +105,17 @@ async function startRunner(job: JobContext): Promise<void> {
     reportDiscovered: async (fingerprint, fields, requiredPaths) =>
       void (await send({ type: 'FIELDS_DISCOVERED', fingerprint, fields, requiredPaths })),
     origin: location.origin,
+    // Lecture de la mise en page par l'IA : gardée dans le navigateur (structure seulement), par extranet et formulaire.
+    layoutCache: {
+      load: async fingerprint => {
+        const key = `layout:${location.origin}:${fingerprint}`;
+        const stored = await chrome.storage.local.get(key);
+        return (stored[key] as FormLayout | undefined) ?? null;
+      },
+      save: async (fingerprint, layout) => {
+        await chrome.storage.local.set({ [`layout:${location.origin}:${fingerprint}`]: layout });
+      },
+    },
     reportIssue: async (step, issue) =>
       void (await send({ type: 'REPORT_ISSUE', insurerId: job.insurerId, origin: location.origin, step, issue })),
     askAi: async request => {

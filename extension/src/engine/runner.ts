@@ -2,6 +2,7 @@ import { CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryFie
 import type { CapturedOffer, CaptureState, JobContext, JobUpdate, RunField, RunState } from '../shared/messages';
 import { AskAi, resolveWithAi } from './ai-fallback';
 import { analyzeForm, FormAnalysis, isAuthPage } from './analyzer';
+import { applyLayout, FormLayout, readLayoutWithAi } from './layout-ai';
 import { detectResultPage, extractFromDom, hasPremium, hasResultHeading, parseAmounts, visibleText } from './capture';
 import { captureWithAi, mergeOffers } from './capture-ai';
 import { expectsDate } from './field-synonyms';
@@ -34,6 +35,8 @@ export interface RunnerPorts {
   memory?: MemoryPort;
   /** Champs sans équivalent d'un formulaire validé : le serveur les ajoute au questionnaire. */
   reportDiscovered?(fingerprint: string, fields: DiscoveredFieldInput[], requiredPaths?: string[]): Promise<void>;
+  /** Lecture de la mise en page déjà faite par l'IA pour un formulaire (cache local du navigateur). */
+  layoutCache?: { load(fingerprint: string): Promise<FormLayout | null>; save(fingerprint: string, layout: FormLayout): Promise<void> };
   /** Origine de l'extranet, clé de la mémoire (par défaut : celle de la page). */
   origin?: string;
   quietMs?: number;
@@ -223,7 +226,7 @@ export class FormRunner {
   /** `depth` borne les relances quand le remplissage fait apparaître d'autres champs (réponse « Oui » → champ en plus). */
   private async runStep(newStep: boolean, depth = 0): Promise<void> {
     if (this.stopped || this.capturing) return;
-    const analysis = analyzeForm(this.ports.doc);
+    let analysis = analyzeForm(this.ports.doc);
     // Le courtier a soumis le formulaire et l'extranet affiche le tarif sans recharger la page.
     if (await this.tryCapture(false, analysis)) return;
     // Page de connexion de l'extranet : l'extension ne touche jamais aux identifiants du courtier.
@@ -241,8 +244,11 @@ export class FormRunner {
     } else if (this.stepCounter === 0) {
       this.stepCounter = 1;
     }
-    this.analysis = analysis;
+    // Suivi des étapes sur l'analyse brute (mêmes clés qu'à chaque vérification de la page).
     this.lastStep = { keys: analysis.fields.map(f => f.key), hint };
+    // Formulaire mal lu par les règles : l'IA en lit la mise en page (une fois par formulaire), puis on remplit sur l'analyse corrigée.
+    analysis = await this.refineLayout(analysis);
+    this.analysis = analysis;
 
     if (analysis.fields.length === 0) {
       // Seule la première page compte : en cours de parcours, une page sans champ (chargement, récapitulatif) est normale.
@@ -323,6 +329,23 @@ export class FormRunner {
   }
 
   private aiResults = new Map<string, Mapping>();
+  /** Lecture de la mise en page par formulaire (empreinte) : demandée à l'IA une seule fois, gardée par le cache. */
+  private readonly layouts = new Map<string, FormLayout>();
+
+  private async refineLayout(analysis: FormAnalysis): Promise<FormAnalysis> {
+    let layout = this.layouts.get(analysis.fingerprint);
+    if (!layout) {
+      layout = (await this.ports.layoutCache?.load(analysis.fingerprint).catch(() => null)) ?? undefined;
+      if (!layout) {
+        const read = await readLayoutWithAi(analysis, this.askAi, this.job.quoteData);
+        this.aiUsed ||= read.used;
+        layout = read.layout;
+        if (read.used) void this.ports.layoutCache?.save(analysis.fingerprint, layout).catch(() => undefined);
+      }
+      this.layouts.set(analysis.fingerprint, layout);
+    }
+    return applyLayout(analysis, layout);
+  }
 
   /**
    * Capture du tarif (E10-1, E10-2) : si la page est celle du résultat (ou si le courtier le demande), lit l'offre dans
