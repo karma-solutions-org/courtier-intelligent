@@ -1,0 +1,18 @@
+<div class="panel" aria-hidden="true">
+  <p class="panel-title">
+    <mat-icon>extension</mat-icon>
+    {{ extension().panelTitle }}
+  </p>
+  <ul class="panel-steps">
+    @for (step of extension().panelSteps; track step.label) {
+      <li [class.done]="step.done">
+        <mat-icon>{{ step.done ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+        {{ step.label }}
+      </li>
+    }
+  </ul>
+  <p class="panel-missing">
+    <mat-icon>info</mat-icon>
+    {{ extension().panelMissing }}
+  </p>
+</div>

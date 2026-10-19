@@ -1,27 +1,30 @@
 import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
+import { TabQueryParamDirective } from '../../../../../core/directives/tab-query-param.directive';
 import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
 import { SettingsStore } from '../../store/settings.store';
 import { MembersPanelComponent } from '../members-panel/members-panel.component';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
-import { TenantFormComponent } from '../tenant-form/tenant-form.component';
+import { AuditLogPanelComponent } from '../audit-log-panel/audit-log-panel.component';
+import { CatalogPanelComponent } from '../catalog-panel/catalog-panel.component';
+import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
 
 @Component({
   selector: 'app-settings-container',
-  imports: [MatTabsModule, TenantFormComponent, MembersPanelComponent],
+  imports: [MatTabsModule, TabQueryParamDirective, CabinetFormComponent, MembersPanelComponent, CatalogPanelComponent, AuditLogPanelComponent],
   template: `
     <h1>{{ structure.title }}</h1>
     @if (store.error()) {
       <p class="error" role="alert">{{ store.error() }}</p>
     }
-    <mat-tab-group animationDuration="0ms">
-      <mat-tab [label]="structure.tabs.tenant">
+    <mat-tab-group appTabQueryParam animationDuration="0ms">
+      <mat-tab [label]="structure.tabs.cabinet">
         <div class="tab">
-          <app-tenant-form
-            [tenant]="store.tenant()"
+          <app-cabinet-form
+            [cabinet]="store.cabinet()"
             [isPending]="store.isPending()"
-            (saved)="store.saveTenant($event)"
+            (saved)="store.saveCabinet($event)"
             (logoSelected)="store.uploadLogo($event)"
           />
         </div>
@@ -31,11 +34,46 @@ import { TenantFormComponent } from '../tenant-form/tenant-form.component';
           <app-members-panel
             [members]="store.members()"
             [invitations]="store.invitations()"
+            [maxUtilisateurs]="store.cabinet()?.limits?.maxUtilisateurs ?? 3"
+            [deviceResetsUsed]="store.deviceResetsUsed()"
+            [deviceResetsQuota]="store.cabinet()?.limits?.resetsAppareilParMois ?? 2"
+            [maxAppareilsParUtilisateur]="store.cabinet()?.limits?.maxAppareilsParUtilisateur ?? 1"
             [currentUid]="authStore.user()?.uid ?? null"
             [isPending]="store.isPending()"
             (invited)="store.invite($event)"
             (roleChanged)="store.setRole($event)"
             (statusChanged)="store.setStatus($event)"
+            (invitationCancelled)="store.cancelInvitation($event)"
+            (deviceReset)="store.resetDevice($event)"
+          />
+        </div>
+      </mat-tab>
+      <mat-tab [label]="structure.tabs.catalog">
+        <div class="tab">
+          <app-catalog-panel
+            [products]="store.products()"
+            [insurers]="store.insurers()"
+            [enabledProducts]="store.cabinet()?.enabledProducts ?? []"
+            [enabledInsurers]="store.cabinet()?.enabledInsurers ?? []"
+            [isPending]="store.isPending()"
+            (saved)="store.saveCatalogChoices($event)"
+            (insurerAdded)="store.addInsurer($event)"
+            (insurerUpdated)="store.updateInsurer($event)"
+            (insurerArchived)="store.archiveInsurer($event)"
+            (productCreated)="store.createProduct($event)"
+            (productUpdated)="store.updateProduct($event)"
+            (productArchived)="store.archiveProduct($event)"
+          />
+        </div>
+      </mat-tab>
+      <mat-tab [label]="structure.tabs.audit">
+        <div class="tab">
+          <app-audit-log-panel
+            [entries]="store.auditLog()"
+            [members]="store.members()"
+            [hasMore]="store.auditLogHasMore()"
+            [loadingMore]="store.auditLogLoadingMore()"
+            (loadMore)="store.loadMoreAuditLog()"
           />
         </div>
       </mat-tab>
@@ -44,8 +82,9 @@ import { TenantFormComponent } from '../tenant-form/tenant-form.component';
   styles: `
     h1 {
       margin: 0 0 16px;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     .tab {
@@ -55,7 +94,7 @@ import { TenantFormComponent } from '../tenant-form/tenant-form.component';
     .error {
       margin: 0 0 16px;
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: 8px;
       color: var(--mat-sys-on-error-container);
       background: var(--mat-sys-error-container);
     }

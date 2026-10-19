@@ -6,12 +6,24 @@
   "type": "module",
   "scripts": {
     "build": "node build.js",
+    "build:emulators": "node build.js --emulators",
+    "build:demo": "node build.js --demo",
     "watch": "node build.js --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "demo:extranet": "npx --yes http-server@14.1.1 demo-extranet -p 8090 -c-1",
+    "demo:extranet-habitation": "npx --yes http-server@14.1.1 demo-extranet-habitation -p 8091 -c-1",
+    "demo:extranet-habitation-2": "npx --yes http-server@14.1.1 demo-extranet-habitation-2 -p 8092 -c-1"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.4",
+    "@types/node": "^22.20.5",
     "esbuild": "^0.28.2",
-    "typescript": "^7.0.2"
+    "jsdom": "^26.1.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "firebase": "^12.19.0"
   }
 }

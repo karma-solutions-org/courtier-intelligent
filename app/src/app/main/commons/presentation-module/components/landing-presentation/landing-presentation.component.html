@@ -22,7 +22,7 @@
           <mat-icon>login</mat-icon>
           {{ structure.signin }}
         </a>
-        <a mat-flat-button [routerLink]="signupUrl()">{{ structure.signup }}</a>
+        <a mat-flat-button class="ci-cta" [routerLink]="signupUrl()">{{ structure.signup }}</a>
       </div>
     }
   </div>
@@ -40,7 +40,7 @@
         </h1>
         <p class="lead">{{ structure.hero.subtitle }}</p>
         <div class="hero-actions">
-          <a mat-flat-button class="cta-large" [routerLink]="isAuthenticated() ? homeUrl() : signinUrl()">
+          <a mat-flat-button class="cta-large ci-cta" [routerLink]="isAuthenticated() ? homeUrl() : signinUrl()">
             {{ isAuthenticated() ? structure.mySpace : structure.hero.primaryCta }}
           </a>
           <a mat-stroked-button class="cta-large" routerLink="/" fragment="fonctionnement">
@@ -50,48 +50,12 @@
       </div>
 
       <!-- Aperçu du comparatif -->
-      <div class="mock" aria-hidden="true">
-        <div class="mock-header">
-          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-        </div>
-        <div class="mock-body">
-          <p class="mock-title">{{ structure.mock.title }}</p>
-          <p class="mock-subtitle">{{ structure.mock.subtitle }}</p>
-          <div class="offers">
-            @for (offer of structure.mock.offers; track offer.insurer; let first = $first) {
-              <div class="offer" [class.chosen]="first">
-                @if (first) {
-                  <span class="chosen-badge">{{ structure.mock.chosen }}</span>
-                }
-                <p class="offer-insurer">{{ offer.insurer }}</p>
-                <p class="offer-premium">{{ offer.premium }}</p>
-                <p class="offer-meta">{{ structure.mock.premiumLabel }}</p>
-                <p class="offer-line">
-                  <span>{{ structure.mock.deductibleLabel }}</span><strong>{{ offer.deductible }}</strong>
-                </p>
-                <p class="gap" [class]="'gap gap-' + offer.status">
-                  <mat-icon>{{ offer.status === 'ok' ? 'check_circle' : offer.status === 'warn' ? 'error' : 'cancel' }}</mat-icon>
-                  {{ offer.label }}
-                </p>
-              </div>
-            }
-          </div>
-        </div>
-      </div>
+      <app-landing-offers-mock [mock]="structure.mock" />
     </div>
   </section>
 
   <!-- Chiffres -->
-  <section class="stats">
-    <div class="container stats-inner">
-      @for (stat of structure.stats; track stat.label) {
-        <div class="stat">
-          <p class="stat-value">{{ stat.value }}</p>
-          <p class="stat-label">{{ stat.label }}</p>
-        </div>
-      }
-    </div>
-  </section>
+  <app-landing-stats [stats]="structure.stats" />
 
   <!-- Comment ça marche -->
   <section id="fonctionnement" class="section">
@@ -146,24 +110,7 @@
         </ul>
       </div>
 
-      <div class="panel" aria-hidden="true">
-        <p class="panel-title">
-          <mat-icon>extension</mat-icon>
-          {{ structure.extension.panelTitle }}
-        </p>
-        <ul class="panel-steps">
-          @for (step of structure.extension.panelSteps; track step.label) {
-            <li [class.done]="step.done">
-              <mat-icon>{{ step.done ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
-              {{ step.label }}
-            </li>
-          }
-        </ul>
-        <p class="panel-missing">
-          <mat-icon>info</mat-icon>
-          {{ structure.extension.panelMissing }}
-        </p>
-      </div>
+      <app-landing-extension-panel [extension]="structure.extension" />
     </div>
   </section>
 

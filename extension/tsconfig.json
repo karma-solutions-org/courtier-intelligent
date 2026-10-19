@@ -9,7 +9,8 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "types": [
-      "chrome"
+      "chrome",
+      "node"
     ],
     "paths": {
       "@shared": [

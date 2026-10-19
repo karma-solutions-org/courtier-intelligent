@@ -1,6 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { from, Observable, switchMap } from 'rxjs';
+import { defer, Observable } from 'rxjs';
 import { FIREBASE_STORAGE } from './firebase';
 
 /** Port stockage de fichiers. */
@@ -11,20 +10,36 @@ export abstract class StorageProvider {
   abstract delete(path: string): Observable<void>;
 }
 
+/** Le SDK Storage est chargé à la première utilisation (hors du bundle initial). */
 @Injectable()
 export class FirestorageProvider extends StorageProvider {
   private readonly _storage = inject(FIREBASE_STORAGE);
 
+  private async _sdk() {
+    const [sdk, storage] = await Promise.all([import('firebase/storage'), this._storage()]);
+    return { sdk, storage };
+  }
+
   upload(path: string, file: Blob): Observable<string> {
-    const fileRef = ref(this._storage, path);
-    return from(uploadBytes(fileRef, file)).pipe(switchMap(() => getDownloadURL(fileRef)));
+    return defer(async () => {
+      const { sdk, storage } = await this._sdk();
+      const fileRef = sdk.ref(storage, path);
+      await sdk.uploadBytes(fileRef, file);
+      return sdk.getDownloadURL(fileRef);
+    });
   }
 
   getUrl(path: string): Observable<string> {
-    return from(getDownloadURL(ref(this._storage, path)));
+    return defer(async () => {
+      const { sdk, storage } = await this._sdk();
+      return sdk.getDownloadURL(sdk.ref(storage, path));
+    });
   }
 
   delete(path: string): Observable<void> {
-    return from(deleteObject(ref(this._storage, path)));
+    return defer(async () => {
+      const { sdk, storage } = await this._sdk();
+      await sdk.deleteObject(sdk.ref(storage, path));
+    });
   }
 }

@@ -19,23 +19,41 @@ import { ACCEPT_INVITATION_PAGE_STRUCTURE } from './accept-invitation-page.struc
       } @else if (!userEmail()) {
         <p class="auth-subtitle">{{ structure.needAccount }}</p>
         <div class="actions">
-          <a mat-flat-button class="auth-submit" [routerLink]="signupUrl()">{{ structure.signup }}</a>
-          <a mat-stroked-button class="auth-submit" [routerLink]="signinUrl()">{{ structure.signin }}</a>
+          <a mat-flat-button class="auth-submit" [routerLink]="signupUrl()">{{
+            structure.signup
+          }}</a>
+          <a mat-stroked-button class="auth-submit" [routerLink]="signinUrl()">{{
+            structure.signin
+          }}</a>
         </div>
       } @else {
         <p class="auth-subtitle">
           {{ structure.connectedAs }} <strong>{{ userEmail() }}</strong>
         </p>
-        @if (error()) {
-          <p class="auth-error" role="alert">{{ error() }}</p>
-        }
-        <button mat-flat-button class="auth-submit full" [disabled]="isPending()" [attr.aria-busy]="isPending()" [attr.aria-label]="isPending() ? 'Traitement en cours' : null" (click)="accepted.emit()">
-          @if (isPending()) {
-            <mat-spinner diameter="20" />
-          } @else {
-            {{ structure.accept }}
+        @if (wrongAccount()) {
+          <p class="auth-error" role="alert">{{ structure.wrongAccount }}</p>
+          <button mat-flat-button class="auth-submit full" (click)="switchAccount.emit()">
+            {{ structure.switchAccount }}
+          </button>
+        } @else {
+          @if (error()) {
+            <p class="auth-error" role="alert">{{ error() }}</p>
           }
-        </button>
+          <button
+            mat-flat-button
+            class="auth-submit full"
+            [disabled]="isPending()"
+            [attr.aria-busy]="isPending()"
+            [attr.aria-label]="isPending() ? 'Traitement en cours' : null"
+            (click)="accepted.emit()"
+          >
+            @if (isPending()) {
+              <mat-spinner diameter="20" />
+            } @else {
+              {{ structure.accept }}
+            }
+          </button>
+        }
       }
     </div>
   `,
@@ -58,9 +76,11 @@ export class AcceptInvitationPresentationComponent {
   readonly userEmail = input<string | null>(null);
   readonly isPending = input(false);
   readonly error = input<string | null>(null);
+  readonly wrongAccount = input(false);
   readonly signinUrl = input.required<string>();
   readonly signupUrl = input.required<string>();
   readonly accepted = output<void>();
+  readonly switchAccount = output<void>();
 
   protected readonly structure = ACCEPT_INVITATION_PAGE_STRUCTURE;
 }

@@ -1,6 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { httpsCallable } from 'firebase/functions';
-import { from, map, Observable } from 'rxjs';
+import { defer, Observable } from 'rxjs';
 import { FIREBASE_FUNCTIONS } from './firebase';
 
 /** Port backend : appels aux Cloud Functions. */
@@ -13,6 +12,10 @@ export class FirebaseFunctionsProvider extends BackendProvider {
   private readonly _functions = inject(FIREBASE_FUNCTIONS);
 
   call<TRequest, TResponse>(name: string, data: TRequest): Observable<TResponse> {
-    return from(httpsCallable<TRequest, TResponse>(this._functions, name)(data)).pipe(map(result => result.data));
+    // Le SDK Functions est chargé au premier appel (hors du bundle initial).
+    return defer(async () => {
+      const [{ httpsCallable }, functions] = await Promise.all([import('firebase/functions'), this._functions()]);
+      return (await httpsCallable<TRequest, TResponse>(functions, name)(data)).data;
+    });
   }
 }

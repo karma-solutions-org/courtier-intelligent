@@ -48,7 +48,6 @@ app/src/app/
 │   │   ├── routes.ts                         # routes racines (lazy par zone)
 │   │   ├── common-routes/                    # common.routes.ts + common-route-container.model.ts
 │   │   ├── cabinet-routes/                   # cabinet.routes.ts + cabinet-route-container.model.ts
-│   │   ├── super-admin-routes/               # super-admin.routes.ts + super-admin-route-container.model.ts
 │   │   ├── guards/                           # auth.guard.ts, role.guard.ts (fonctionnels, canMatch)
 │   │   └── matcher/                          # matchers d'URL si besoin
 │   ├── components/                           # composants transverses (statistics-card…)
@@ -61,7 +60,7 @@ app/src/app/
     │   ├── main-module/                      # shell / layout
     │   ├── navbar-module/
     │   ├── toolbar-module/
-    │   └── extension-module/                 # liaison avec l'extension Chrome (envoi du token)
+    │   └── extension-module/                 # détection de l'extension Chrome (installée / absente)
     ├── cabinet/                              # zone cabinet (admin + courtier)
     │   ├── home-module/                      # tableau de bord
     │   ├── assures-module/
@@ -70,11 +69,6 @@ app/src/app/
     │   ├── comparatif-module/
     │   ├── proposition-module/
     │   └── settings-module/                  # cabinet, membres, assureurs actifs
-    └── super-admin/
-        ├── tenants-management-module/
-        ├── catalogue-management-module/      # produits, questionnaires, garanties
-        ├── insurers-management-module/
-        └── extension-monitoring-module/
 ```
 
 ### Anatomie d'un module
@@ -135,14 +129,14 @@ export const DossiersStore = signalStore(
     // Flux temps réel Firestore
     listen: rxMethod<DossierFilter>(pipe(
       tap(filter => patchState(store, { filter }, setPending())),
-      switchMap(filter => service.watchDossiers(auth.tenantId()!, filter).pipe(tapResponse({
+      switchMap(filter => service.watchDossiers(auth.cabinetId()!, filter).pipe(tapResponse({
         next: dossiers => patchState(store, setAllEntities(dossiers), setFulfilled()),
         error: (e: Error) => patchState(store, setError(e.message)),
       }))),
     )),
     // Écriture
     create: rxMethod<NewDossier>(pipe(
-      exhaustMap(input => service.create(auth.tenantId()!, input).pipe(tapResponse({
+      exhaustMap(input => service.create(auth.cabinetId()!, input).pipe(tapResponse({
         next: () => patchState(store, setFulfilled()),
         error: (e: Error) => patchState(store, setError(e.message)),
       }))),
@@ -159,7 +153,7 @@ export const DossiersStore = signalStore(
 4. `switchMap` pour les lectures et les flux, `exhaustMap` pour les écritures.
 5. La logique réutilisable va dans un `signalStoreFeature()` sous `core/store-features/`.
 6. Un store peut injecter un store de portée plus large (`AuthStore`), jamais un store de portée plus étroite.
-7. Le `tenantId` vient toujours de `AuthStore`, qui lit les claims ; il n'est jamais saisi ni passé par l'URL.
+7. Le `cabinetId` vient toujours de `AuthStore`, qui lit les claims ; il n'est jamais saisi ni passé par l'URL.
 
 **Correspondance avec l'ancien projet (NgRx classique) :**
 
@@ -185,7 +179,7 @@ Les providers vivent dans `core/providers/`. Chaque port est une classe abstrait
 
 | Port (abstrait) | Implémentation |
 |---|---|
-| `AuthenticationProvider` | `FireauthProvider` (expose `user$` avec les claims `tenantId` et `role`) |
+| `AuthenticationProvider` | `FireauthProvider` (expose `user$` avec les claims `cabinetId` et `role`) |
 | `DatabaseProvider` | `FirestoreProvider` (`watchDocument`, `watchCollection`, `add`, `set`, `update`, `delete`) |
 | `BackendProvider` | `FirebaseFunctionsProvider` (`call(name, data)`) |
 | `StorageProvider` | `FirestorageProvider` (`upload`, `getUrl`, `delete`) |
@@ -203,14 +197,14 @@ Le SDK est initialisé une seule fois dans `core/providers/firebase.ts`. `enviro
 Aucun `provideStore`, `provideState` ni `provideEffects`.
 
 - Un service par module (`xxx.service.ts`, `providedIn: 'root'`). Il construit ses requêtes avec un `QueryModel` (filtres, tri, limite) et ne retourne que des `Observable` typés.
-- Les chemins Firestore sont **toujours** préfixés par `tenants/{tenantId}/…`, sauf pour le catalogue global.
+- Les chemins Firestore sont **toujours** préfixés par `cabinets/{cabinetId}/…`, sauf pour le catalogue global.
 - Les appels aux Cloud Functions passent par `BackendProvider`.
 
 ## 8. Routing
 
-- Chaque zone (`commons`, `cabinet`, `super-admin`) et chaque module sont chargés en lazy.
+- Chaque zone (`commons`, `cabinet`) et chaque module sont chargés en lazy.
 - Chaque zone a un `xxx-route-container.model.ts` qui centralise ses chemins (comme `BackOfficeRouteContainerModel`).
-- Les guards sont fonctionnels, avec `canMatch` : `authGuard`, puis `roleGuard('superadmin' | 'admin' | 'courtier')`. Le code d'une zone non autorisée n'est jamais téléchargé.
+- Les guards sont fonctionnels, avec `canMatch` : `authGuard`, puis `roleGuard('admin' | 'courtier')`. Le code d'une zone non autorisée n'est jamais téléchargé.
 - Les paramètres de route sont liés aux `input()` grâce à `withComponentInputBinding()`.
 - Le store d'un module est fourni dans les `providers` de sa route.
 
@@ -225,7 +219,7 @@ Aucun `provideStore`, `provideState` ni `provideEffects`.
 
 ## 9. Extension Chrome
 
-- `main/commons/extension-module/` contient un `ExtensionService`, qui détecte l'extension et lui envoie le custom token (`chrome.runtime.sendMessage`), et un `ExtensionStore` global, qui expose l'état `connected`.
+- `main/commons/extension-module/` contient un `ExtensionService`, qui détecte si l'extension est installée (message `PING`). Aucun identifiant n'est transmis : l'extension a sa propre connexion Firebase, avec le même compte que le courtier.
 - Après la connexion, l'app ne parle **jamais** directement à l'extension : tout passe par Firestore (`quoteJobs`, `offers`), écouté en temps réel par `TarificationStore`.
 
 ## 10. Règles pour les agents IA

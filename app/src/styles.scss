@@ -1,39 +1,500 @@
-// Include theming for Angular Material with `mat.theme()`.
-// This Sass mixin will define CSS variables that are used for styling Angular Material
-// components according to the Material 3 design spec.
-// Learn more about theming and how to use it for your application's
-// custom components at https://material.angular.dev/guide/theming
+// Thème Angular Material (M3) + design system Courtier Intelligent.
 @use '@angular/material' as mat;
 
 html {
   height: 100%;
+  font-size: 14.4px;
   @include mat.theme(
     (
       color: (
-        primary: mat.$azure-palette,
-        tertiary: mat.$blue-palette,
+        primary: mat.$blue-palette,
+        tertiary: mat.$azure-palette,
       ),
-      typography: Roboto,
+      typography: (
+        plain-family: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+        brand-family: 'Outfit, Inter, sans-serif',
+      ),
       density: 0,
+    )
+  );
+
+  // Rôles Material alignés sur le design system BAZZ-CRM (bleu #0b63ff, navy #0b2265).
+  @include mat.theme-overrides(
+    (
+      primary: #0b63ff,
+      on-primary: #ffffff,
+      primary-container: #e8f1fd,
+      on-primary-container: #0a48a3,
+      secondary-container: #e6f0ff,
+      on-secondary-container: #0b2265,
+      tertiary: #0b63ff,
+      tertiary-container: #eff6ff,
+      on-tertiary-container: #0a48a3,
+      surface-tint: #0b63ff,
     )
   );
 }
 
+:root {
+  /* ---- Marque (design system BAZZ-CRM) ---- */
+  /* Les noms « navy » / « pink » sont gardés pour ne pas toucher aux composants. */
+  --ci-navy-900: #0b2265;
+  --ci-navy-800: #0a48a3;
+  --ci-navy-700: #0b63ff;
+  --ci-navy-100: #e8f1fd;
+  --ci-navy-50: #f2f7ff;
+
+  --ci-pink: #0b63ff; /* bouton principal */
+  --ci-pink-hover: #0a48a3;
+  --ci-accent: #0b63ff; /* focus, onglet actif, liens */
+  --ci-accent-soft: #e6f0ff;
+  --ci-accent-ink: #0a48a3;
+
+  /* ---- Menu latéral (rail sombre BAZZ) ---- */
+  --ci-sidebar-bg: #0f1624;
+  --ci-sidebar-text: #94a3b8;
+  --ci-sidebar-muted: #64748b;
+  --ci-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --ci-sidebar-active: linear-gradient(135deg, #0b63ff, #0847b8);
+  --ci-sidebar-border: #243147;
+
+  /* ---- Sémantique ---- */
+  --ci-success: #067a45;
+  --ci-success-soft: #e2fcef;
+  --ci-warning: #a8500a;
+  --ci-warning-soft: #fff3e0;
+  --ci-danger: #d4142c;
+  --ci-danger-soft: #ffe9ed;
+  --ci-info: #5b21e0;
+  --ci-info-soft: #f0e9ff;
+
+  /* ---- Rôles BAZZ ---- */
+  --accent-solid: #0b63ff;
+  --accent-deep: #0847b8;
+  --danger-solid: #ff2d55;
+  --border-strong: #cbd5e1;
+  --surface-3: #f1f5f9;
+  --on-accent: #ffffff;
+  --row-hover: #f2f7ff;
+  --transition-fast: 0.15s ease;
+
+  /* ---- Statuts de dossier (texte AA + fond doux ; le point sert aux indicateurs) ---- */
+  --st-brouillon: #5b6475;
+  --st-brouillon-bg: #eef0f4;
+  --st-brouillon-dot: #94a0b4;
+  --st-complet: #1d5fc2;
+  --st-complet-bg: #e2ecfd;
+  --st-complet-dot: #3b82f6;
+  --st-besoin_valide: #0b6f7a;
+  --st-besoin_valide-bg: #d9f4f4;
+  --st-besoin_valide-dot: #14b8c4;
+  --st-tarification: #4c3a9e;
+  --st-tarification-bg: #efecfa;
+  --st-tarification-dot: #8b6cf6;
+  --st-comparaison: #7d2f6f;
+  --st-comparaison-bg: #f8edf5;
+  --st-comparaison-dot: #d946b8;
+  --st-decision: #9a5300;
+  --st-decision-bg: #ffefd6;
+  --st-decision-dot: #f59e0b;
+  --st-proposition_envoyee: #b23c12;
+  --st-proposition_envoyee-bg: #ffe6da;
+  --st-proposition_envoyee-dot: #f97316;
+  --st-souscrit: #127443;
+  --st-souscrit-bg: #d9f5e5;
+  --st-souscrit-dot: #22c55e;
+  --st-refuse: #b4232f;
+  --st-refuse-bg: #fde2e4;
+  --st-refuse-dot: #ef4444;
+  --st-sans_suite: #4b5563;
+  --st-sans_suite-bg: #e9eaee;
+  --st-sans_suite-dot: #6b7280;
+
+  /* ---- Surfaces ---- */
+  --ci-bg: #f5f7fa;
+  --ci-surface: #ffffff;
+  --ci-surface-2: #f8fafc;
+  --ci-border: #e2e8f0;
+  --ci-text: #0f172a;
+  --ci-text-muted: #55627a;
+
+  /* ---- Formes / élévation ---- */
+  --ci-radius-sm: 6px;
+  --ci-radius: 12px;
+  --ci-radius-lg: 16px;
+  --ci-radius-pill: 9999px;
+  --ci-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --ci-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+
+  /* ---- Typographie ---- */
+  --ci-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ci-font-display: 'Outfit', 'Inter', sans-serif;
+  --ci-fs-xs: 0.8125rem;
+}
+
+/* Mode sombre (opt-in) — valeurs BAZZ-CRM. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ci-bg: #0b111e;
+  --ci-surface: #182235;
+  --ci-surface-2: #1e2a3f;
+  --ci-border: #2b3a54;
+  --ci-text: #f8fafc;
+  --ci-text-muted: #9aa8bf;
+  --ci-accent: #4ea8ff;
+  --ci-accent-soft: #10294f;
+  --ci-navy-900: #cddcff;
+  --ci-success: #2ee88f;
+  --ci-success-soft: #0d3325;
+  --ci-warning: #ffb02e;
+  --ci-warning-soft: #3a2a10;
+  --ci-danger: #ff6b85;
+  --ci-danger-soft: #3d151f;
+  --ci-info: #a78bff;
+  --ci-info-soft: #221a4d;
+  --border-strong: #3a4a67;
+  --surface-3: #212e46;
+  --row-hover: #1c2740;
+}
+
 body {
-  // Default the application to a light color theme. This can be changed to
-  // `dark` to enable the dark color theme, or to `light dark` to defer to the
-  // user's system settings.
   color-scheme: light;
-
-  // Set a default background, font and text colors for the application using
-  // Angular Material's system-level CSS variables. Learn more about these
-  // variables at https://material.angular.dev/guide/system-variables
-  background-color: var(--mat-sys-surface);
-  color: var(--mat-sys-on-surface);
+  background-color: var(--ci-bg);
+  color: var(--ci-text);
   font: var(--mat-sys-body-medium);
-
-  // Reset the user agent margin.
+  font-family: var(--ci-font);
   margin: 0;
   height: 100%;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
-/* You can add global styles to this file, and also import other style files */
+
+h1,
+h2,
+h3 {
+  font-family: var(--ci-font-display);
+  color: var(--ci-text);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: var(--ci-accent);
+}
+
+/* ---- Material : finitions globales ---- */
+.mat-mdc-card {
+  --mat-card-elevated-container-shape: var(--ci-radius);
+  --mat-card-outlined-container-shape: var(--ci-radius);
+  --mat-card-outlined-outline-color: var(--ci-border);
+  border-radius: var(--ci-radius) !important;
+}
+
+.mat-mdc-card.mat-mdc-card-outlined,
+.mat-mdc-card:not([class*='mat-elevation']) {
+  box-shadow: var(--ci-shadow-sm);
+}
+
+.mat-mdc-unelevated-button.mat-primary,
+.mat-mdc-flat-button,
+.mdc-button--unelevated {
+  border-radius: var(--ci-radius-sm) !important;
+}
+
+.mat-mdc-outlined-button,
+.mat-mdc-button {
+  border-radius: var(--ci-radius-sm) !important;
+}
+
+.mat-mdc-tab-group,
+.mat-mdc-tab-nav-bar {
+  --mat-tab-active-indicator-color: var(--ci-accent);
+  --mat-tab-active-label-text-color: var(--ci-navy-900);
+  --mat-tab-active-focus-label-text-color: var(--ci-navy-900);
+  --mat-tab-active-hover-label-text-color: var(--ci-navy-900);
+  --mat-tab-active-focus-indicator-color: var(--ci-accent);
+  --mat-tab-active-hover-indicator-color: var(--ci-accent);
+  --mat-tab-active-indicator-height: 3px;
+  --mat-tab-label-text-weight: 500;
+}
+
+.mat-mdc-tab .mdc-tab-indicator__content--underline {
+  border-radius: 3px 3px 0 0;
+}
+
+.mat-mdc-table {
+  background: var(--ci-surface) !important;
+  border-radius: var(--ci-radius);
+  overflow: hidden;
+}
+
+.mat-mdc-header-row {
+  background: var(--ci-surface-2) !important;
+}
+
+.mat-mdc-header-cell {
+  font-weight: 600 !important;
+  color: var(--ci-text-muted) !important;
+  font-size: var(--ci-fs-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mat-mdc-row:hover {
+  background: var(--row-hover);
+}
+
+.mat-mdc-dialog-surface {
+  border-radius: var(--ci-radius-lg) !important;
+}
+
+.mat-mdc-dialog-title {
+  font-family: var(--ci-font) !important;
+  font-weight: 600 !important;
+}
+
+// Le contenu défile (overflow: auto) : le libellé flottant du premier champ « outline » dépasse
+// au-dessus du champ et serait rogné par le bord de la zone. Une marge sur le champ ne peut pas être
+// écrasée par le padding que Material (ou un composant) pose sur la zone.
+.mat-mdc-dialog-content > .mat-mdc-form-field:first-child {
+  margin-top: 8px;
+}
+
+.mat-step-header .mat-step-icon-selected,
+.mat-step-header .mat-step-icon-state-edit,
+.mat-step-header .mat-step-icon-state-done {
+  background: var(--ci-navy-900) !important;
+  color: #fff !important;
+}
+
+.mat-mdc-progress-bar {
+  border-radius: 4px;
+  --mat-progress-bar-active-indicator-color: var(--ci-accent);
+}
+
+.mat-mdc-chip {
+  --mat-chip-container-shape-radius: var(--ci-radius-pill);
+}
+
+.mat-mdc-snack-bar-container {
+  --mat-snack-bar-container-shape: var(--ci-radius);
+}
+
+/* ---- Boutons Material au style BAZZ-CRM ---- */
+.mat-mdc-button-base {
+  font-family: var(--ci-font) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+}
+
+.mat-mdc-unelevated-button.mat-mdc-button-base:not(:disabled) {
+  --mat-button-filled-container-color: var(--accent-solid);
+  --mat-button-filled-label-text-color: var(--on-accent);
+  box-shadow: 0 4px 10px rgba(16, 102, 228, 0.2);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    --mat-button-filled-container-color: var(--ci-pink-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(16, 102, 228, 0.3);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &.mat-warn {
+    --mat-button-filled-container-color: #ef4444;
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2);
+  }
+}
+
+.mat-mdc-outlined-button.mat-mdc-button-base:not(:disabled) {
+  --mat-button-outlined-outline-color: var(--ci-border);
+  --mat-button-outlined-label-text-color: var(--ci-text-muted);
+
+  &:hover {
+    background: var(--surface-3);
+    color: var(--ci-text);
+  }
+}
+
+/* Classes de boutons BAZZ (pour les éléments non Material) */
+.btn-ident {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.4rem;
+  border: none;
+  border-radius: var(--ci-radius);
+  font-family: var(--ci-font);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &.btn-pill { border-radius: var(--ci-radius-pill); }
+  &.btn-square { border-radius: var(--ci-radius-sm); }
+  &.btn-sm { padding: 0.4rem 0.9rem; font-size: 0.875rem; }
+  &.btn-lg { padding: 0.8rem 1.8rem; font-size: 1rem; }
+  &:disabled { opacity: 0.65; cursor: not-allowed; }
+
+  &.btn-primary {
+    background-color: var(--accent-solid);
+    color: var(--on-accent);
+    box-shadow: 0 4px 10px rgba(16, 102, 228, 0.2);
+    &:hover { background-color: var(--ci-pink-hover); transform: translateY(-1px); box-shadow: 0 6px 14px rgba(16, 102, 228, 0.3); }
+    &:active { transform: translateY(0); }
+  }
+
+  &.btn-secondary {
+    background-color: transparent;
+    border: 1px solid var(--ci-border);
+    color: var(--ci-text-muted);
+    &:hover { background-color: var(--surface-3); color: var(--ci-text); }
+  }
+
+  &.btn-dark {
+    background-color: #0b111e;
+    color: var(--on-accent);
+    &:hover { background-color: #1e293b; transform: translateY(-1px); }
+  }
+
+  &.btn-danger {
+    background-color: #ef4444;
+    color: var(--on-accent);
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2);
+    &:hover { background-color: var(--danger-solid); transform: translateY(-1px); }
+  }
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--ci-accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--ci-radius-pill); }
+
+/* Bouton d'action principale de la page (rose, comme CompliScan) : <a mat-flat-button class="ci-cta"> */
+.mat-mdc-unelevated-button.ci-cta {
+  --mat-button-filled-container-color: var(--ci-pink);
+  --mat-button-filled-label-text-color: #fff;
+  font-weight: 600;
+}
+
+.mat-mdc-unelevated-button.ci-cta:hover {
+  --mat-button-filled-container-color: var(--ci-pink-hover);
+}
+
+/* ---- Utilitaires du design system ---- */
+.ci-card {
+  background: var(--ci-surface);
+  border: 1px solid var(--ci-border);
+  border-radius: var(--ci-radius);
+  box-shadow: var(--ci-shadow-sm);
+}
+
+.ci-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--ci-radius-sm);
+  font-size: var(--ci-fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ci-badge--success {
+  color: var(--ci-success);
+  background: var(--ci-success-soft);
+}
+
+.ci-badge--warning {
+  color: var(--ci-warning);
+  background: var(--ci-warning-soft);
+}
+
+.ci-badge--danger {
+  color: var(--ci-danger);
+  background: var(--ci-danger-soft);
+}
+
+.ci-badge--info {
+  color: var(--ci-info);
+  background: var(--ci-info-soft);
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+/* ---- Couleurs par statut : tout élément [data-status] expose --st-color / --st-bg / --st-dot ---- */
+[data-status='brouillon'] {
+  --st-color: var(--st-brouillon);
+  --st-bg: var(--st-brouillon-bg);
+  --st-dot: var(--st-brouillon-dot);
+}
+
+[data-status='complet'] {
+  --st-color: var(--st-complet);
+  --st-bg: var(--st-complet-bg);
+  --st-dot: var(--st-complet-dot);
+}
+
+[data-status='besoin_valide'] {
+  --st-color: var(--st-besoin_valide);
+  --st-bg: var(--st-besoin_valide-bg);
+  --st-dot: var(--st-besoin_valide-dot);
+}
+
+[data-status='tarification'] {
+  --st-color: var(--st-tarification);
+  --st-bg: var(--st-tarification-bg);
+  --st-dot: var(--st-tarification-dot);
+}
+
+[data-status='comparaison'] {
+  --st-color: var(--st-comparaison);
+  --st-bg: var(--st-comparaison-bg);
+  --st-dot: var(--st-comparaison-dot);
+}
+
+[data-status='decision'] {
+  --st-color: var(--st-decision);
+  --st-bg: var(--st-decision-bg);
+  --st-dot: var(--st-decision-dot);
+}
+
+[data-status='proposition_envoyee'] {
+  --st-color: var(--st-proposition_envoyee);
+  --st-bg: var(--st-proposition_envoyee-bg);
+  --st-dot: var(--st-proposition_envoyee-dot);
+}
+
+[data-status='souscrit'] {
+  --st-color: var(--st-souscrit);
+  --st-bg: var(--st-souscrit-bg);
+  --st-dot: var(--st-souscrit-dot);
+}
+
+[data-status='refuse'] {
+  --st-color: var(--st-refuse);
+  --st-bg: var(--st-refuse-bg);
+  --st-dot: var(--st-refuse-dot);
+}
+
+[data-status='sans_suite'] {
+  --st-color: var(--st-sans_suite);
+  --st-bg: var(--st-sans_suite-bg);
+  --st-dot: var(--st-sans_suite-dot);
+}
+

@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { faker } from '@faker-js/faker';
-import { Invitation, Member, MemberStatus, TenantRole } from '@shared';
+import { Invitation, Member, MemberStatus, CabinetRole } from '@shared';
 import { page } from 'vitest/browser';
-import { mockInvitation, mockMember } from '../../../../../core/utils/unit-test-utils/mocks/tenant.mock';
+import { mockInvitation, mockMember, mockTimestamp } from '../../../../../core/utils/unit-test-utils/mocks/cabinet.mock';
 import { MembersPanelComponent } from './members-panel.component';
 
 /** L'onglet « Membres » des paramètres, tel que l'admin du cabinet le manipule. */
@@ -14,18 +14,30 @@ class MembersPanelTester {
   readonly inviteEmail = this.root.getByRole('textbox', { name: 'Email' });
   readonly inviteButton = this.root.getByRole('button', { name: 'Inviter' });
 
-  readonly invited: { email: string; role: TenantRole }[] = [];
-  readonly roleChanges: { uid: string; role: TenantRole }[] = [];
+  readonly invited: { email: string; role: CabinetRole }[] = [];
+  readonly roleChanges: { uid: string; role: CabinetRole }[] = [];
   readonly statusChanges: { uid: string; status: MemberStatus }[] = [];
+  readonly cancelledInvitations: string[] = [];
+  readonly deviceResets: string[] = [];
 
   constructor() {
     const component = this.fixture.componentInstance;
     component.invited.subscribe(event => this.invited.push(event));
     component.roleChanged.subscribe(event => this.roleChanges.push(event));
     component.statusChanged.subscribe(event => this.statusChanges.push(event));
+    component.invitationCancelled.subscribe(id => this.cancelledInvitations.push(id));
+    component.deviceReset.subscribe(uid => this.deviceResets.push(uid));
   }
 
-  setInputs(inputs: { members?: Member[]; invitations?: Invitation[]; currentUid?: string | null }): void {
+  setInputs(inputs: {
+    members?: Member[];
+    invitations?: Invitation[];
+    currentUid?: string | null;
+    maxUtilisateurs?: number;
+    deviceResetsUsed?: number;
+    deviceResetsQuota?: number;
+    maxAppareilsParUtilisateur?: number;
+  }): void {
     for (const [name, value] of Object.entries(inputs)) {
       this.fixture.componentRef.setInput(name, value);
     }
@@ -113,5 +125,94 @@ describe('MembersPanelComponent', () => {
 
     await expect.element(tester.root.getByText('Invitations en attente')).toBeVisible();
     await expect.element(tester.root.getByText(invitation.email)).toBeVisible();
+  });
+
+  describe("Limite d'utilisateurs de l'offre", () => {
+    it('compte les membres actifs et les invitations en attente', async () => {
+      tester.setInputs({
+        members: [mockMember({ status: 'active' }), mockMember({ status: 'disabled' })],
+        invitations: [mockInvitation()],
+        maxUtilisateurs: 3,
+      });
+
+      await expect.element(tester.root.getByText('2 / 3')).toBeVisible();
+      await expect.element(tester.inviteButton).toBeEnabled();
+    });
+
+    it('bloque les invitations quand la limite est atteinte', async () => {
+      tester.setInputs({
+        members: [mockMember({ status: 'active' }), mockMember({ status: 'active' })],
+        invitations: [mockInvitation()],
+        maxUtilisateurs: 3,
+      });
+
+      await expect.element(tester.root.getByText('3 / 3')).toBeVisible();
+      await expect.element(tester.root.getByText(/a atteint sa limite/)).toBeVisible();
+      await expect.element(tester.inviteButton).toBeDisabled();
+    });
+
+    it('annule une invitation pour libérer une place', async () => {
+      const invitation = mockInvitation();
+      tester.setInputs({ invitations: [invitation] });
+
+      await tester.root.getByRole('button', { name: 'Annuler' }).click();
+
+      expect(tester.cancelledInvitations).toEqual([invitation.id]);
+    });
+  });
+
+  describe('Appareil lié', () => {
+    const withDevice = () => mockMember({ device: { id: 'appareil-1', label: 'Chrome · Windows', boundAt: mockTimestamp() } });
+
+    it("montre l'appareil lié de chaque membre", async () => {
+      const member = withDevice();
+      const noDevice = mockMember({ device: null });
+      tester.setInputs({ members: [member, noDevice] });
+
+      await expect.element(tester.row(member).getByText('Chrome · Windows')).toBeVisible();
+      await expect.element(tester.row(noDevice).getByText('Aucun appareil lié')).toBeVisible();
+    });
+
+    it("montre tous les appareils liés quand l'offre en autorise plusieurs", async () => {
+      const member = mockMember({
+        device: { id: 'appareil-1', label: 'Chrome · Windows', boundAt: mockTimestamp() },
+        extraDevices: [{ id: 'appareil-2', label: 'Edge · macOS', boundAt: mockTimestamp() }],
+      });
+      tester.setInputs({ members: [member], maxAppareilsParUtilisateur: 2 });
+
+      await expect.element(tester.row(member).getByText('Chrome · Windows')).toBeVisible();
+      await expect.element(tester.row(member).getByText('Edge · macOS')).toBeVisible();
+      await expect.element(tester.root.getByText(/Appareils par utilisateur/)).toBeVisible();
+
+      await tester.row(member).getByRole('button', { name: 'Réinitialiser les appareils' }).click();
+      await tester.row(member).getByRole('button', { name: 'Confirmer' }).click();
+      expect(tester.deviceResets).toEqual([member.id]);
+    });
+
+    it("n'affiche pas la limite d'appareils avec un seul appareil par utilisateur", async () => {
+      tester.setInputs({ members: [withDevice()], maxAppareilsParUtilisateur: 1 });
+
+      await expect.element(tester.root.getByText(/Appareils par utilisateur/)).not.toBeInTheDocument();
+    });
+
+    it("réinitialise l'appareil après confirmation seulement", async () => {
+      const member = withDevice();
+      tester.setInputs({ members: [member] });
+
+      await tester.row(member).getByRole('button', { name: "Réinitialiser l'appareil" }).click();
+      expect(tester.deviceResets).toEqual([]);
+
+      await tester.row(member).getByRole('button', { name: 'Confirmer' }).click();
+      expect(tester.deviceResets).toEqual([member.id]);
+    });
+
+    it('bloque la réinitialisation quand le quota du mois est atteint', async () => {
+      const member = withDevice();
+      tester.setInputs({ members: [member], deviceResetsUsed: 2, deviceResetsQuota: 2 });
+
+      await expect.element(tester.root.getByText('2 / 2')).toBeVisible();
+      await expect.element(tester.root.getByText(/Quota de réinitialisations atteint/)).toBeVisible();
+      await expect.element(tester.row(member).getByRole('button', { name: "Réinitialiser l'appareil" })).toBeDisabled();
+    });
   });
 });

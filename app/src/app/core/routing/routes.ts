@@ -3,7 +3,7 @@ import { CommonRouteContainerModel } from './common-routes/common-route-containe
 import { COMMON_ROUTES } from './common-routes/common.routes';
 import { authGuard } from './guards/auth.guards';
 
-/** Routes racines : chaque zone (commons, cabinet, super-admin) est chargée en lazy. */
+/** Routes racines : chaque zone (commons, cabinet) est chargée en lazy. */
 export const ROUTES: Routes = [
   {
     path: CommonRouteContainerModel.LANDING_ROUTE.path,

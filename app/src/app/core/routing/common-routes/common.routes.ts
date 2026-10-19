@@ -1,6 +1,11 @@
 import { Routes } from '@angular/router';
-import { guestGuard } from '../guards/auth.guards';
+import { guestGuard, noCabinetGuard } from '../guards/auth.guards';
 import { CommonRouteContainerModel } from './common-route-container.model';
+
+const sessionIssue = () =>
+  import('../../../main/commons/authentication-module/components/session-issue/session-issue.component').then(
+    c => c.SessionIssueComponent,
+  );
 
 /** Pages publiques : accessibles uniquement sans être connecté. */
 export const COMMON_ROUTES: Routes = [
@@ -23,6 +28,16 @@ export const COMMON_ROUTES: Routes = [
       ).then(c => c.SignupContainerComponent),
   },
   {
+    // Inscription pas terminée (onglet fermé avant le clic sur le lien) : on la termine ici.
+    path: CommonRouteContainerModel.CREATE_CABINET_ROUTE.path,
+    canMatch: [noCabinetGuard],
+    title: 'Créer votre cabinet — Courtier Intelligent',
+    loadComponent: () =>
+      import(
+        '../../../main/commons/authentication-module/components/create-cabinet/create-cabinet-container/create-cabinet-container.component'
+      ).then(c => c.CreateCabinetContainerComponent),
+  },
+  {
     // Accessible connecté ou non : la page guide l'invité dans les deux cas.
     path: CommonRouteContainerModel.INVITATION_ROUTE.path,
     title: 'Invitation — Courtier Intelligent',
@@ -39,5 +54,18 @@ export const COMMON_ROUTES: Routes = [
       import(
         '../../../main/commons/authentication-module/components/forget-password/forget-password-container/forget-password-container.component'
       ).then(c => c.ForgetPasswordContainerComponent),
+  },
+  {
+    // Déconnexion automatique : l'utilisateur n'est plus connecté, pas de guard.
+    path: CommonRouteContainerModel.DEVICE_NOT_AUTHORIZED_ROUTE.path,
+    title: 'Appareil non autorisé — Courtier Intelligent',
+    data: { issue: 'device_not_authorized' },
+    loadComponent: sessionIssue,
+  },
+  {
+    path: CommonRouteContainerModel.SESSION_REPLACED_ROUTE.path,
+    title: 'Session ouverte ailleurs — Courtier Intelligent',
+    data: { issue: 'session_replaced' },
+    loadComponent: sessionIssue,
   },
 ];

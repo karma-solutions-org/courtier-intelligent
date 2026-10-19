@@ -1,13 +1,11 @@
 import { Routes } from '@angular/router';
 import { SettingsStore } from '../../../main/cabinet/settings-module/store/settings.store';
-import { TenantsManagementStore } from '../../../main/super-admin/tenants-management-module/store/tenants-management.store';
+import { DossierStore } from '../../../main/cabinet/dossiers-module/store/dossier.store';
+import { DossiersStore } from '../../../main/cabinet/dossiers-module/store/dossiers.store';
+import { AssuresStore } from '../../../main/cabinet/assures-module/store/assures.store';
 import { roleGuard } from '../guards/auth.guards';
-import { CabinetRouteContainerModel, SuperAdminRouteContainerModel } from './cabinet-route-container.model';
-
-const underConstruction = () =>
-  import('../../../main/commons/main-module/components/under-construction/under-construction.component').then(
-    c => c.UnderConstructionComponent,
-  );
+import { unsavedChangesGuard } from '../guards/unsaved-changes.guard';
+import { CabinetRouteContainerModel } from './cabinet-route-container.model';
 
 /** Pages affichées dans le layout de l'espace connecté. */
 export const CABINET_ROUTES: Routes = [
@@ -17,22 +15,91 @@ export const CABINET_ROUTES: Routes = [
     title: 'Tableau de bord — Courtier Intelligent',
     loadComponent: () =>
       import('../../../main/commons/main-module/components/home-container/home-container.component').then(
-        c => c.HomeContainerComponent,
+        (c) => c.HomeContainerComponent,
       ),
   },
   {
     path: CabinetRouteContainerModel.DOSSIERS_ROUTE.path,
     canMatch: [roleGuard('admin', 'courtier')],
-    title: 'Dossiers — Courtier Intelligent',
-    data: { pageTitle: 'Dossiers' },
-    loadComponent: underConstruction,
+    providers: [DossiersStore],
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        // Vue transverse (compteurs du tableau de bord) ; la gestion courante passe par l'espace client.
+        title: 'Dossiers — Courtier Intelligent',
+        loadComponent: () =>
+          import('../../../main/cabinet/dossiers-module/components/dossiers-container/dossiers-container.component').then(
+            (c) => c.DossiersContainerComponent,
+          ),
+      },
+      {
+        path: CabinetRouteContainerModel.DOSSIER_NEW_ROUTE.path,
+        title: 'Nouveau dossier — Courtier Intelligent',
+        loadComponent: () =>
+          import('../../../main/cabinet/dossiers-module/components/new-dossier-container/new-dossier-container.component').then(
+            (c) => c.NewDossierContainerComponent,
+          ),
+      },
+      {
+        // Étapes 3 et 4 de « Nouveau dossier » : questionnaire et récapitulatif (reprise d'un brouillon).
+        path: ':id/brouillon',
+        title: 'Brouillon — Courtier Intelligent',
+        providers: [DossierStore],
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: () =>
+          import('../../../main/cabinet/dossiers-module/components/dossier-draft-container/dossier-draft-container.component').then(
+            (c) => c.DossierDraftContainerComponent,
+          ),
+      },
+      {
+        path: ':id',
+        title: 'Dossier — Courtier Intelligent',
+        providers: [DossierStore],
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: () =>
+          import('../../../main/cabinet/dossiers-module/components/dossier-detail-container/dossier-detail-container.component').then(
+            (c) => c.DossierDetailContainerComponent,
+          ),
+      },
+    ],
   },
+  // Ancienne adresse de la liste des assurés.
+  { path: 'assures', redirectTo: CabinetRouteContainerModel.CLIENTS_ROUTE.path },
+  { path: 'assures/:id', redirectTo: `${CabinetRouteContainerModel.CLIENTS_ROUTE.path}/:id` },
   {
-    path: CabinetRouteContainerModel.ASSURES_ROUTE.path,
+    path: CabinetRouteContainerModel.CLIENTS_ROUTE.path,
     canMatch: [roleGuard('admin', 'courtier')],
-    title: 'Assurés — Courtier Intelligent',
-    data: { pageTitle: 'Assurés' },
-    loadComponent: underConstruction,
+    providers: [AssuresStore],
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        title: 'Clients — Courtier Intelligent',
+        loadComponent: () =>
+          import('../../../main/cabinet/assures-module/components/assures-container/assures-container.component').then(
+            (c) => c.AssuresContainerComponent,
+          ),
+      },
+      {
+        path: CabinetRouteContainerModel.CLIENT_NEW_ROUTE.path,
+        title: 'Nouveau client — Courtier Intelligent',
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: () =>
+          import('../../../main/cabinet/assures-module/components/new-assure-container/new-assure-container.component').then(
+            (c) => c.NewAssureContainerComponent,
+          ),
+      },
+      {
+        path: ':id',
+        title: 'Espace client — Courtier Intelligent',
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: () =>
+          import('../../../main/cabinet/assures-module/components/assure-detail-container/assure-detail-container.component').then(
+            (c) => c.AssureDetailContainerComponent,
+          ),
+      },
+    ],
   },
   {
     path: CabinetRouteContainerModel.SETTINGS_ROUTE.path,
@@ -40,32 +107,17 @@ export const CABINET_ROUTES: Routes = [
     title: 'Paramètres — Courtier Intelligent',
     providers: [SettingsStore],
     loadComponent: () =>
-      import(
-        '../../../main/cabinet/settings-module/components/settings-container/settings-container.component'
-      ).then(c => c.SettingsContainerComponent),
+      import('../../../main/cabinet/settings-module/components/settings-container/settings-container.component').then(
+        (c) => c.SettingsContainerComponent,
+      ),
   },
   {
-    path: SuperAdminRouteContainerModel.TENANTS_ROUTE.path,
-    canMatch: [roleGuard('superadmin')],
-    title: 'Cabinets — Courtier Intelligent',
-    providers: [TenantsManagementStore],
+    path: CabinetRouteContainerModel.TRASH_ROUTE.path,
+    canMatch: [roleGuard('admin')],
+    title: 'Corbeille — Courtier Intelligent',
     loadComponent: () =>
-      import(
-        '../../../main/super-admin/tenants-management-module/components/tenants-management-container/tenants-management-container.component'
-      ).then(c => c.TenantsManagementContainerComponent),
-  },
-  {
-    path: SuperAdminRouteContainerModel.CATALOGUE_ROUTE.path,
-    canMatch: [roleGuard('superadmin')],
-    title: 'Catalogue — Courtier Intelligent',
-    data: { pageTitle: 'Catalogue' },
-    loadComponent: underConstruction,
-  },
-  {
-    path: SuperAdminRouteContainerModel.INSURERS_ROUTE.path,
-    canMatch: [roleGuard('superadmin')],
-    title: 'Assureurs — Courtier Intelligent',
-    data: { pageTitle: 'Assureurs' },
-    loadComponent: underConstruction,
+      import('../../../main/cabinet/trash-module/components/trash-container/trash-container.component').then(
+        (c) => c.TrashContainerComponent,
+      ),
   },
 ];

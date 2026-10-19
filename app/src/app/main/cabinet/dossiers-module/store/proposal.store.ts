@@ -1,0 +1,107 @@
+import { computed, inject } from '@angular/core';
+import { patchState, signalStore, withComputed, withHooks, withMethods, withState } from '@ngrx/signals';
+import { rxMethod } from '@ngrx/signals/rxjs-interop';
+import { Offer } from '@shared';
+import { catchError, EMPTY, exhaustMap, Observable, pipe, switchMap, tap } from 'rxjs';
+import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
+import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
+import { PROPOSAL_STRUCTURE } from '../components/proposal-tab/proposal-tab.structure';
+import { PricingService } from '../services/pricing.service';
+import { ProposalAnswer, ProposalService } from '../services/proposal.service';
+import { DossierStore } from './dossier.store';
+
+interface ProposalState {
+  offers: Offer[];
+  busy: boolean;
+  /** Vrai une fois les offres reçues (ou l'écoute en échec). */
+  loaded: boolean;
+  error: string | null;
+  successMessage: string | null;
+}
+
+/** Store de l'onglet Proposition (fourni par le composant) : offre retenue, envoi et réponse de l'assuré. */
+export const ProposalStore = signalStore(
+  withState<ProposalState>({ offers: [], busy: false, loaded: false, error: null, successMessage: null }),
+  withComputed((store, dossierStore = inject(DossierStore)) => ({
+    /**
+     * Offre retenue telle qu'elle a été choisie puis envoyée : copie figée de la proposition, sinon de la décision
+     * (l'offre vivante peut changer ensuite), à défaut l'offre actuelle (dossiers antérieurs aux copies).
+     */
+    chosenOffer: computed(() => {
+      const dossier = dossierStore.dossier();
+      const insurerId = dossier?.decision?.insurerId;
+      const snapshot = dossier?.proposal?.offerSnapshot ?? dossier?.decision?.offerSnapshot ?? null;
+      if (snapshot && snapshot.insurerId === insurerId) return snapshot;
+      return store.offers().find(offer => offer.id === insurerId) ?? null;
+    }),
+    /** L'offre retenue est à refaire (données du dossier modifiées depuis sa capture). */
+    chosenOfferStale: computed(() => {
+      const insurerId = dossierStore.dossier()?.decision?.insurerId;
+      return !!store.offers().find(offer => offer.id === insurerId)?.stale;
+    }),
+  })),
+  withMethods(
+    (
+      store,
+      pricing = inject(PricingService),
+      service = inject(ProposalService),
+      authStore = inject(AuthStore),
+      dossierStore = inject(DossierStore),
+    ) => {
+      /** Appel au serveur ; le dossier (suivi en temps réel) reflète le nouveau statut. */
+      const run = <T>(request: (dossierId: string) => Observable<T>, message: string) => {
+        // Sans dossier sélectionné (navigation en cours), rien à envoyer.
+        const dossierId = dossierStore.selectedId();
+        if (!dossierId) return EMPTY;
+        patchState(store, { busy: true, error: null });
+        return request(dossierId).pipe(
+          tap(() => patchState(store, { successMessage: message })),
+          catchError(error => {
+            patchState(store, { error: toBackendErrorMessage(error) });
+            return EMPTY;
+          }),
+          tap({ finalize: () => patchState(store, { busy: false }) }),
+        );
+      };
+      return {
+        clearMessages: () => patchState(store, { error: null, successMessage: null }),
+
+        send: rxMethod<{ to: string; message: string }>(
+          pipe(
+            exhaustMap(({ to, message }) =>
+              run(id => service.send(id, to, message), PROPOSAL_STRUCTURE.sentMessage),
+            ),
+          ),
+        ),
+
+        recordAnswer: rxMethod<ProposalAnswer>(
+          pipe(
+            exhaustMap(answer =>
+              run(id => service.recordAnswer(id, answer), PROPOSAL_STRUCTURE.answerSaved),
+            ),
+          ),
+        ),
+
+        _listen: rxMethod<string | null>(
+          pipe(
+            tap(() => patchState(store, { offers: [], loaded: false })),
+            switchMap(id => {
+              const cabinetId = authStore.cabinetId();
+              if (!id || !cabinetId) return EMPTY;
+              return pricing.watchOffers(cabinetId, id).pipe(
+                tap(offers => patchState(store, { offers, loaded: true })),
+                catchError(error => {
+                  patchState(store, { error: toBackendErrorMessage(error), loaded: true });
+                  return EMPTY;
+                }),
+              );
+            }),
+          ),
+        ),
+      };
+    },
+  ),
+  withHooks({
+    onInit: store => store._listen(inject(DossierStore).selectedId),
+  }),
+);

@@ -15,8 +15,9 @@ import { MatIconModule } from '@angular/material/icon';
   styles: `
     h1 {
       margin: 0 0 24px;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 600;
+      letter-spacing: -0.02em;
     }
 
     .empty {
@@ -26,9 +27,9 @@ import { MatIconModule } from '@angular/material/icon';
       gap: 8px;
       padding: 64px 24px;
       border: 1px dashed var(--mat-sys-outline-variant);
-      border-radius: 12px;
-      color: var(--mat-sys-on-surface-variant);
-      background: #fff;
+      border-radius: 8px;
+      color: var(--ci-text-muted);
+      background: var(--ci-surface);
 
       mat-icon {
         width: 40px;

@@ -1,32 +1,63 @@
 import { InjectionToken } from '@angular/core';
 import { FirebaseApp, initializeApp } from 'firebase/app';
-import { Auth, connectAuthEmulator, getAuth } from 'firebase/auth';
-import { connectFirestoreEmulator, Firestore, initializeFirestore } from 'firebase/firestore';
-import { connectFunctionsEmulator, Functions, getFunctions } from 'firebase/functions';
-import { connectStorageEmulator, FirebaseStorage, getStorage } from 'firebase/storage';
+import type { Auth } from 'firebase/auth';
+import type { Firestore } from 'firebase/firestore';
+import type { Functions } from 'firebase/functions';
+import type { FirebaseStorage } from 'firebase/storage';
 import { environment } from '../../../environments/environment';
 
-export const FIREBASE_APP = new InjectionToken<FirebaseApp>('FIREBASE_APP');
-export const FIREBASE_AUTH = new InjectionToken<Auth>('FIREBASE_AUTH');
-export const FIRESTORE = new InjectionToken<Firestore>('FIRESTORE');
-export const FIREBASE_FUNCTIONS = new InjectionToken<Functions>('FIREBASE_FUNCTIONS');
-export const FIREBASE_STORAGE = new InjectionToken<FirebaseStorage>('FIREBASE_STORAGE');
+/** Service Firebase chargé à la première utilisation (SDK hors du bundle initial). */
+export type LazyService<T> = () => Promise<T>;
 
-/** Initialise le SDK Firebase une seule fois et expose chaque service via un token. */
+export const FIREBASE_APP = new InjectionToken<FirebaseApp>('FIREBASE_APP');
+export const FIREBASE_AUTH = new InjectionToken<LazyService<Auth>>('FIREBASE_AUTH');
+export const FIRESTORE = new InjectionToken<LazyService<Firestore>>('FIRESTORE');
+export const FIREBASE_FUNCTIONS = new InjectionToken<LazyService<Functions>>('FIREBASE_FUNCTIONS');
+export const FIREBASE_STORAGE = new InjectionToken<LazyService<FirebaseStorage>>('FIREBASE_STORAGE');
+
+/** Charge le service une seule fois (la même promesse sert tous les appels) ; un échec permet de réessayer. */
+function once<T>(load: () => Promise<T>): LazyService<T> {
+  let promise: Promise<T> | null = null;
+  return () =>
+    (promise ??= load().catch(error => {
+      promise = null;
+      throw error;
+    }));
+}
+
+/**
+ * Initialise le SDK Firebase une seule fois et expose chaque service via un token. Chaque service (Auth compris)
+ * est importé à la première utilisation : le SDK reste hors du bundle initial. L'authentification est demandée
+ * dès le démarrage (état de connexion des gardes de route), mais téléchargée en parallèle du reste.
+ */
 export function provideFirebase() {
   const app = initializeApp(environment.firebaseConfig);
-  const auth = getAuth(app);
-  const firestore = initializeFirestore(app, { ignoreUndefinedProperties: true });
-  // Même région que les Cloud Functions de courtier-intelligent-back.
-  const functions = getFunctions(app, 'europe-west3');
-  const storage = getStorage(app);
+  const auth = once(async () => {
+    const { connectAuthEmulator, getAuth } = await import('firebase/auth');
+    const instance = getAuth(app);
+    if (environment.useEmulators) connectAuthEmulator(instance, 'http://127.0.0.1:9099', { disableWarnings: true });
+    return instance;
+  });
 
-  if (environment.useEmulators) {
-    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-    connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
-    connectFunctionsEmulator(functions, '127.0.0.1', 5001);
-    connectStorageEmulator(storage, '127.0.0.1', 9199);
-  }
+  const firestore = once(async () => {
+    const { connectFirestoreEmulator, initializeFirestore } = await import('firebase/firestore');
+    const instance = initializeFirestore(app, { ignoreUndefinedProperties: true });
+    if (environment.useEmulators) connectFirestoreEmulator(instance, '127.0.0.1', 8080);
+    return instance;
+  });
+  const functions = once(async () => {
+    const { connectFunctionsEmulator, getFunctions } = await import('firebase/functions');
+    // Même région que les Cloud Functions de courtier-intelligent-back.
+    const instance = getFunctions(app, 'europe-west3');
+    if (environment.useEmulators) connectFunctionsEmulator(instance, '127.0.0.1', 5001);
+    return instance;
+  });
+  const storage = once(async () => {
+    const { connectStorageEmulator, getStorage } = await import('firebase/storage');
+    const instance = getStorage(app);
+    if (environment.useEmulators) connectStorageEmulator(instance, '127.0.0.1', 9199);
+    return instance;
+  });
 
   return [
     { provide: FIREBASE_APP, useValue: app },

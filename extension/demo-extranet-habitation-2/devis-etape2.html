@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Devis habitation – Logement – Maison Sûre (démo locale)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="demo-banner">Site de démonstration local – aucun contrat réel, aucune donnée transmise.</div>
+  <div class="topbar"><div class="logo">Maison <span>Sûre</span> <small>(démo locale)</small></div><div class="user">Espace courtier – Cabinet démo</div></div>
+  <main class="container">
+    <div class="card">
+      <h1>Devis habitation</h1>
+      <p class="subtitle">Caractéristiques du logement à assurer.</p>
+      <p class="step-indicator">Étape 2 sur 3</p>
+      <ol class="steps"><li class="">1. Souscripteur</li><li class="active" aria-current="step">2. Logement</li><li class="">3. Garanties et antécédents</li></ol>
+      <form id="devis" data-next="devis-etape3.html" novalidate>
+        <h2>Logement</h2>
+        <div class="grid">
+          <div class="field"><fieldset class="radio"><legend>Type de logement <span class="req">*</span></legend>
+            <label><input type="radio" name="typeLogement" value="maison" required> Maison</label>
+            <label><input type="radio" name="typeLogement" value="appartement"> Appartement</label>
+          </fieldset></div>
+          <div class="field"><label for="qualiteOccupant">Qualité de l'occupant <span class="req">*</span></label><select id="qualiteOccupant" name="qualiteOccupant" required><option value="">Sélectionner…</option><option value="proprietaire_occupant">Propriétaire occupant</option><option value="locataire">Locataire</option><option value="proprietaire_non_occupant">Propriétaire non occupant</option></select></div>
+          <div class="field"><label for="surfaceHabitable">Surface habitable (m²) <span class="req">*</span></label><input id="surfaceHabitable" name="surfaceHabitable" type="number" required min="9" max="1000"></div>
+          <div class="field"><label for="nombrePieces">Nombre de pièces principales <span class="req">*</span></label><input id="nombrePieces" name="nombrePieces" type="number" required min="1" max="30"></div>
+          <div class="field"><fieldset class="radio"><legend>Résidence principale <span class="req">*</span></legend>
+            <label><input type="radio" name="residencePrincipale" value="oui" required> Oui</label>
+            <label><input type="radio" name="residencePrincipale" value="non"> Non (résidence secondaire)</label>
+          </fieldset></div>
+          <div class="field"><label for="etage">Étage (appartement)</label><input id="etage" name="etage" type="number" min="0" max="60"></div>
+          <div class="field"><label for="anneeConstruction">Année de construction</label><input id="anneeConstruction" name="anneeConstruction" type="number" min="1700" max="2026"></div>
+          <div class="field"><label for="dependances">Dépendances</label><select id="dependances" name="dependances"><option value="">Sélectionner…</option><option value="aucune">Aucune</option><option value="garage">Garage</option><option value="cave">Cave</option><option value="garage_cave">Garage et cave</option></select></div>
+        </div>
+        <div class="actions"><a class="link" href="devis-etape1.html">‹ Précédent</a><button type="submit" class="btn">Suivant</button></div>
+      </form>
+    </div>
+  </main>
+  <footer>Maison Sûre (démo locale) – extranet fictif pour le comparatif de Courtier Intelligent.</footer>
+  <script src="app.js"></script>
+</body>
+</html>

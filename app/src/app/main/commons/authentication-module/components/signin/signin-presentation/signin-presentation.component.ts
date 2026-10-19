@@ -29,6 +29,8 @@ import { SIGNIN_PAGE_STRUCTURE } from './signin-page.structure';
 export class SigninPresentationComponent {
   readonly isPending = input(false);
   readonly error = input<string | null>(null);
+  /** Information à afficher avant la connexion (ex. compte déjà connecté sur un autre appareil). */
+  readonly notice = input<string | null>(null);
   readonly forgotPasswordUrl = input.required<string>();
   readonly signupUrl = input.required<string>();
   readonly submitted = output<CredentialsModel>();
