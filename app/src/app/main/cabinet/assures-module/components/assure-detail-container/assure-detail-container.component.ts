@@ -16,6 +16,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
+import { TabQueryParamDirective } from '../../../../../core/directives/tab-query-param.directive';
 import { Router, RouterLink } from '@angular/router';
 import { Assure, AssureDocument, Dossier } from '@shared';
 import { combineLatest, of, switchMap } from 'rxjs';
@@ -44,6 +45,7 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
     MatButtonModule,
     MatIconModule,
     MatTabsModule,
+    TabQueryParamDirective,
     AssureFormComponent,
     StatusChipComponent,
   ],
@@ -128,7 +130,7 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
         </aside>
 
         <section class="main">
-          <mat-tab-group animationDuration="0ms" mat-stretch-tabs="false">
+          <mat-tab-group appTabQueryParam animationDuration="0ms" mat-stretch-tabs="false">
             <mat-tab [label]="structure.infoTitle">
               <div class="tab">
                 <div class="card stats">

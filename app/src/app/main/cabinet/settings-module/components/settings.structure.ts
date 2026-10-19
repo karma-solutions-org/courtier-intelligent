@@ -135,6 +135,7 @@ export const SETTINGS_STRUCTURE = {
     events: {
       connexion: 'Connexion',
       connexion_refusee_appareil: 'Connexion refusée : appareil non autorisé',
+      connexion_refusee_session_active: 'Connexion refusée : compte déjà ouvert sur un autre appareil',
       appareil_lie: 'Appareil lié au compte',
       extension_connexion: "Extension Chrome connectée",
       extension_jeton_emis: "Connexion automatique de l'extension autorisée",

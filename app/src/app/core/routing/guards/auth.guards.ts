@@ -17,11 +17,19 @@ function whenAuthReady(check: (store: InstanceType<typeof AuthStore>, router: Ro
   );
 }
 
-/** Réservé aux utilisateurs connectés ; sinon redirection vers la connexion. */
+/** Réservé aux membres d'un cabinet : visiteur → connexion, compte sans cabinet → création du cabinet. */
 export const authGuard: CanMatchFn = () =>
-  whenAuthReady((store, router) =>
-    store.isAuthenticated() || router.parseUrl(CommonRouteContainerModel.SIGNIN_ROUTE.url),
-  );
+  whenAuthReady((store, router) => {
+    if (!store.isAuthenticated()) return router.parseUrl(CommonRouteContainerModel.SIGNIN_ROUTE.url);
+    return !!store.cabinetId() || router.parseUrl(CommonRouteContainerModel.CREATE_CABINET_ROUTE.url);
+  });
+
+/** Réservé aux comptes connectés qui n'ont pas encore de cabinet (inscription pas terminée). */
+export const noCabinetGuard: CanMatchFn = () =>
+  whenAuthReady((store, router) => {
+    if (!store.isAuthenticated()) return router.parseUrl(CommonRouteContainerModel.SIGNIN_ROUTE.url);
+    return !store.cabinetId() || router.parseUrl(CommonRouteContainerModel.HOME_ROUTE.url);
+  });
 
 /** Réservé aux visiteurs non connectés (pages de connexion) ; sinon redirection vers l'accueil. */
 export const guestGuard: CanMatchFn = () =>

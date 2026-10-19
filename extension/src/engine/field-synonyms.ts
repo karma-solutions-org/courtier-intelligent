@@ -98,7 +98,7 @@ export const FIELD_SYNONYMS: Record<FixedCanonicalPath, FieldSynonyms> = {
   'vehicle.registration': { labels: ['immatriculation', 'numero d immatriculation', 'plaque d immatriculation', 'plaque', 'immat', 'n d immatriculation'], names: ['immatriculation', 'immat', 'registration', 'plaque', 'licenseplate'] },
   'vehicle.brand': { labels: ['marque', 'marque du vehicule', 'constructeur'], names: ['marque', 'brand', 'make'] },
   'vehicle.model': { labels: ['modele', 'modele du vehicule'], names: ['modele', 'model'] },
-  'vehicle.version': { labels: ['version', 'finition', 'motorisation', 'version du vehicule'], names: ['version', 'finition', 'trim'] },
+  'vehicle.version': { labels: ['version', 'finition', 'motorisation', 'version du vehicule', 'designation', 'designation du vehicule'], names: ['version', 'finition', 'trim', 'designation'] },
   'vehicle.firstRegistrationDate': { labels: ['date de premiere mise en circulation', 'premiere mise en circulation', 'date de mise en circulation', 'mise en circulation', 'date de 1ere mise en circulation', 'date de 1ere immatriculation', 'premiere immatriculation'], names: ['miseencirculation', 'dmec', 'firstregistration', 'pmec'] },
   'vehicle.fiscalPower': { labels: ['puissance fiscale', 'puissance fiscale en cv', 'cv fiscaux', 'puissance cv', 'chevaux fiscaux', 'cv'], names: ['puissance', 'fiscalpower', 'cv', 'cvfiscaux'] },
   'vehicle.vehicleValue': { labels: ['valeur du vehicule', 'valeur a neuf', 'valeur d achat', 'valeur estimee', 'valeur venale', 'prix du vehicule', 'valeur'], names: ['valeur', 'vehiclevalue', 'prix'] },

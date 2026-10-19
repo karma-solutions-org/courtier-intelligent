@@ -92,6 +92,7 @@ export interface Session {
 export type AuditLogType =
   | 'connexion'
   | 'connexion_refusee_appareil'
+  | 'connexion_refusee_session_active'
   | 'appareil_lie'
   | 'extension_connexion'
   | 'extension_jeton_emis'
@@ -448,6 +449,8 @@ export interface DossierDocument {
   /** Lecture en échec : code de la raison (`ia_quota`, `ia_upstream`, `ia_unusable`…). */
   error?: string | null;
   uploadedBy: string;
+  /** Pièce du client reprise dans le dossier (documents-reprendrePiecesClient) : id de la pièce d'origine. */
+  sourceAssureDocumentId?: string;
   createdAt?: TimestampLike;
   analyzedAt?: TimestampLike;
 }

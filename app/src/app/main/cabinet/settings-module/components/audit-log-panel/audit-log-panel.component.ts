@@ -116,7 +116,10 @@ export class AuditLogPanelComponent {
       member: names.get(entry.uid) ?? this.structure.unknownMember,
       label: this.structure.events[entry.type] ?? entry.type,
       device: typeof entry.data?.['appareil'] === 'string' ? (entry.data['appareil'] as string) : null,
-      refused: entry.type === 'connexion_refusee_appareil' || entry.type === 'reinitialisation_refusee_quota',
+      refused:
+        entry.type === 'connexion_refusee_appareil' ||
+        entry.type === 'connexion_refusee_session_active' ||
+        entry.type === 'reinitialisation_refusee_quota',
     }));
   });
 }

@@ -8,6 +8,16 @@ export function defaultOcrSelection(fields: OcrField[]): Partial<Record<Canonica
   return Object.fromEntries(fields.map(f => [f.canonicalPath, !needsConfirmation(f)]));
 }
 
+/** Même champ lu sur plusieurs documents (recto et verso…) : on garde la lecture la plus sûre. */
+export function mergeOcrFields(fields: OcrField[]): OcrField[] {
+  const best = new Map<CanonicalPath, OcrField>();
+  for (const field of fields) {
+    const current = best.get(field.canonicalPath);
+    if (!current || field.confidence > current.confidence) best.set(field.canonicalPath, field);
+  }
+  return [...best.values()];
+}
+
 /** Réponses à appliquer au dossier : uniquement les valeurs cochées par le courtier. */
 export function selectedOcrAnswers(fields: OcrField[], selection: Partial<Record<CanonicalPath, boolean>>): CanonicalData {
   return Object.fromEntries(fields.filter(f => selection[f.canonicalPath]).map(f => [f.canonicalPath, f.value]));

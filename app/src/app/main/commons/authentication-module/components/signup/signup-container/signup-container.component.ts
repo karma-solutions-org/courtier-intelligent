@@ -10,6 +10,7 @@ import { SignupPresentationComponent } from '../signup-presentation/signup-prese
     <app-signup-presentation
       [isPending]="authStore.isPending()"
       [error]="authStore.error()"
+      [verificationEmailSent]="authStore.verificationEmailSent()"
       [signinUrl]="signinUrl"
       [withCabinet]="!joiningByInvitation()"
       (submitted)="authStore.signUp($event)"

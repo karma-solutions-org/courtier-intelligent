@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -15,7 +15,7 @@ import {
   isAssureReadableType,
   safeDocumentFileName,
 } from '@shared';
-import { catchError, concatMap, finalize, from, map, Observable, of, switchMap } from 'rxjs';
+import { catchError, concatMap, finalize, from, map, mergeMap, Observable, of, switchMap } from 'rxjs';
 import { toBackendErrorMessage } from '../../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
 import { AssuresService } from '../../services/assures.service';
@@ -33,10 +33,13 @@ interface PickedFile {
   id: number;
   file: File;
   type: AssureDocumentType;
+  /** Envoyé dès le choix, pour que l'IA reconnaisse son type. */
+  storagePath: string;
+  status: 'recognizing' | 'ready' | 'failed';
 }
 
 /**
- * « Pré-remplir depuis une pièce » : le courtier choisit ses fichiers et le type de chacun. La CIN (ou le Kbis) est lue
+ * « Pré-remplir depuis une pièce » : le courtier choisit ses fichiers ; l'IA reconnaît le type de chacun (modifiable). La CIN (ou le Kbis) est lue
  * par l'IA et remplit le formulaire ; les autres pièces (carte grise, permis…) sont seulement envoyées, puis rangées avec
  * le client et reprises dans ses dossiers.
  */
@@ -58,7 +61,7 @@ interface PickedFile {
         <button mat-stroked-button type="button" [disabled]="busy()" (click)="picker.click()">
           <mat-icon>attach_file</mat-icon>{{ text.choose }}
         </button>
-        <button mat-flat-button type="button" [disabled]="busy() || !files().length" (click)="read()">
+        <button mat-flat-button type="button" [disabled]="busy() || !canImport()" (click)="read()">
           <mat-icon>upload_file</mat-icon>{{ text.import }}
         </button>
       </div>
@@ -68,8 +71,13 @@ interface PickedFile {
           @for (picked of files(); track picked.id) {
             <li>
               <span class="name">{{ picked.file.name }}</span>
+              @if (picked.status === 'recognizing') {
+                <span class="hint">{{ text.recognizing }}</span>
+              } @else if (picked.status === 'failed') {
+                <span class="hint error">{{ text.uploadFailed }}</span>
+              }
               <mat-form-field appearance="outline" subscriptSizing="dynamic">
-                <mat-select [ngModel]="picked.type" (ngModelChange)="setType(picked.id, $event)" [disabled]="busy()" [attr.aria-label]="text.type">
+                <mat-select [ngModel]="picked.type" (ngModelChange)="setType(picked.id, $event)" [disabled]="busy() || picked.status !== 'ready'" [attr.aria-label]="text.type">
                   @for (t of types; track t) {
                     <mat-option [value]="t">{{ text.types[t] }}</mat-option>
                   }
@@ -150,6 +158,11 @@ interface PickedFile {
         align-items: center;
       }
 
+      .hint {
+        font-size: 12px;
+        color: var(--ci-text-muted);
+      }
+
       .name {
         flex: 1;
         min-width: 0;
@@ -200,14 +213,57 @@ export class AssureDocumentImportComponent {
   protected readonly done = signal<string | null>(null);
   /** Pièces sans information reconnue (verso, autre document…) : simple information, pas une erreur. */
   protected readonly notice = signal<string | null>(null);
+  /** Toutes les pièces sont envoyées et ont un type (aucune en cours de reconnaissance ou en échec). */
+  protected readonly canImport = computed(() => this.files().length > 0 && this.files().every(picked => picked.status === 'ready'));
   private _nextId = 0;
 
-  /** Ajoute les fichiers choisis (type CIN par défaut, à changer ligne par ligne) ; les fichiers refusés sont écartés. */
+  /**
+   * Ajoute les fichiers choisis et les envoie aussitôt dans le dépôt provisoire : l'IA reconnaît le type de chacun
+   * (pré-sélectionné, à corriger si besoin). Non reconnu : « Autre ». Les fichiers refusés sont écartés.
+   */
   protected pick(list: FileList | null): void {
+    const cabinetId = this._auth.cabinetId();
+    const uid = this._auth.user()?.uid;
+    if (!cabinetId || !uid) return;
     const picked = Array.from(list ?? []);
     const accepted = picked.filter(file => ASSURE_DOCUMENT_MIME_TYPES.includes(file.type) && file.size <= ASSURE_DOCUMENT_MAX_BYTES);
     this.error.set(accepted.length < picked.length ? this.text.badFile : null);
-    this.files.update(files => [...files, ...accepted.map(file => ({ id: this._nextId++, file, type: 'cin' as AssureDocumentType }))]);
+    const added: PickedFile[] = accepted.map(file => {
+      const id = this._nextId++;
+      return {
+        id,
+        file,
+        type: 'autre',
+        storagePath: `${assureImportsFolder(cabinetId, uid)}/${Date.now()}-${id}-${safeDocumentFileName(file.name)}`,
+        status: 'recognizing',
+      };
+    });
+    this.files.update(files => [...files, ...added]);
+    from(added)
+      .pipe(
+        mergeMap(
+          picked =>
+            this._service.uploadImport(picked.storagePath, picked.file).pipe(
+              switchMap(() =>
+                this._service.recognizePiece(picked.storagePath).pipe(
+                  // IA indisponible ou quota atteint : le fichier est bien envoyé, le courtier choisit le type.
+                  catchError(() => of({ type: null })),
+                ),
+              ),
+              map(({ type }) => this.update(picked.id, { type: type ?? 'autre', status: 'ready' })),
+              catchError(() => {
+                this.update(picked.id, { status: 'failed' });
+                return of(undefined);
+              }),
+            ),
+          3,
+        ),
+      )
+      .subscribe();
+  }
+
+  private update(id: number, patch: Partial<PickedFile>): void {
+    this.files.update(files => files.map(picked => (picked.id === id ? { ...picked, ...patch } : picked)));
   }
 
   protected setType(id: number, type: AssureDocumentType): void {
@@ -219,14 +275,12 @@ export class AssureDocumentImportComponent {
   }
 
   /**
-   * Envoi dans le dépôt provisoire du courtier, l'un après l'autre ; la CIN et le Kbis sont aussi lus pour pré-remplir
-   * le formulaire. Chaque pièce envoyée est transmise au conteneur ; un fichier en échec reste dans la liste.
+   * Pièces déjà envoyées : la CIN et le Kbis sont lus pour pré-remplir le formulaire, l'un après l'autre. Chaque pièce
+   * est transmise au conteneur, qui la range avec le client à sa création ; un fichier en échec reste dans la liste.
    */
   protected read(): void {
     const queue = this.files();
-    const cabinetId = this._auth.cabinetId();
-    const uid = this._auth.user()?.uid;
-    if (!queue.length || !cabinetId || !uid) return;
+    if (!queue.length) return;
     this.done.set(null);
     this.notice.set(null);
     this.error.set(null);
@@ -238,8 +292,7 @@ export class AssureDocumentImportComponent {
     this.busy.set(true);
     from(queue)
       .pipe(
-        concatMap(({ id, file, type }) => {
-          const storagePath = `${assureImportsFolder(cabinetId, uid)}/${type}-${Date.now()}-${safeDocumentFileName(file.name)}`;
+        concatMap(({ id, file, type, storagePath }) => {
           const values$: Observable<AssureOcrValues> = isAssureReadableType(type)
             ? this._service.readPiece(type, storagePath).pipe(
                 map(({ values, readable }) => {
@@ -251,8 +304,7 @@ export class AssureDocumentImportComponent {
                 }),
               )
             : of({});
-          return this._service.uploadImport(storagePath, file).pipe(
-            switchMap(() => values$),
+          return values$.pipe(
             map(values => {
               kept++;
               this.remove(id);

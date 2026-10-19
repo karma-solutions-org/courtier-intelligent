@@ -16,6 +16,8 @@ export interface FillOptions {
   suggestionTimeoutMs?: number;
   /** La valeur est une date (AAAA-MM-JJ) à écrire dans le format du champ, même si c'est un champ de texte. */
   date?: boolean;
+  /** Version du véhicule : si aucune option ne correspond exactement, choisir la désignation la plus proche (`matchVersion`). */
+  version?: boolean;
 }
 
 // ── Événements : les extranets (React, Angular…) n'écoutent pas la propriété `value`, mais ces événements ──
@@ -95,6 +97,14 @@ const CHOICE_SYNONYMS: Record<string, string[]> = {
   fausse_declaration: ['fausse declaration', 'declaration inexacte'],
   alcoolemie: ['alcool', 'alcoolemie', 'stupefiants'],
   autre: ['autre', 'autres'],
+  // Énergie du véhicule : les extranets reprennent souvent les codes de la carte grise (P.3).
+  diesel: ['diesel', 'gazole', 'gasoil', 'go'],
+  essence: ['essence', 'es', 'sans plomb', 'super'],
+  hybride: ['hybride', 'hybride essence', 'hybride diesel', 'eh', 'gh'],
+  hybride_rechargeable: ['hybride rechargeable', 'phev', 'ee', 'gl'],
+  electrique: ['electrique', 'el', 'electricite'],
+  gpl: ['gpl', 'gaz de petrole liquefie', 'pe'],
+  ethanol: ['ethanol', 'e85', 'superethanol', 'fe'],
 };
 
 const YES = ['oui', 'yes', 'true', 'vrai', '1', 'o', 'y'];
@@ -133,6 +143,68 @@ export function matchOption(options: FieldOption[], value: FillValue): FieldOpti
   return null;
 }
 
+// ── Immatriculation : avec ou sans séparateurs, selon ce que demande l'extranet ──
+
+/** Texte affiché autour du champ (consigne « sans espace et sans tiret », exemple « AA001AA »…). */
+function nearbyText(element: HTMLElement): string {
+  // On remonte tant que le bloc reste petit (le cadre « Par immatriculation »), sans aller jusqu'à la page entière.
+  let text = '';
+  let node: HTMLElement | null = element.parentElement;
+  for (let level = 0; level < 8 && node; level++, node = node.parentElement) {
+    const content = node.textContent ?? '';
+    if (content.length > 1500) break;
+    text = content;
+  }
+  return text;
+}
+
+/**
+ * Plaque à saisir : « CM-359-VC » devient « CM359VC » quand l'extranet la veut collée (consigne affichée près du champ,
+ * exemple sans séparateur, ou champ trop court pour les tirets). Sinon, la plaque est saisie telle qu'au dossier.
+ */
+export function registrationFor(field: FormField, element: HTMLElement | undefined, value: FillValue): FillValue {
+  if (typeof value !== 'string') return value;
+  const compact = value.replace(/[\s-]+/g, '').toUpperCase();
+  if (compact === value) return value;
+  const around = normalize(`${field.label} ${field.placeholder ?? ''} ${element ? nearbyText(element) : ''}`);
+  const wantsCompact =
+    /sans (espace|tiret)/.test(around) ||
+    /\b[a-z]{2}\d{3}[a-z]{2}\b/.test(around) ||
+    (field.maxLength !== null && field.maxLength < value.length);
+  return wantsCompact ? compact : value;
+}
+
+/**
+ * Version du véhicule (« 2.0 90 ch Gazole Fourgon (FLA0A6) ») face aux désignations d'un extranet (« 2.0 DCI 90 L1H1… ») :
+ * on compte les éléments communs, les nombres (cylindrée, puissance) comptant double. L'option retenue doit avoir au moins
+ * un nombre en commun et devancer nettement les autres ; sinon `null` (le courtier choisit).
+ */
+export function matchVersion(options: FieldOption[], value: FillValue): FieldOption | null {
+  if (typeof value !== 'string') return null;
+  const tokens = new Set(words(value.replace(/[()]/g, ' ')));
+  const isNumber = (token: string) => /^\d+(\.\d+)?$/.test(token);
+  // « 2.0 » s'écrit aussi « 2,0 » ou « 2l » : la virgule est déjà un séparateur pour `words`, on garde aussi « 2 0 ».
+  const scored = options
+    .filter(option => option.value !== '' || option.label !== '')
+    .map(option => {
+      const label = words(option.label.replace(/(\d),(\d)/g, '$1.$2'));
+      let score = 0;
+      let numbers = 0;
+      for (const token of new Set(label)) {
+        if (!tokens.has(token)) continue;
+        if (isNumber(token)) {
+          score += 2;
+          numbers += 1;
+        } else score += 1;
+      }
+      return { option, score, numbers };
+    })
+    .sort((a, b) => b.score - a.score);
+  const [best, second] = scored;
+  if (!best || best.numbers === 0 || best.score < 3) return null;
+  return !second || best.score > second.score ? best.option : null;
+}
+
 // ── Remplissage par type de champ ───────────────────────────────────────────
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
@@ -163,15 +235,31 @@ function fillText(field: FormField, element: HTMLInputElement | HTMLTextAreaElem
   return ok(field);
 }
 
-function fillSelect(field: FormField, element: HTMLSelectElement, value: FillValue): FillResult {
-  const option = matchOption(field.options, value);
+/** Options actuelles de la liste : elle a pu être rechargée depuis l'analyse (liste dépendante d'une autre). */
+function liveOptions(element: HTMLSelectElement): FieldOption[] {
+  return [...element.options].map(option => ({ value: option.value, label: (option.textContent ?? '').trim() }));
+}
+
+/**
+ * Choisit l'option qui correspond, d'après la liste ACTUELLE (pas celle de l'analyse). Déjà choisie : rien n'est touché,
+ * car rechoisir la même marque relance chez certains extranets le chargement des modèles (et vide le modèle choisi).
+ * Vérifie ensuite le libellé gardé (la valeur interne d'une option peut changer quand la liste est reconstruite).
+ */
+function fillSelect(field: FormField, element: HTMLSelectElement, value: FillValue, fillOptions: FillOptions = {}): FillResult {
+  const options = liveOptions(element);
+  const candidates = options.length > 1 ? options : field.options;
+  const option = matchOption(candidates, value) ?? (fillOptions.version ? matchVersion(candidates, value) : null);
   if (!option) return fail(field, `Aucune option ne correspond à « ${String(value)} ».`);
+  const index = options.findIndex(o => o.value === option.value && o.label === option.label);
+  const selected = () => normalize(element.options[element.selectedIndex]?.textContent) === normalize(option.label);
+  if (index >= 0 && element.selectedIndex === index) return ok(field);
   element.focus();
-  element.value = option.value;
+  if (index >= 0) element.selectedIndex = index;
+  else element.value = option.value;
   fire(element, 'input');
   fire(element, 'change');
   blur(element);
-  return element.value === option.value ? ok(field) : fail(field, "L'option n'a pas pu être sélectionnée.");
+  return selected() ? ok(field) : fail(field, "L'option n'a pas pu être sélectionnée.");
 }
 
 function fillRadio(field: FormField, radios: HTMLElement[], value: FillValue): FillResult {
@@ -233,7 +321,7 @@ export async function fillField(field: FormField, elements: HTMLElement[], value
   try {
     switch (field.kind) {
       case 'select':
-        return fillSelect(field, element as HTMLSelectElement, value);
+        return fillSelect(field, element as HTMLSelectElement, value, options);
       case 'radio':
         return fillRadio(field, elements, value);
       case 'checkbox':

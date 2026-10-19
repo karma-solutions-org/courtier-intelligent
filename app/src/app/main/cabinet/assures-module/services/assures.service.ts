@@ -29,6 +29,11 @@ export class AssuresService {
     return this._backend.call('assures-lirePiece', { type, storagePath });
   }
 
+  /** Type de la pièce reconnu par l'IA (`null` : non reconnu), pour le pré-sélectionner. */
+  recognizePiece(storagePath: string): Observable<{ type: AssureDocumentType | null }> {
+    return this._backend.call('assures-reconnaitrePiece', { storagePath });
+  }
+
   /** Range la pièce avec le client créé. */
   attachPiece(data: { assureId: string; type: AssureDocumentType; storagePath: string; fileName: string; values: AssureOcrValues }): Observable<{ documentId: string }> {
     return this._backend.call('assures-rattacherPiece', data);

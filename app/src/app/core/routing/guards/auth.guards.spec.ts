@@ -117,9 +117,9 @@ describe('Guards', () => {
       expect(navigate).toHaveBeenCalledWith('/appareil-non-autorise');
     });
 
-    it("n'ouvre pas de session pour un compte sans cabinet", async () => {
+    it("n'ouvre pas de session pour un compte sans cabinet et l'envoie créer son cabinet", async () => {
       signInAs(null);
-      expect(await evaluate(authGuard)).toBe(true);
+      expect(await evaluate(authGuard)).toBe('/creer-mon-cabinet');
       expect(session.open).not.toHaveBeenCalled();
     });
   });

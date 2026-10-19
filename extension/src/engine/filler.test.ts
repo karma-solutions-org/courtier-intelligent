@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { analyzeForm, FormField } from './analyzer';
-import { dateFormatOf, fillField, formatDate, matchOption } from './filler';
+import { dateFormatOf, fillField, formatDate, matchOption, registrationFor, matchVersion } from './filler';
 
 /** Monte un formulaire et renvoie le champ analysé, ses éléments et la liste des événements reçus. */
 function setup(html: string) {
@@ -267,5 +267,55 @@ describe('matchOption', () => {
 
   it('une valeur inconnue ne correspond à rien', () => {
     expect(matchOption(options, 'spatial')).toBeNull();
+  });
+});
+
+describe('registrationFor (immatriculation avec ou sans séparateurs)', () => {
+  const plate = (html: string) => {
+    document.body.innerHTML = html;
+    const { fields, elements } = analyzeForm(document);
+    return registrationFor(fields[0], elements.get(fields[0].key)?.[0], 'CM-359-VC');
+  };
+
+  it('colle la plaque quand la page le demande (consigne ou exemple)', () => {
+    expect(plate('<div><div><label for="i">Immatriculation</label><input id="i" /></div><p>Saisissez votre numéro sans espace et sans tiret, ex: AA001AA</p></div>')).toBe('CM359VC');
+    expect(plate('<label for="i">Immatriculation</label><input id="i" placeholder="AA001AA" />')).toBe('CM359VC');
+  });
+
+  it('colle la plaque quand le champ est trop court pour les tirets', () => {
+    expect(plate('<label for="i">Immatriculation</label><input id="i" maxlength="7" />')).toBe('CM359VC');
+  });
+
+  it('garde les tirets sinon', () => {
+    expect(plate('<label for="i">Immatriculation</label><input id="i" placeholder="AB-123-CD" />')).toBe('CM-359-VC');
+  });
+});
+
+describe('registrationFor : consigne éloignée du champ (cadre Zéphir)', () => {
+  it('trouve la consigne plusieurs niveaux plus haut', () => {
+    document.body.innerHTML = `<section><h3>Par immatriculation</h3><div class="body"><div class="row"><div class="col"><div class="wrap">
+      <input id="i" name="immat" aria-label="Immatriculation" /></div></div></div>
+      <p>Saisissez votre numéro sans espace et sans tiret, ex: AA001AA</p><button>Rechercher</button></div></section>`;
+    const { fields, elements } = analyzeForm(document);
+    expect(registrationFor(fields[0], elements.get(fields[0].key)?.[0], 'CM-359-VC')).toBe('CM359VC');
+  });
+});
+
+describe('matchVersion (désignation la plus proche)', () => {
+  const opt = (...labels: string[]) => labels.map((label, i) => ({ value: String(i + 1), label }));
+  const VERSION = '2.0 90 ch Gazole Fourgon (FLA0A6)';
+
+  it('choisit la désignation qui partage cylindrée et puissance', () => {
+    const options = opt('1.6 DCI 120 L1H1 GRAND CONFORT', '2.0 DCI 90 L1H1 CONFORT', '2.0 DCI 115 L2H1 GRAND CONFORT');
+    expect(matchVersion(options, VERSION)?.label).toBe('2.0 DCI 90 L1H1 CONFORT');
+  });
+
+  it('ne choisit rien quand deux désignations sont aussi proches', () => {
+    const options = opt('2.0 DCI 90 L1H1 CONFORT', '2.0 DCI 90 L2H1 CONFORT');
+    expect(matchVersion(options, VERSION)).toBeNull();
+  });
+
+  it('ne choisit rien sans nombre en commun', () => {
+    expect(matchVersion(opt('FOURGON CONFORT', 'FOURGON GRAND CONFORT'), VERSION)).toBeNull();
   });
 });

@@ -64,7 +64,7 @@ export const ASSURES_STRUCTURE = {
   },
   piece: {
     title: 'Pré-remplir depuis une pièce',
-    hint: "Importez les pièces du client, avec le type de chacune : la CIN (ou le Kbis) remplit le formulaire, vérifiez-le avant de créer le client. Toutes les pièces sont rangées avec sa fiche, et la carte grise, le permis ou le relevé d'information rempliront ses dossiers.",
+    hint: "Importez les pièces du client : leur type est reconnu automatiquement, corrigez-le si besoin. La CIN, le permis, la carte grise (ou le Kbis) remplissent le formulaire : vérifiez-le avant de créer le client. Toutes les pièces sont rangées avec sa fiche, et la carte grise, le permis ou le relevé d'information rempliront ses dossiers.",
     type: 'Type de pièce',
     types: {
       cin: "Carte d'identité (CIN)",
@@ -77,6 +77,8 @@ export const ASSURES_STRUCTURE = {
     choose: 'Choisir des pièces',
     import: 'Importer',
     removeFile: 'Retirer ce fichier',
+    recognizing: 'Reconnaissance…',
+    uploadFailed: 'Envoi impossible : retirez-le et réessayez.',
     kept: 'pièce(s) rangée(s) avec le client, reprise(s) dans ses dossiers.',
     reading: 'Lecture du document…',
     filled: 'champ(s) rempli(s) depuis la pièce : vérifiez-les ci-dessous.',

@@ -5,7 +5,7 @@ import { analyzeForm, FormAnalysis, isAuthPage } from './analyzer';
 import { detectResultPage, extractFromDom, hasPremium, hasResultHeading, parseAmounts, visibleText } from './capture';
 import { captureWithAi, mergeOffers } from './capture-ai';
 import { expectsDate } from './field-synonyms';
-import { fillField, FillResult } from './filler';
+import { fillField, FillResult, registrationFor } from './filler';
 import { asCanonicalPath, isCompatible, Mapping, mapFields } from './mapping';
 import { applyMemory, MemoryPort, toDiscoveredFields, toMemoryFields, toRequiredPaths } from './memory';
 import { FillPlan, planFill } from './plan';
@@ -473,13 +473,15 @@ export class FormRunner {
 
   private async fill(plan: FillPlan, analysis: FormAnalysis): Promise<Map<string, FillResult>> {
     const results = new Map<string, FillResult>();
-    for (const { field, value, path } of plan.instructions) {
+    for (const { field, value: planned, path } of plan.instructions) {
+      const elements = analysis.elements.get(field.key) ?? [];
+      const value = path === 'vehicle.registration' ? registrationFor(field, elements[0], planned) : planned;
       const signature = `${String(value)}`;
       if (this.written.get(field.key) === signature) {
         results.set(field.key, { fieldKey: field.key, status: 'filled' });
         continue;
       }
-      const result = await fillField(field, analysis.elements.get(field.key) ?? [], value, { date: expectsDate(path, value) });
+      const result = await fillField(field, elements, value, { date: expectsDate(path, value), version: path === 'vehicle.version' });
       results.set(field.key, result);
       if (result.status === 'filled') this.written.set(field.key, signature);
     }

@@ -7,5 +7,6 @@ export class CommonRouteContainerModel {
   static readonly FORGOT_PASSWORD_ROUTE = { path: 'mot-de-passe-oublie', url: '/mot-de-passe-oublie' };
   static readonly DEVICE_NOT_AUTHORIZED_ROUTE = { path: 'appareil-non-autorise', url: '/appareil-non-autorise' };
   static readonly SESSION_REPLACED_ROUTE = { path: 'session-ouverte-ailleurs', url: '/session-ouverte-ailleurs' };
+  static readonly CREATE_CABINET_ROUTE = { path: 'creer-mon-cabinet', url: '/creer-mon-cabinet' };
   static readonly HOME_ROUTE = { path: 'espace', url: '/espace' };
 }

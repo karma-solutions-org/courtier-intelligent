@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { guestGuard } from '../guards/auth.guards';
+import { guestGuard, noCabinetGuard } from '../guards/auth.guards';
 import { CommonRouteContainerModel } from './common-route-container.model';
 
 const sessionIssue = () =>
@@ -26,6 +26,16 @@ export const COMMON_ROUTES: Routes = [
       import(
         '../../../main/commons/authentication-module/components/signup/signup-container/signup-container.component'
       ).then(c => c.SignupContainerComponent),
+  },
+  {
+    // Inscription pas terminée (onglet fermé avant le clic sur le lien) : on la termine ici.
+    path: CommonRouteContainerModel.CREATE_CABINET_ROUTE.path,
+    canMatch: [noCabinetGuard],
+    title: 'Créer votre cabinet — Courtier Intelligent',
+    loadComponent: () =>
+      import(
+        '../../../main/commons/authentication-module/components/create-cabinet/create-cabinet-container/create-cabinet-container.component'
+      ).then(c => c.CreateCabinetContainerComponent),
   },
   {
     // Accessible connecté ou non : la page guide l'invité dans les deux cas.

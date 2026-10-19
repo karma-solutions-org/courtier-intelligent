@@ -59,6 +59,7 @@ export function mockAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
     cabinetId: faker.string.alphanumeric(20),
     role: 'courtier',
     authTime: 1_790_000_000,
+    emailVerified: true,
     ...overrides,
   };
 }

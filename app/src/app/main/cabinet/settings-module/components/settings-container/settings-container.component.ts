@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
+import { TabQueryParamDirective } from '../../../../../core/directives/tab-query-param.directive';
 import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
 import { SettingsStore } from '../../store/settings.store';
 import { MembersPanelComponent } from '../members-panel/members-panel.component';
@@ -11,13 +12,13 @@ import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
 
 @Component({
   selector: 'app-settings-container',
-  imports: [MatTabsModule, CabinetFormComponent, MembersPanelComponent, CatalogPanelComponent, AuditLogPanelComponent],
+  imports: [MatTabsModule, TabQueryParamDirective, CabinetFormComponent, MembersPanelComponent, CatalogPanelComponent, AuditLogPanelComponent],
   template: `
     <h1>{{ structure.title }}</h1>
     @if (store.error()) {
       <p class="error" role="alert">{{ store.error() }}</p>
     }
-    <mat-tab-group animationDuration="0ms">
+    <mat-tab-group appTabQueryParam animationDuration="0ms">
       <mat-tab [label]="structure.tabs.cabinet">
         <div class="tab">
           <app-cabinet-form

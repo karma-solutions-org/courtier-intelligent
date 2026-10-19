@@ -1,5 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -25,7 +25,7 @@ import { toBackendErrorMessage } from '../../../../../core/utils/backend-error.u
 import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
 import { DocumentsService } from '../../services/documents.service';
 import { DossierStore } from '../../store/dossier.store';
-import { defaultOcrSelection, formatOcrValue, needsConfirmation, selectedOcrAnswers } from '../../util/documents.utils';
+import { defaultOcrSelection, formatOcrValue, mergeOcrFields, needsConfirmation, selectedOcrAnswers } from '../../util/documents.utils';
 import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
 
 /**
@@ -94,7 +94,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from './document-import.structure';
         </div>
         @if (busy()) {
           <p class="status" role="status">
-            {{ busy() === 'client' ? text.clientPieces : busy() === 'analyze' ? text.analyzing : text.uploading }}
+            {{ busy() === 'analyze' ? text.analyzing : text.uploading }}
             @if (progress(); as p) {
               ({{ p.done + 1 }}/{{ p.total }})
             }
@@ -442,27 +442,13 @@ export class DocumentImportContainerComponent {
   protected readonly type = signal<DossierDocumentType>('carte_grise');
   /** Fichiers choisis, chacun avec son type (pré-rempli avec le type du menu au moment du choix). */
   protected readonly files = signal<PickedFile[]>([]);
-  protected readonly busy = signal<'upload' | 'analyze' | 'client' | null>(null);
+  protected readonly busy = signal<'upload' | 'analyze' | null>(null);
   /** Import de plusieurs fichiers : position dans la file (affichée « 2/5 »). */
   protected readonly progress = signal<{ done: number; total: number } | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly message = signal<string | null>(null);
   protected readonly proposal = signal<{ documentId: string; fields: OcrField[] } | null>(null);
   protected readonly selection = signal<Partial<Record<CanonicalPath, boolean>>>({});
-
-  /** Dossiers dont les pièces du client ont déjà été reprises pendant cette visite. */
-  private readonly _clientPiecesTaken = new Set<string>();
-
-  constructor() {
-    // Pièces importées à la création du client : reprises dans le dossier, lues, et rangées dans les champs vides.
-    effect(() => {
-      const key = this._key();
-      const ready = this.editable() && !!this.store.product();
-      if (!key || !ready || this._clientPiecesTaken.has(key.dossierId)) return;
-      this._clientPiecesTaken.add(key.dossierId);
-      untracked(() => this.takeClientPieces(key.dossierId));
-    });
-  }
 
   protected readonly anyAnalyzable = computed(() => this.files().some(picked => isAnalyzableDocumentType(picked.type)));
   private _nextFileId = 0;
@@ -560,41 +546,6 @@ export class DocumentImportContainerComponent {
       });
   }
 
-  /**
-   * Reprend les pièces du client (une seule fois chacune, côté serveur), les fait lire, puis écrit les valeurs sûres
-   * (confiance suffisante) dans les champs encore VIDES : rien de ce que le courtier a saisi n'est écrasé.
-   */
-  private takeClientPieces(dossierId: string): void {
-    const fields: OcrField[] = [];
-    this.busy.set('client');
-    this._service
-      .takeClientPieces(dossierId)
-      .pipe(
-        switchMap(({ documents }) => from(documents.filter(document => isAnalyzableDocumentType(document.type)))),
-        concatMap(document =>
-          this._service.analyze(dossierId, document.documentId).pipe(
-            tap(({ status, ocrFields }) => {
-              if (status === 'analyzed') fields.push(...ocrFields);
-            }),
-            catchError(() => of(null)),
-          ),
-        ),
-        catchError(() => EMPTY),
-        finalize(() => {
-          this.busy.set(null);
-          if (this.store.selectedId() !== dossierId) return;
-          const toFill = mergeOcrFields(fields).filter(
-            field => !needsConfirmation(field) && this.currentValue(field.canonicalPath) === null,
-          );
-          if (!toFill.length) return;
-          for (const field of toFill) this.store.edit(field.canonicalPath, field.value);
-          this.store.saveNow({ event: true });
-          this.message.set(`${toFill.length} ${this.text.clientPiecesApplied}`);
-        }),
-      )
-      .subscribe();
-  }
-
   protected analyze(documentId: string): void {
     const dossierId = this.store.selectedId();
     if (!dossierId) return;
@@ -672,14 +623,4 @@ interface PickedFile {
   id: number;
   file: File;
   type: DossierDocumentType;
-}
-
-/** Même champ lu sur plusieurs documents (recto et verso…) : on garde la lecture la plus sûre. */
-function mergeOcrFields(fields: OcrField[]): OcrField[] {
-  const best = new Map<CanonicalPath, OcrField>();
-  for (const field of fields) {
-    const current = best.get(field.canonicalPath);
-    if (!current || field.confidence > current.confidence) best.set(field.canonicalPath, field);
-  }
-  return [...best.values()];
 }

@@ -51,6 +51,8 @@ export const DOSSIERS_STRUCTURE = {
   },
   draft: {
     documentsTitle: 'Commencez par les documents',
+    clientPiecesReading: 'Lecture des pièces du client (carte grise, permis…)…',
+    clientPiecesApplied: 'champ(s) rempli(s) depuis les pièces du client : vérifiez-les.',
     documentsHint:
       "Importez la carte grise, le permis, la CIN ou le relevé d'information : les informations lues pré-remplissent le questionnaire, vous n'aurez plus qu'à compléter ce qui manque.",
     toQuestionnaire: 'Continuer vers le questionnaire',
@@ -70,6 +72,11 @@ export const DOSSIERS_STRUCTURE = {
     missingHint:
       "Le dossier ne peut pas passer en « complet » tant qu'elles ne sont pas renseignées.",
     goTo: 'Renseigner',
+    fillMissing: 'Compléter les informations manquantes',
+    fillMissingTitle: 'Informations manquantes',
+    fillMissingHint: 'Seules les questions obligatoires encore vides sont affichées.',
+    saveMissing: 'Enregistrer',
+    cancel: 'Annuler',
     assure: 'Client',
     product: 'Produit',
     saving: 'Enregistrement…',

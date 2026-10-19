@@ -32,6 +32,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
 export class SignupPresentationComponent {
   readonly isPending = input(false);
   readonly error = input<string | null>(null);
+  readonly verificationEmailSent = input(false);
   readonly signinUrl = input.required<string>();
   /** Vrai pour créer un nouveau cabinet ; faux quand on s'inscrit pour rejoindre un cabinet (invitation). */
   readonly withCabinet = input(true);

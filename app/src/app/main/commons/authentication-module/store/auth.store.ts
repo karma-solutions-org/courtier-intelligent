@@ -37,6 +37,8 @@ interface AuthState {
   /** Vrai dès que Firebase a indiqué l'état de connexion initial. */
   initialized: boolean;
   resetEmailSent: boolean;
+  /** Inscription : lien de vérification envoyé, en attente du clic. */
+  verificationEmailSent: boolean;
   /** Page où revenir après connexion ou inscription (ex. acceptation d'une invitation). */
   redirectUrl: string | null;
   sessionStatus: SessionStatus;
@@ -53,6 +55,7 @@ export const AuthStore = signalStore(
     user: null,
     initialized: false,
     resetEmailSent: false,
+    verificationEmailSent: false,
     redirectUrl: null,
     sessionStatus: 'none',
     sessionNotice: null,
@@ -150,13 +153,16 @@ export const AuthStore = signalStore(
         tap(() => patchState(store, setPending(), { sessionNotice: null })),
         exhaustMap(signup =>
           authService.signUp(signup).pipe(
+            tap(() => patchState(store, { verificationEmailSent: true })),
+            // Connecté automatiquement dès que le lien est cliqué (dans n'importe quel onglet).
+            switchMap(() => authService.completeSignUp(signup.cabinetName)),
             tapResponse({
               next: () => {
-                patchState(store, setFulfilled());
+                patchState(store, setFulfilled(), { verificationEmailSent: false });
                 router.navigateByUrl(store.redirectUrl() ?? CommonRouteContainerModel.HOME_ROUTE.url);
                 patchState(store, { redirectUrl: null });
               },
-              error: error => patchState(store, setError(toSignupErrorMessage(error))),
+              error: error => patchState(store, setError(toSignupErrorMessage(error)), { verificationEmailSent: false }),
             }),
           ),
         ),
@@ -179,6 +185,38 @@ export const AuthStore = signalStore(
         ),
       ),
     ),
+    /** Termine une inscription interrompue : crée le cabinet puis ouvre l'espace. */
+    createCabinet: rxMethod<string>(
+      pipe(
+        tap(() => patchState(store, setPending())),
+        exhaustMap(name =>
+          authService.createCabinet(name).pipe(
+            tapResponse({
+              next: () => {
+                patchState(store, setFulfilled());
+                router.navigateByUrl(CommonRouteContainerModel.HOME_ROUTE.url);
+              },
+              error: error => patchState(store, setError(toBackendErrorMessage(error))),
+            }),
+          ),
+        ),
+      ),
+    ),
+    resendEmailVerification: rxMethod<void>(
+      pipe(
+        tap(() => patchState(store, setPending(), { verificationEmailSent: false })),
+        exhaustMap(() =>
+          authService.resendEmailVerification().pipe(
+            tapResponse({
+              next: () => patchState(store, setFulfilled(), { verificationEmailSent: true }),
+              error: error => patchState(store, setError(toAuthErrorMessage(error))),
+            }),
+          ),
+        ),
+      ),
+    ),
+    /** Attend le clic sur le lien (autre onglet ou téléphone) : la page passe alors au formulaire du cabinet. */
+    watchEmailVerification: rxMethod<void>(pipe(switchMap(() => authService.waitForEmailVerification()))),
     sendPasswordReset: rxMethod<string>(
       pipe(
         tap(() => patchState(store, setPending(), { resetEmailSent: false })),
@@ -196,7 +234,7 @@ export const AuthStore = signalStore(
     setRedirectUrl: (url: string | null) =>
       patchState(store, { redirectUrl: url && url.startsWith('/') && !url.startsWith('//') ? url : null }),
     refreshClaims: rxMethod<void>(pipe(exhaustMap(() => authService.refreshToken()))),
-    resetStatus: () => patchState(store, resetRequestStatus(), { resetEmailSent: false }),
+    resetStatus: () => patchState(store, resetRequestStatus(), { resetEmailSent: false, verificationEmailSent: false }),
     _listenUser: rxMethod<void>(
       pipe(
         switchMap(() =>

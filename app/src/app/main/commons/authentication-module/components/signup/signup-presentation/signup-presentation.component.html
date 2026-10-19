@@ -3,7 +3,9 @@
   <h1 class="auth-brand">{{ structure.title }}</h1>
   <p class="auth-subtitle">{{ withCabinet() ? structure.subtitle : structure.subtitleInvitation }}</p>
 
-  @if (error()) {
+  @if (verificationEmailSent()) {
+    <p class="auth-success" role="status">{{ structure.verificationSent }}</p>
+  } @else if (error()) {
     <p class="auth-error" role="alert">{{ error() }}</p>
   }
 

@@ -9,17 +9,24 @@ import {
   OnDestroy,
   OnInit,
   signal,
+  untracked,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
-import { CanonicalPath } from '@shared';
+import { CanonicalPath, isAnalyzableDocumentType, OcrField, Question } from '@shared';
+import { catchError, concatMap, EMPTY, finalize, from, map, of, switchMap, take, tap } from 'rxjs';
 import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { displayName } from '../../../assures-module/util/assures.utils';
+import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
+import { DocumentsService } from '../../services/documents.service';
 import { DossierStore } from '../../store/dossier.store';
+import { mergeOcrFields, needsConfirmation } from '../../util/documents.utils';
 import { sectionIndexOf } from '../../util/dossiers.utils';
 import { DocumentImportContainerComponent } from '../document-import/document-import-container.component';
+import { QuestionFieldComponent } from '../question-field/question-field.component';
 import { DossierStepperHeaderComponent } from '../dossier-stepper-header/dossier-stepper-header.component';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 import {
@@ -40,6 +47,7 @@ import {
     DocumentImportContainerComponent,
     DossierStepperHeaderComponent,
     QuestionnaireFormComponent,
+    QuestionFieldComponent,
   ],
   template: `
     @if (store.dossier(); as dossier) {
@@ -103,6 +111,30 @@ import {
             {{ isLastSection() ? structure.toSummary : structure.next }}
           </button>
         </div>
+      } @else if (view() === 'missing') {
+        <section class="card">
+          <h2>{{ structure.fillMissingTitle }}</h2>
+          <p class="hint">{{ structure.fillMissingHint }}</p>
+          <div class="fields">
+            @for (question of missingQuestions(); track question.canonicalPath) {
+              <app-question-field
+                [question]="question"
+                [value]="store.answers()[question.canonicalPath]"
+                [showMissing]="true"
+                (changed)="onAnswer({ path: question.canonicalPath, value: $event })"
+              />
+            }
+          </div>
+        </section>
+        <div class="actions">
+          <button mat-button type="button" (click)="view.set('summary')">
+            {{ structure.cancel }}
+          </button>
+          <span class="spacer"></span>
+          <button mat-flat-button type="button" (click)="saveMissing()">
+            {{ structure.saveMissing }}
+          </button>
+        </div>
       } @else {
         <section class="card">
           <h2>{{ structure.summaryTitle }}</h2>
@@ -127,6 +159,9 @@ import {
                   </li>
                 }
               </ul>
+              <button mat-flat-button type="button" class="fill-all" (click)="openMissing()">
+                {{ structure.fillMissing }}
+              </button>
             </div>
           } @else {
             <p class="complete"><mat-icon>check_circle</mat-icon>{{ structure.complete }}</p>
@@ -272,6 +307,20 @@ import {
       }
     }
 
+    .fill-all {
+      margin-top: 12px;
+    }
+
+    .hint {
+      margin: 0 0 16px;
+      color: var(--ci-text-muted);
+    }
+
+    .fields {
+      display: grid;
+      gap: 12px;
+    }
+
     .complete {
       display: flex;
       align-items: center;
@@ -307,14 +356,29 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
 
   protected readonly store = inject(DossierStore);
   private readonly _router = inject(Router);
+  private readonly _documents = inject(DocumentsService);
+  private readonly _authStore = inject(AuthStore);
+  private readonly _snackBar = inject(MatSnackBar);
+  /** Dossier dont les pièces du client ont déjà été reprises pendant cette visite. */
+  private _clientPiecesTakenFor: string | null = null;
   protected readonly structure = DOSSIERS_STRUCTURE.draft;
   protected readonly nameOf = displayName;
 
-  protected readonly view = signal<'documents' | 'questionnaire' | 'summary'>('documents');
+  protected readonly view = signal<'documents' | 'questionnaire' | 'summary' | 'missing'>('documents');
   /** Position de chaque vue dans les étapes de « Nouveau dossier ». */
-  protected readonly stepOf = { documents: 3, questionnaire: 4, summary: 5 } as const;
+  protected readonly stepOf = { documents: 3, questionnaire: 4, summary: 5, missing: 5 } as const;
   protected readonly showMissing = signal(false);
   protected readonly validating = signal(false);
+  /** Champs manquants figés à l'ouverture : une question remplie reste affichée pendant la saisie. */
+  private readonly _missingPaths = signal<CanonicalPath[]>([]);
+  protected readonly missingQuestions = computed<Question[]>(() => {
+    const questions = new Map(
+      this.store.schema().flatMap(section => section.questions).map(q => [q.canonicalPath, q]),
+    );
+    return this._missingPaths()
+      .map(path => questions.get(path))
+      .filter((q): q is Question => !!q);
+  });
 
   /** Section affichée, bornée au questionnaire (la reprise peut venir d'un ancien enregistrement). */
   protected readonly sectionIndex = computed(() =>
@@ -367,6 +431,14 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
       }
     });
     effect(() => {
+      // Pièces importées à la création du client (carte grise, permis…) : reprises dans le dossier, lues, et rangées
+      // dans les champs vides. Ici et non dans l'étape Documents : un dossier pré-rempli s'ouvre au questionnaire.
+      const dossier = this.store.dossier();
+      if (!dossier || !this.store.editable() || !this.store.product() || this._clientPiecesTakenFor === dossier.id) return;
+      this._clientPiecesTakenFor = dossier.id;
+      untracked(() => this.takeClientPieces(dossier.id));
+    });
+    effect(() => {
       // Une erreur de validation rend la main au courtier.
       if (this.store.error()) this.validating.set(false);
     });
@@ -398,6 +470,52 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
     }
   }
 
+  /**
+   * Reprend les pièces du client (une seule fois chacune, côté serveur), lit celles qui ne l'ont pas encore été, puis
+   * écrit les valeurs sûres (confiance suffisante) dans les champs encore VIDES : rien de ce que le courtier a saisi
+   * n'est écrasé. Une lecture coupée (page rechargée) reprend à l'ouverture suivante : les pièces non lues sont lues
+   * et toutes les valeurs du client sont appliquées. Rien à lire : rien n'est réappliqué (un champ vidé reste vide).
+   */
+  private takeClientPieces(dossierId: string): void {
+    const cabinetId = this._authStore.cabinetId();
+    if (!cabinetId) return;
+    const fields: OcrField[] = [];
+    this._documents
+      .takeClientPieces(dossierId)
+      .pipe(
+        switchMap(() => this._documents.watchDocuments(cabinetId, dossierId).pipe(take(1))),
+        map(documents => documents.filter(document => !!document.sourceAssureDocumentId && isAnalyzableDocumentType(document.type))),
+        switchMap(documents => {
+          const toRead = documents.filter(document => document.status === 'uploaded');
+          if (!toRead.length) return EMPTY;
+          for (const document of documents) if (document.status === 'analyzed') fields.push(...document.ocrFields);
+          this._snackBar.open(this.structure.clientPiecesReading, undefined, { duration: 4000 });
+          return from(toRead).pipe(
+            concatMap(document =>
+              this._documents.analyze(dossierId, document.id).pipe(
+                tap(({ status, ocrFields }) => {
+                  if (status === 'analyzed') fields.push(...ocrFields);
+                }),
+                catchError(() => of(null)),
+              ),
+            ),
+          );
+        }),
+        catchError(() => EMPTY),
+        finalize(() => {
+          if (this.store.selectedId() !== dossierId || !fields.length) return;
+          const answers = this.store.answers();
+          const isEmpty = (path: CanonicalPath) => answers[path] === undefined || answers[path] === null || answers[path] === '';
+          const toFill = mergeOcrFields(fields).filter(field => !needsConfirmation(field) && isEmpty(field.canonicalPath));
+          if (!toFill.length) return;
+          for (const field of toFill) this.store.edit(field.canonicalPath, field.value);
+          this.store.saveNow({ event: true, sectionIndex: this.sectionIndex() });
+          this._snackBar.open(`${toFill.length} ${this.structure.clientPiecesApplied}`, undefined, { duration: 6000 });
+        }),
+      )
+      .subscribe();
+  }
+
   protected onAnswer({ path, value }: AnswerChange): void {
     this.store.edit(path, value);
   }
@@ -425,6 +543,17 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
     this.store.goToSection(sectionIndexOf(this.store.schema(), path));
     this.view.set('questionnaire');
     this.showMissing.set(true);
+  }
+
+  /** Depuis le récapitulatif : n'affiche que les questions obligatoires encore vides. */
+  protected openMissing(): void {
+    this._missingPaths.set([...this.store.missing()]);
+    this.view.set('missing');
+  }
+
+  protected saveMissing(): void {
+    this.store.saveNow({ sectionIndex: this.sectionIndex() });
+    this.view.set('summary');
   }
 
   protected saveAndQuit(): void {

@@ -39,7 +39,5 @@ export const DOCUMENT_IMPORT_STRUCTURE = {
   apply: 'Appliquer',
   cancel: 'Annuler',
   applied: 'Valeurs appliquées au dossier.',
-  clientPieces: 'Lecture des pièces du client…',
-  clientPiecesApplied: 'champ(s) rempli(s) depuis les pièces du client : vérifiez-les dans le questionnaire.',
   failed: "Le document n'a pas pu être lu. Vous pouvez réessayer ou saisir les valeurs à la main.",
 };

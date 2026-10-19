@@ -1,0 +1,51 @@
+<div class="auth-card">
+  <app-logo class="auth-logo" [size]="44" />
+
+  @if (!emailVerified()) {
+    <h1 class="auth-brand">{{ structure.verifyTitle }}</h1>
+    <p class="auth-subtitle">{{ structure.verifyText }} <strong>{{ email() }}</strong>. {{ structure.verifyWaiting }}</p>
+
+    @if (verificationEmailSent()) {
+      <p class="auth-success" role="status">{{ structure.resent }}</p>
+    } @else if (error()) {
+      <p class="auth-error" role="alert">{{ error() }}</p>
+    }
+
+    <button mat-flat-button class="auth-submit" type="button" [disabled]="isPending()" (click)="resend.emit()">
+      @if (isPending()) {
+        <mat-spinner diameter="20" />
+      } @else {
+        {{ structure.resend }}
+      }
+    </button>
+  } @else {
+    <h1 class="auth-brand">{{ structure.title }}</h1>
+    <p class="auth-subtitle">{{ structure.subtitle }}</p>
+
+    @if (error()) {
+      <p class="auth-error" role="alert">{{ error() }}</p>
+    }
+
+    <form (ngSubmit)="submit()" novalidate>
+      <mat-form-field appearance="outline">
+        <mat-label>{{ structure.cabinetNameLabel }}</mat-label>
+        <input matInput [formControl]="cabinetName" autocomplete="organization" />
+        @if (cabinetName.hasError('required')) {
+          <mat-error>{{ structure.cabinetNameRequired }}</mat-error>
+        }
+      </mat-form-field>
+
+      <button mat-flat-button class="auth-submit" type="submit" [disabled]="isPending()" [attr.aria-busy]="isPending()" [attr.aria-label]="isPending() ? 'Traitement en cours' : null">
+        @if (isPending()) {
+          <mat-spinner diameter="20" />
+        } @else {
+          {{ structure.submit }}
+        }
+      </button>
+    </form>
+  }
+
+  <div class="auth-link">
+    <button mat-button type="button" (click)="signOut.emit()">{{ structure.signOut }}</button>
+  </div>
+</div>

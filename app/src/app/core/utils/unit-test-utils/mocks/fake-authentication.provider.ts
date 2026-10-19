@@ -17,8 +17,10 @@ export class FakeAuthenticationProvider extends AuthenticationProvider {
 
   readonly signIn = vi.fn((_email: string, _password: string) => of(undefined));
   readonly signUp = vi.fn((_name: string, _email: string, _password: string) => of(undefined));
+  readonly waitForEmailVerification = vi.fn(() => of(undefined));
+  readonly resendEmailVerification = vi.fn(() => of(undefined));
   readonly signOut = vi.fn(() => of(undefined));
-  readonly sendPasswordReset = vi.fn((_email: string, _continueUrl: string) => of(undefined));
+  readonly sendPasswordReset = vi.fn((_email: string) => of(undefined));
   readonly refreshToken = vi.fn(() => of(undefined));
 
   signInAs(user: AuthUser): void {
