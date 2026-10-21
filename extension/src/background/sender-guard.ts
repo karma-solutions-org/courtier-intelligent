@@ -116,7 +116,7 @@ export const MAX_AI_INPUT_CHARS = 30_000;
 export function sanitizeAiRequest(
   message: { purpose?: unknown; messages?: unknown; maxTokens?: unknown },
   prompts: Readonly<Record<string, string>>,
-): { system: string; messages: { role: 'user'; content: string }[]; maxTokens: number } | null {
+): { purpose: string; system: string; messages: { role: 'user'; content: string }[]; maxTokens: number } | null {
   const purpose = typeof message.purpose === 'string' ? message.purpose : '';
   if (!Object.prototype.hasOwnProperty.call(prompts, purpose) || !Array.isArray(message.messages)) return null;
   let budget = MAX_AI_INPUT_CHARS;
@@ -130,7 +130,7 @@ export function sanitizeAiRequest(
   if (messages.length === 0) return null;
   const requested = Number(message.maxTokens);
   const maxTokens = Number.isFinite(requested) && requested > 0 ? Math.min(Math.floor(requested), MAX_AI_TOKENS) : MAX_AI_TOKENS;
-  return { system: prompts[purpose], messages, maxTokens };
+  return { purpose, system: prompts[purpose], messages, maxTokens };
 }
 
 /**

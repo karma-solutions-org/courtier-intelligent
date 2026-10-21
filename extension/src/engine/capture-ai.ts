@@ -1,4 +1,4 @@
-import type { CanonicalData } from '@shared';
+import { AI_MASK as MASK, CAPTURE_SYSTEM_PROMPT, type CanonicalData } from '@shared';
 import type { CapturedOffer } from '../shared/messages';
 import type { AiRequest, AskAi } from './ai-fallback';
 import { parseAmounts } from './capture';
@@ -15,17 +15,8 @@ import { sanitizeOffer } from './offer';
 const MAX_PAGE_CHARS = 12_000;
 /** Contexte gardé autour de chaque montant (avant / après) quand la page en contient. */
 const AMOUNT_CONTEXT_CHARS = 300;
-const MASK = '[masqué]';
 
-export const CAPTURE_SYSTEM_PROMPT =
-  "Tu lis le texte de la page de résultat d'un extranet d'assurance auto, après que le courtier a demandé un tarif. " +
-  'Extrais l’offre affichée. Réponds UNIQUEMENT par un objet JSON de la forme ' +
-  '{"isResultPage":true|false,"quoteNumber":string|null,"premiumAnnual":number|null,"premiumMonthly":number|null,' +
-  '"generalDeductible":number|null,"guarantees":[{"label":string,"included":true|false,"limit":number|null,"deductible":number|null}],' +
-  '"exclusions":[string]}. Montants en euros, sous forme de nombres (640.5, pas "640,50 €"). ' +
-  "N'invente rien : une information absente de la page vaut null (ou n'apparaît pas dans les listes). " +
-  "Une prime dont la périodicité (annuelle ou mensuelle) n'est pas indiquée vaut null. " +
-  `Les passages "${MASK}" sont des données personnelles retirées, et "…" sépare des extraits de la page : ignore-les. Aucun texte hors du JSON.`;
+export { CAPTURE_SYSTEM_PROMPT } from '@shared';
 
 /** Variantes accentuées de chaque lettre : une valeur du dossier est masquée quelle que soit son écriture. */
 const ACCENTS: Record<string, string> = {

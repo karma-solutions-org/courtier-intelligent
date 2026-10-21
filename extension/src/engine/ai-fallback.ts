@@ -1,20 +1,20 @@
-import type { CanonicalPath } from '@shared';
+import { MAPPING_SYSTEM_PROMPT, type AiPurpose, type CanonicalPath } from '@shared';
 import type { FormField } from './analyzer';
 import { pathExample } from './field-synonyms';
 import { asCanonicalPath, isCompatible, Mapping } from './mapping';
 import { normalize } from './text';
 
+export type { AiPurpose } from '@shared';
+export { MAPPING_SYSTEM_PROMPT } from '@shared';
+
 /** Requête envoyée à `ia-proxy` (le modèle et la clé sont choisis par le serveur). */
 export interface AiRequest {
-  /** Prompt système choisi par le service worker d'après `purpose` : jamais transmis par la page. */
+  /** Le prompt système est choisi par le serveur d'après `purpose` (`system` sert aux tests et au débogage). */
   purpose: AiPurpose;
   system: string;
   messages: { role: 'user'; content: string }[];
   maxTokens: number;
 }
-
-/** Usage de l'IA : chacun a son prompt système fixe. */
-export type AiPurpose = 'mapping' | 'capture' | 'layout';
 
 /** Envoie la requête au proxy d'IA et renvoie le texte de la réponse. */
 export type AskAi = (request: AiRequest) => Promise<string>;
@@ -25,12 +25,6 @@ const MAX_OPTIONS = 20;
 /** Confiance minimale d'une réponse de l'IA, et plafond : l'IA ne vaut jamais un libellé exact. */
 const MIN_AI_CONFIDENCE = 0.6;
 const MAX_AI_CONFIDENCE = 0.85;
-
-export const MAPPING_SYSTEM_PROMPT =
-  "Tu associes des champs d'un formulaire d'assurance auto (extranet d'assureur) à une LISTE FERMÉE de chemins canoniques. " +
-  'Réponds UNIQUEMENT par un objet JSON de la forme {"mappings":[{"key":"<clé du champ>","canonicalPath":"<chemin de la liste>"|null,"confidence":<nombre de 0 à 1>}]}. ' +
-  "Un chemin absent de la liste est interdit : si aucun chemin ne convient, mets canonicalPath à null. " +
-  "Ne réponds pour aucun champ qui n'est pas dans la liste fournie. Aucun texte hors du JSON.";
 
 /**
  * Construit la requête pour les champs incertains. Seule la STRUCTURE du formulaire est envoyée (libellés, types,

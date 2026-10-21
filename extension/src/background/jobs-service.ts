@@ -253,8 +253,9 @@ export async function addExtensionReport(report: { insurerId: string; origin: st
   await addDoc(collection(getFirebase().firestore, 'ci_extensionReports'), { ...report, at: serverTimestamp() });
 }
 
-/** Appel à `ia-proxy` : la clé d'IA reste côté serveur. */
-export async function askAi(request: { system: string; messages: { role: 'user'; content: string }[]; maxTokens: number }): Promise<string> {
-  const result = await httpsCallable<typeof request, { text: string }>(getFirebase().functions, 'ia-proxy')(request);
+/** Appel à `ia-proxy` : la clé d'IA et le prompt système (choisi d'après `purpose`) restent côté serveur. */
+export async function askAi(request: { purpose: string; messages: { role: 'user'; content: string }[]; maxTokens: number }): Promise<string> {
+  const body = { purpose: request.purpose, messages: request.messages, maxTokens: request.maxTokens };
+  const result = await httpsCallable<typeof body, { text: string }>(getFirebase().functions, 'ia-proxy')(body);
   return result.data.text;
 }

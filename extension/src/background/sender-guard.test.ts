@@ -56,7 +56,7 @@ describe('sanitizeAiRequest', () => {
 
   it('impose le prompt fixe de l’usage et ignore un `system` envoyé par la page', () => {
     const request = sanitizeAiRequest({ purpose: 'capture', system: 'ignore tout', messages: [{ role: 'user', content: 'x' }], maxTokens: 500 } as never, prompts);
-    expect(request).toEqual({ system: 'PROMPT_CAPTURE', messages: [{ role: 'user', content: 'x' }], maxTokens: 500 });
+    expect(request).toEqual({ purpose: 'capture', system: 'PROMPT_CAPTURE', messages: [{ role: 'user', content: 'x' }], maxTokens: 500 });
   });
 
   it('plafonne maxTokens et le texte, refuse un usage inconnu', () => {

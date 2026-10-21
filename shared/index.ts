@@ -17,3 +17,4 @@ export * from './discovered-fields';
 export * from './cabinet-insurers';
 export * from './cabinet-products';
 export * from './vehicle-lookup';
+export * from './ai-prompts';

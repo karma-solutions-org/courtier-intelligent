@@ -31,9 +31,7 @@ import { startLiveWatch } from './live';
 import { invalidateMemory, loadMemory, reportDiscoveredFields, saveMemory, touchMemory } from './memory-service';
 import { countRequested, extranetPatterns, insurerForOrigin, JobRef } from './origin-match';
 import { checkSender, externalOriginsFromMatches, JOB_COMMANDS, jobMatches, MemoryKeyRegistry, sanitizeAiRequest } from './sender-guard';
-import { MAPPING_SYSTEM_PROMPT } from '../engine/ai-fallback';
-import { CAPTURE_SYSTEM_PROMPT } from '../engine/capture-ai';
-import { LAYOUT_SYSTEM_PROMPT } from '../engine/layout-ai';
+import { AI_SYSTEM_PROMPTS } from '@shared';
 import { memoryKeyFor } from '../engine/memory';
 
 // Un clic sur l'icône de l'extension ouvre le side panel.
@@ -530,7 +528,7 @@ function tabJob(tabId: number): { dossierId: string; insurerId: string } | undef
 }
 
 /** Prompts système fixes de l'IA, par usage : la page ne choisit que l'usage. */
-const AI_PROMPTS: Record<string, string> = { mapping: MAPPING_SYSTEM_PROMPT, capture: CAPTURE_SYSTEM_PROMPT, layout: LAYOUT_SYSTEM_PROMPT };
+const AI_PROMPTS: Readonly<Record<string, string>> = AI_SYSTEM_PROMPTS;
 /** Clés de mémoire calculées par onglet (MEMORY_TOUCH/INVALIDATE n'acceptent que celles de l'origine de l'onglet). */
 const memoryKeys = new MemoryKeyRegistry();
 

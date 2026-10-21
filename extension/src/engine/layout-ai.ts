@@ -1,4 +1,4 @@
-import type { CanonicalData } from '@shared';
+import { LAYOUT_SYSTEM_PROMPT, type CanonicalData } from '@shared';
 import type { AskAi, AiRequest } from './ai-fallback';
 import type { FieldOption, FormAnalysis, FormField } from './analyzer';
 import { clientValues, looksLikeClientData, misreadOptions } from './memory';
@@ -23,16 +23,7 @@ export interface FormLayout {
 
 export const EMPTY_LAYOUT: FormLayout = { labels: {}, options: {}, groups: [] };
 
-export const LAYOUT_SYSTEM_PROMPT =
-  "Tu lis la STRUCTURE d'un formulaire d'extranet d'assurance (aucune donnée client). Pour chaque champ, tu reçois sa clé, " +
-  'son type, son nom technique, le libellé lu par un programme (parfois faux), le texte autour du champ et ses options. ' +
-  'Corrige ce que le programme a mal lu : ' +
-  '1) "labels" : la question posée à l\'utilisateur (ex. « Civilité », « Date de naissance »), jamais un nom technique ni un titre de section ; ' +
-  '2) "options" : le texte visible de chaque option (ex. « Homme », « Non, aucune assurance »), en gardant la valeur interne "value" reçue ; ' +
-  '3) "groups" : les cases consécutives qui forment UNE valeur (date jour/mois/année = "date_dmy", année/mois/jour = "date_ymd", ' +
-  'téléphone ou plaque découpés = "segments"). ' +
-  'Réponds UNIQUEMENT par un objet JSON {"labels":{"<clé>":"<libellé>"},"options":{"<clé>":[{"value":"<valeur reçue>","label":"<texte>"}]},' +
-  '"groups":[{"keys":["<clé>",...],"type":"date_dmy"}]}. N\'invente aucune clé ni valeur ; omets ce qui est déjà juste. Aucun texte hors du JSON.';
+export { LAYOUT_SYSTEM_PROMPT } from '@shared';
 
 const MAX_FIELDS = 60;
 const MAX_CONTEXT = 80;
