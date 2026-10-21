@@ -158,15 +158,15 @@ describe('toDiscoveredFields : jamais de donnée client, peu de bruit', () => {
 
   it('écarte les options qui ressemblent à une donnée client (valeur du dossier, plaque, e-mail, téléphone, date)', () => {
     const options = ['Oui', 'Dupont', 'AB-123-CD', 'EF-456-GH', 'x@y.fr', '06 12 34 56 78', '12/03/1985', 'Non'].map(v => ({ value: v, label: v }));
-    const [found] = toDiscoveredFields([field('select:q', { kind: 'select', inputType: 'select', label: 'Question libre', options })], [mapping('select:q', 'unmapped')], [], QUOTE);
+    const [found] = toDiscoveredFields([field('select:q', { kind: 'select', inputType: 'select', label: 'Question libre', options, required: true })], [mapping('select:q', 'unmapped')], [], QUOTE);
     expect(found.options.map(o => o.value)).toEqual(['Oui', 'Non']);
   });
 
   it('applique safeLabel au libellé et plafonne les longueurs', () => {
     const long = 'x'.repeat(300);
     const fields = [
-      field('text:mail', { label: 'jean.dupont@example.fr' }),
-      field('text:ok', { label: 'Question normale', name: long, section: long, options: [{ value: long, label: long }] as never }),
+      field('text:mail', { label: 'jean.dupont@example.fr', required: true }),
+      field('text:ok', { label: 'Question normale', name: long, section: long, options: [{ value: long, label: long }] as never, required: true }),
     ];
     const found = toDiscoveredFields(fields, [mapping('text:mail', 'unmapped'), mapping('text:ok', 'unmapped')]);
     expect(found.map(f => f.fieldKey)).toEqual(['text:ok']);
@@ -175,8 +175,14 @@ describe('toDiscoveredFields : jamais de donnée client, peu de bruit', () => {
     expect(found[0].options[0].value.length).toBeLessThanOrEqual(80);
   });
 
+  it('ne signale que les champs obligatoires de l’extranet (un champ facultatif ne bloque pas le devis)', () => {
+    const fields = [field('text:obligatoire', { label: 'Question obligatoire', required: true }), field('text:facultatif', { label: 'Question facultative' })];
+    const found = toDiscoveredFields(fields, [mapping('text:obligatoire', 'unmapped'), mapping('text:facultatif', 'unmapped')]);
+    expect(found.map(f => f.fieldKey)).toEqual(['text:obligatoire']);
+  });
+
   it('un champ reconnu sur une question du produit absente de quoteData (masquée) n’est pas nouveau', () => {
-    const fields = [field('text:immat', { label: 'Immatriculation' })];
+    const fields = [field('text:immat', { label: 'Immatriculation', required: true })];
     const mappings = [mapping('text:immat', 'mapped', 'vehicle.registration')];
     expect(toDiscoveredFields(fields, mappings, ['vehicle.registration'])).toEqual([]);
     expect(toDiscoveredFields(fields, mappings, ['client.lastName'])).toHaveLength(1);
@@ -189,5 +195,14 @@ describe('Questions découvertes : lecture ratée jamais signalée', () => {
     expect(misreadOptions([{ value: 'H', label: 'oSexe' }, { value: 'F', label: 'oSexe' }], 'oSexe')).toBe(true);
     expect(misreadOptions([{ value: '1', label: 'Oui' }, { value: '0', label: 'Oui' }], 'x')).toBe(true);
     expect(misreadOptions([{ value: 'H', label: 'Homme' }, { value: 'F', label: 'Femme' }], 'oSexe')).toBe(false);
+  });
+});
+
+describe('Questions découvertes : navigation jamais signalée', () => {
+  it('reconnaît un fil d’Ariane', async () => {
+    const { isNavigationLabel } = await import('./memory');
+    expect(isNavigationLabel('> Conducteur 1 > Véhicule')).toBe(true);
+    expect(isNavigationLabel('Étape 1 › Étape 2')).toBe(true);
+    expect(isNavigationLabel('Pays de naissance')).toBe(false);
   });
 });

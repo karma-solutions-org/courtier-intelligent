@@ -165,6 +165,9 @@ const TEXT = {
 
     .card {
       display: grid;
+      /* Un contenu large (groupe de boutons, libellé long) ne fait jamais déborder la carte de sa colonne. */
+      min-width: 0;
+      overflow-wrap: anywhere;
       gap: 12px;
       align-content: start;
       padding: 20px;
@@ -176,6 +179,7 @@ const TEXT = {
 
     header {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       gap: 12px;

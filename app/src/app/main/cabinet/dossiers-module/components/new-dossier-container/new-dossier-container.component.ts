@@ -57,7 +57,7 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
         <a mat-button [routerLink]="newAssureUrl"><mat-icon>person_add</mat-icon>{{ structure.createAssure }}</a>
       } @else {
         <h2>{{ structure.productTitle }}</h2>
-        <mat-radio-group class="choices" [value]="productId()" (change)="productId.set($event.value)" [attr.aria-label]="structure.productTitle">
+        <mat-radio-group class="choices products" [value]="productId()" (change)="productId.set($event.value)" [attr.aria-label]="structure.productTitle">
           @for (product of store.availableProducts(); track product.id) {
             <mat-radio-button [value]="product.id">{{ product.name }}</mat-radio-button>
           } @empty {
@@ -140,6 +140,12 @@ import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 
     .choices {
       gap: 6px;
+    }
+
+    /* Produits : noms courts, côte à côte plutôt qu'une ligne pleine largeur chacun (en colonne sur mobile). */
+    .choices.products {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     }
 
     .choices mat-radio-button {

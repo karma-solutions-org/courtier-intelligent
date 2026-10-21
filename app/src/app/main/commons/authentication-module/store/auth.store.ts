@@ -5,6 +5,7 @@ import { patchState, signalStore, withComputed, withHooks, withMethods, withStat
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { catchError, EMPTY, exhaustMap, filter, interval, merge, of, pipe, skipWhile, startWith, switchMap, take, tap } from 'rxjs';
 import { AuthUser } from '../../../../core/providers/authentication.provider';
+import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { CommonRouteContainerModel } from '../../../../core/routing/common-routes/common-route-container.model';
 import {
   resetRequestStatus,
@@ -70,7 +71,7 @@ export const AuthStore = signalStore(
     ready: computed(() => initialized() && !(user()?.cabinetId && sessionStatus() !== 'open')),
   })),
   // ── Session : un seul appareil connecté par utilisateur ───────────────────
-  withMethods((store, authService = inject(AuthService), session = inject(SessionService), router = inject(Router)) => {
+  withMethods((store, authService = inject(AuthService), session = inject(SessionService), router = inject(Router), backend = inject(BackendProvider)) => {
     /** Déconnecte cet appareil sans fermer la session (elle appartient à un autre appareil). */
     const kickOut = (notice: string, issue: SessionIssue | null) => {
       patchState(store, { sessionStatus: 'none', sessionNotice: notice, sessionIssue: issue });
@@ -81,6 +82,14 @@ export const AuthStore = signalStore(
     };
 
     return {
+      /** Un appel refusé par le serveur car la session est fermée : déconnexion, au lieu d'un simple « échec ». */
+      _watchSessionClosed: rxMethod<void>(
+        pipe(
+          switchMap(() => backend.sessionClosed ?? EMPTY),
+          filter(() => store.sessionStatus() === 'open'),
+          tap(() => kickOut(SESSION_REPLACED_NOTICE, 'session_replaced')),
+        ),
+      ),
       _openSession: rxMethod<void>(
         pipe(
           tap(() => patchState(store, { sessionStatus: 'opening' })),
@@ -116,10 +125,7 @@ export const AuthStore = signalStore(
                     filter(active => active?.authTime !== target.authTime),
                     take(1),
                     tap(() =>
-                      kickOut(
-                        'Votre session a été fermée : une nouvelle connexion a été ouverte ou un administrateur a réinitialisé votre appareil.',
-                        'session_replaced',
-                      ),
+                      kickOut(SESSION_REPLACED_NOTICE, 'session_replaced'),
                     ),
                   ),
                 )
@@ -255,6 +261,7 @@ export const AuthStore = signalStore(
   withHooks({
     onInit: store => {
       store._listenUser();
+      store._watchSessionClosed();
       store._keepAlive(
         computed(() => {
           const user = store.user();
@@ -266,6 +273,9 @@ export const AuthStore = signalStore(
     },
   }),
 );
+
+const SESSION_REPLACED_NOTICE =
+  'Votre session a été fermée : une nouvelle connexion a été ouverte ou un administrateur a réinitialisé votre appareil.';
 
 function issueUrl(issue: SessionIssue | null): string {
   switch (issue) {

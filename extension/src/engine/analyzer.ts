@@ -47,12 +47,55 @@ const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6, [role="heading"]';
 
 /** Un élément est visible s'il ne l'est pas masqué lui-même ni par l'un de ses ancêtres. */
 export function isVisible(element: Element): boolean {
-  for (let node: Element | null = element; node; node = node.parentElement) {
+  // Dans un shadow DOM, on remonte jusqu'à l'hôte.
+  for (let node: Element | null = element; node; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) {
     if (node.hasAttribute('hidden')) return false;
     const style = node.ownerDocument.defaultView?.getComputedStyle(node);
     if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
   }
   return true;
+}
+
+/**
+ * Champ présent mais invisible pour l'utilisateur : transparent (opacity 0), de taille nulle, ou rejeté hors de l'écran
+ * (piège à robots, champ technique). Seul le champ lui-même compte : un bloc qui apparaît en fondu n'est pas concerné.
+ */
+function isVisuallyHidden(element: Element): boolean {
+  const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+  if (!style) return false;
+  if (style.opacity === '0') return true;
+  if (style.width === '0px' && style.height === '0px') return true;
+  const offscreen = (value: string) => parseFloat(value) <= -1000;
+  return (style.position === 'absolute' || style.position === 'fixed') && (offscreen(style.left) || offscreen(style.top));
+}
+
+/** Racine (document ou shadow root) où chercher les `<label for>` et les id d'un élément. */
+const rootOf = (element: Element): Document | ShadowRoot => element.getRootNode() as Document | ShadowRoot;
+
+/** `<label for>` d'un élément, sinon `<label>` qui l'englobe. */
+function labelElementOf(element: HTMLElement): HTMLLabelElement | null {
+  const forLabel = element.id ? [...rootOf(element).querySelectorAll<HTMLLabelElement>('label[for]')].find(label => label.htmlFor === element.id) : null;
+  return forLabel ?? element.closest('label');
+}
+
+/**
+ * Bouton radio / case masqué et dessiné par son libellé (boutons « Privé | Trajet ») : le libellé visible fait le champ.
+ * Remplissage : clic sur ce libellé.
+ */
+export function isLabelStyledChoice(element: HTMLElement): boolean {
+  if (!(element instanceof HTMLInputElement) || !['radio', 'checkbox'].includes(element.type)) return false;
+  if (isVisible(element) && !isVisuallyHidden(element)) return false;
+  const label = labelElementOf(element);
+  return !!label && isVisible(label) && !isVisuallyHidden(label);
+}
+
+/** Tous les éléments de `scope` qui correspondent, y compris dans les shadow DOM ouverts (composants web), récursivement. */
+function deepQueryAll<T extends Element>(scope: ParentNode, selector: string): T[] {
+  const found = [...scope.querySelectorAll<T>(selector)];
+  for (const host of scope.querySelectorAll('*')) {
+    if (host.shadowRoot) found.push(...deepQueryAll<T>(host.shadowRoot, selector));
+  }
+  return found;
 }
 
 const textOf = (node: Node | null | undefined): string => cleanLabel((node?.textContent ?? '').replace(/\s+/g, ' ').trim());
@@ -67,7 +110,7 @@ function labelText(label: HTMLLabelElement): string {
 function labelledBy(element: Element): string | null {
   const ids = element.getAttribute('aria-labelledby')?.split(/\s+/).filter(Boolean) ?? [];
   const text = ids
-    .map(id => textOf(element.ownerDocument.getElementById(id)))
+    .map(id => textOf(rootOf(element).getElementById(id)))
     .filter(Boolean)
     .join(' ');
   return text || null;
@@ -75,7 +118,7 @@ function labelledBy(element: Element): string | null {
 
 /** Libellé d'un champ : aria-labelledby, `<label for>`, `<label>` englobant, aria-label, cellule voisine, placeholder. */
 function labelOf(element: HTMLElement): string {
-  const doc = element.ownerDocument;
+  const doc = rootOf(element);
   const fromAria = labelledBy(element);
   if (fromAria) return fromAria;
 
@@ -106,6 +149,15 @@ function labelOf(element: HTMLElement): string {
   if (previous && !previous.matches('input, select, textarea') && previous.children.length === 0) {
     const text = textOf(previous);
     if (text && text.length < 80) return text;
+  }
+  // Libellé flottant écrit APRÈS le champ, dans le même petit bloc (Material : <div><input><label>Nom</label></div>).
+  const parent = element.parentElement;
+  if (parent && parent.querySelectorAll('input, select, textarea').length === 1) {
+    for (let next = element.nextElementSibling; next; next = next.nextElementSibling) {
+      if (!(next instanceof HTMLLabelElement) || (next.htmlFor && next.htmlFor !== element.id)) continue;
+      const text = labelText(next);
+      if (text && text.length < 80) return text;
+    }
   }
   // Libellé à côté du bloc qui contient le champ (ex. « Date de naissance » à gauche des cases jour / mois / année).
   const container = element.parentElement;
@@ -148,6 +200,9 @@ function groupLabelOf(first: HTMLElement): string {
   }
   const column = tableColumnOf(first);
   if (column) return column.header;
+  // Tableau de saisie : la question est dans la cellule qui précède (le libellé « Oui » du bouton n'est qu'une réponse).
+  const previousCell = first.closest('td')?.previousElementSibling;
+  if (previousCell && /^(td|th)$/i.test(previousCell.tagName) && textOf(previousCell)) return textOf(previousCell);
   const container = first.closest('div, p, li, td');
   const heading = container
     ? [...container.children].find(child => child.matches('label, span, p, strong') && !child.querySelector('input, select, textarea'))
@@ -307,16 +362,20 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
   const scope = root instanceof Document ? root.body : root;
   const headings = [...scope.querySelectorAll(HEADING_SELECTOR)];
 
-  const candidates = [...scope.querySelectorAll<HTMLElement>(CONTROL_SELECTOR)].filter(element => {
+  const candidates = deepQueryAll<HTMLElement>(scope, CONTROL_SELECTOR).filter(element => {
     const type = (element.getAttribute('type') ?? 'text').toLowerCase();
+    // Champ en lecture seule (souvent un calendrier qui ignore la saisie) : on ne peut pas le remplir en écrivant.
+    const readOnly = (element instanceof HTMLInputElement && type !== 'radio' && type !== 'checkbox' && element.readOnly) ||
+      (element instanceof HTMLTextAreaElement && element.readOnly);
     return (
       !(element instanceof HTMLInputElement && IGNORED_INPUT_TYPES.has(type)) &&
       !(element as HTMLInputElement).disabled &&
+      !readOnly &&
       element.getAttribute('aria-disabled') !== 'true' &&
       !(isCustomControl(element) && element.querySelector('input, select, textarea')) &&
       element.getAttribute('aria-hidden') !== 'true' &&
       !isSearchField(element) &&
-      isVisible(element)
+      ((isVisible(element) && !isVisuallyHidden(element)) || isLabelStyledChoice(element))
     );
   });
 
@@ -324,6 +383,15 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
   const elements = new Map<string, HTMLElement[]>();
   const usedKeys = new Map<string, number>();
   const radioGroups = new Map<string, HTMLElement[]>();
+  // Les groupes radio sont propres à chaque <form> (deux formulaires sans id peuvent réutiliser le même nom).
+  const formIndexes = new WeakMap<HTMLFormElement, number>();
+  let nextFormIndex = 0;
+  const formOf = (element: HTMLElement): string => {
+    const form = (element as HTMLInputElement).form ?? element.closest('form');
+    if (!form) return '';
+    if (!formIndexes.has(form)) formIndexes.set(form, nextFormIndex++);
+    return `${form.id}#${formIndexes.get(form)}`;
+  };
   const segmentGroups = findSegmentGroups(candidates);
   const inSegmentGroup = new Set([...segmentGroups.values()].flatMap(({ parts }) => parts.slice(1)));
 
@@ -345,7 +413,7 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
       const name = isCustomControl(element)
         ? radioGroupId(element.closest<HTMLElement>('[role="radiogroup"]') ?? element.parentElement ?? element)
         : (element as HTMLInputElement).name || element.id || `radio-${fields.length}`;
-      const groupKey = `${name}@${element.closest('form')?.id ?? ''}`;
+      const groupKey = `${name}@${formOf(element)}`;
       const existing = radioGroups.get(groupKey);
       if (existing) {
         existing.push(element);
@@ -385,7 +453,7 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
   // Les options des groupes radio ne sont connues qu'une fois le groupe complet.
   for (const field of fields) {
     const group = elements.get(field.key)!;
-    field.options = optionsOf(group[0], group);
+    field.options = field.inputType.startsWith('split-') ? [] : optionsOf(group[0], group);
   }
 
   return { fields, elements, fingerprint: fingerprintOf(fields, doc) };
@@ -414,6 +482,7 @@ function partOf(element: HTMLElement): 'd' | 'm' | 'y' | null {
 }
 
 function widthOf(element: HTMLElement): number | null {
+  if (element instanceof HTMLSelectElement) return null;
   const input = element as HTMLInputElement;
   if (input.maxLength > 0) return input.maxLength;
   const size = Number(input.getAttribute('size'));
@@ -428,7 +497,7 @@ function sideBySide(parts: HTMLElement[]): boolean {
   const parents = parts.map(p => p.parentElement);
   if (parents.every(p => p === parents[0])) return true;
   const grand = parents.map(p => p?.parentElement);
-  return !!grand[0] && grand.every(g => g === grand[0]) && parents.every(p => (p?.querySelectorAll('input').length ?? 0) === 1);
+  return !!grand[0] && grand.every(g => g === grand[0]) && parents.every(p => (p?.querySelectorAll('input, select').length ?? 0) === 1);
 }
 
 /**
@@ -436,7 +505,7 @@ function sideBySide(parts: HTMLElement[]): boolean {
  * nommer la case (« Jour », « MM », « AAAA ») ne compte pas : il fait partie du groupe.
  */
 function hasOwnLabel(element: HTMLElement): boolean {
-  const doc = element.ownerDocument;
+  const doc = rootOf(element);
   const texts = [
     element.getAttribute('aria-label'),
     labelledBy(element),
@@ -477,7 +546,10 @@ function findSegmentGroups(candidates: HTMLElement[]): Map<HTMLElement, SegmentG
     for (let j = i; j < candidates.length; j++) {
       const candidate = candidates[j];
       const width = widthOf(candidate);
-      const short = isTextBox(candidate) && ((width !== null && width <= MAX_SEGMENT_WIDTH) || partOf(candidate) !== null);
+      // Une liste jour / mois / année (trois <select>) compte comme une case de date.
+      const short =
+        (isTextBox(candidate) && ((width !== null && width <= MAX_SEGMENT_WIDTH) || partOf(candidate) !== null)) ||
+        (candidate instanceof HTMLSelectElement && partOf(candidate) !== null);
       // Une case qui a son propre libellé est un champ à part (« Champ A » / « Champ B »), pas la suite du groupe.
       if (!short || (run.length && (hasOwnLabel(candidate) || !sideBySide([...run, candidate])))) break;
       run.push(candidate);

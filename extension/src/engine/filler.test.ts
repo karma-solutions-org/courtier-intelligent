@@ -231,12 +231,12 @@ describe('Saisie assistée (autocomplete)', () => {
     expect(input.value).toBe('Lyon 6e');
   });
 
-  it('garde le texte saisi quand aucune suggestion n’apparaît', async () => {
+  it('garde le texte saisi quand aucune suggestion n’apparaît, mais le signale à vérifier', async () => {
     const { fill } = setup(html);
 
     const result = await fill(0, 'Saint-Étienne');
 
-    expect(result.status).toBe('filled');
+    expect(result.status).toBe('failed');
     expect((document.getElementById('v') as HTMLInputElement).value).toBe('Saint-Étienne');
   });
 

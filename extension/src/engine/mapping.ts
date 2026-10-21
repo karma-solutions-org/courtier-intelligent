@@ -1,4 +1,4 @@
-import { CANONICAL_PATHS, CanonicalPath, isCanonicalPath, isExtraPath, isFixedCanonicalPath, parseClaimPath } from '@shared';
+import { CANONICAL_PATHS, CanonicalPath, ExtraCanonicalPath, isCanonicalPath, isExtraPath, isFixedCanonicalPath, labelSignature, parseClaimPath } from '@shared';
 import type { FormField } from './analyzer';
 import { COMPATIBLE_KINDS, FIELD_SYNONYMS, INHERITED_LABELS, PATH_EXPECTED, PREFIX_KEYWORDS } from './field-synonyms';
 import { containsPhrase, normalize, words } from './text';
@@ -59,7 +59,9 @@ export function isCompatible(field: FormField, path: CanonicalPath): boolean {
 /** Mots de « confirmation » retirés avant la comparaison : « Confirmez votre e-mail » se lit comme « votre e-mail ». */
 const CONFIRMATION_WORDS = /\b(confirmez|confirmer|confirmation|ressaisissez|ressaisir|repetez|retapez)\b/g;
 
-const camelSplit = (text: string): string => text.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+const SECONDARY_DRIVER = /\b(conducteur secondaire|second conducteur|2e conducteur|co conducteur|conducteur additionnel|conducteur occasionnel)\b/;
+
+const camelSplit =(text: string): string => text.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
 
 function prefixOf(path: CanonicalPath): string {
   return path.split('.')[0];
@@ -85,6 +87,8 @@ export function scoreCandidate(field: FormField, path: CanonicalPath): number {
   // Sinistre n : uniquement un champ de la ligne n d'un tableau de sinistres.
   const claim = parseClaimPath(path);
   if (claim && field.row !== claim.index) return 0;
+  // Le dossier ne décrit qu'un conducteur : ceux d'un conducteur secondaire ne reçoivent jamais ses valeurs.
+  if (SECONDARY_DRIVER.test(normalize(`${field.label} ${field.section ?? ''}`))) return 0;
   const spec = FIELD_SYNONYMS[path];
   const label = normalize(field.label).replace(CONFIRMATION_WORDS, ' ').replace(/\s+/g, ' ').trim();
   const prefixes = contextPrefixes(field);
@@ -184,6 +188,53 @@ export function mapFields(fields: FormField[]): Mapping[] {
     }
   }
   return mappings;
+}
+
+/** Pluriel retiré (« sinistres » = « sinistre », « travaux » = « travau ») : la comparaison ne dépend pas de l'accord. */
+const stem = (word: string): string => (word.length > 3 ? word.replace(/[sx]$/, '') : word);
+
+/** Mots significatifs d'un libellé, ou du code d'une question ajoutée depuis un extranet (`extra.kilometrage_annuel`). */
+const labelTokens = (label: string): Set<string> => new Set(labelSignature(label).split(' ').filter(Boolean).map(stem));
+const extraTokens = (path: ExtraCanonicalPath): Set<string> => labelTokens(path.slice('extra.'.length).replace(/_/g, ' '));
+
+/**
+ * Question ajoutée depuis un extranet la plus proche du libellé du champ (mêmes mots, quel que soit leur ordre ou leur
+ * accord) : la même question posée par un autre assureur, sous une autre forme, est ainsi reconnue sans l'IA.
+ * Score : 0,9 pour les mêmes mots, moins quand des mots diffèrent ; null si trop peu de mots en commun.
+ */
+export function matchExtraPath(field: FormField, extraPaths: readonly ExtraCanonicalPath[]): Candidate | null {
+  const fieldTokens = labelTokens(field.label);
+  if (fieldTokens.size === 0) return null;
+  let best: Candidate | null = null;
+  for (const path of extraPaths) {
+    const tokens = extraTokens(path);
+    const common = [...tokens].filter(token => fieldTokens.has(token)).length;
+    const similarity = common / new Set([...tokens, ...fieldTokens]).size;
+    const score = 0.5 + 0.4 * similarity;
+    if (similarity > 0 && score >= UNCERTAIN_THRESHOLD + 0.2 && (!best || score > best.score)) best = { path, score };
+  }
+  return best;
+}
+
+/**
+ * Les champs que les synonymes n'ont pas reconnus sont comparés aux questions ajoutées depuis un extranet présentes
+ * dans le dossier : assez proche, le champ est associé (`mapped`) ; sinon le candidat est proposé à l'IA (`uncertain`).
+ * Un chemin déjà visé par un autre champ n'est pas repris.
+ */
+export function mapExtraPaths(fields: FormField[], mappings: Mapping[], extraPaths: readonly ExtraCanonicalPath[]): Mapping[] {
+  if (extraPaths.length === 0) return mappings;
+  const used = new Set(mappings.filter(m => m.canonicalPath).map(m => m.canonicalPath!));
+  const fieldByKey = new Map(fields.map(field => [field.key, field]));
+  return mappings.map(mapping => {
+    const field = fieldByKey.get(mapping.fieldKey);
+    if (!field || mapping.status === 'mapped' || mapping.source !== 'heuristic') return mapping;
+    const match = matchExtraPath(field, extraPaths.filter(path => !used.has(path)));
+    if (!match || match.score <= mapping.confidence) return mapping;
+    const candidates = [match, ...mapping.candidates].slice(0, 3);
+    if (match.score < ACCEPT_THRESHOLD) return { ...mapping, status: 'uncertain', confidence: match.score, candidates };
+    used.add(match.path);
+    return { ...mapping, canonicalPath: match.path, status: 'mapped', confidence: match.score, candidates };
+  });
 }
 
 /** Contrôle qu'un chemin vient de la liste fermée : ni l'IA, ni la correction manuelle ne peuvent en inventer. */

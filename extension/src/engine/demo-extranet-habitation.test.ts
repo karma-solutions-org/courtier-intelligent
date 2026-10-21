@@ -10,7 +10,7 @@ import { detectStepHint, isFinalStep } from './steps';
 /**
  * Extranet de démonstration Habitation (`demo-extranet-habitation/`, servi sur http://localhost:8091) : sert à tester
  * l'ajout automatique des champs au questionnaire. Les champs du souscripteur sont reconnus ; ceux du logement et des
- * garanties ne le sont pas et doivent être signalés, obligatoires (*) ou facultatifs.
+ * garanties ne le sont pas : les obligatoires (*) sont signalés, les facultatifs non (ils ne bloquent pas le devis).
  */
 
 const load = (page: string) => {
@@ -39,27 +39,27 @@ afterEach(() => {
 });
 
 describe('Extranet de démonstration Habitation', () => {
-  it('étape 1 : reconnaît le souscripteur, signale la situation familiale (obligatoire) et les occupants (facultatif)', () => {
+  it('étape 1 : reconnaît le souscripteur, signale la situation familiale (obligatoire), pas les occupants (facultatif)', () => {
     load('devis-etape1.html');
     const { fields } = analyzeForm(document);
     const paths = mapFields(fields).filter(m => m.status === 'mapped').map(m => m.canonicalPath);
     expect(paths).toEqual(expect.arrayContaining(['client.lastName', 'client.firstName', 'client.email']));
-    expect(discovered()).toMatchObject({ 'Situation familiale': true, "Nombre d'occupants": false });
+    expect(discovered()).toMatchObject({ 'Situation familiale': true });
+    expect(discovered()).not.toHaveProperty("Nombre d'occupants");
     expect(detectStepHint(document)).toMatchObject({ current: 1, total: 3 });
   });
 
-  it('étape 2 : signale les champs du logement avec leur caractère obligatoire', () => {
+  it('étape 2 : signale les champs obligatoires du logement, pas les facultatifs', () => {
     load('devis-etape2.html');
-    expect(discovered()).toMatchObject({
+    const found = discovered();
+    expect(found).toMatchObject({
       'Type de logement': true,
       "Qualité de l'occupant": true,
       'Surface habitable (m²)': true,
       'Nombre de pièces principales': true,
       'Résidence principale': true,
-      'Étage (appartement)': false,
-      'Année de construction': false,
-      'Dépendances': false,
     });
+    for (const optional of ['Étage (appartement)', 'Année de construction', 'Dépendances']) expect(found).not.toHaveProperty(optional);
   });
 
   it('étape 3 : signale garanties et antécédents, et la reconnaît comme dernière étape', () => {
@@ -68,8 +68,8 @@ describe('Extranet de démonstration Habitation', () => {
       'Capital mobilier à garantir (€)': true,
       'Nombre de sinistres habitation sur 5 ans': true,
       'Résilié par un précédent assureur': true,
-      'Valeur des objets de valeur (€)': false,
     });
+    expect(discovered()).not.toHaveProperty('Valeur des objets de valeur (€)');
     expect(isFinalStep(document, detectStepHint(document))).toBe(true);
   });
 

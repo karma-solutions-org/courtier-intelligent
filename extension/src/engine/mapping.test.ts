@@ -2,7 +2,7 @@ import { CANONICAL_PATHS, parseClaimPath } from '@shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { mountAssureurA } from './__fixtures__/assureur-a';
 import { analyzeForm, FormField } from './analyzer';
-import { ACCEPT_THRESHOLD, asCanonicalPath, isCompatible, mapFields, scoreCandidate } from './mapping';
+import { ACCEPT_THRESHOLD, asCanonicalPath, isCompatible, mapExtraPaths, mapFields, matchExtraPath, scoreCandidate } from './mapping';
 import { FIELD_SYNONYMS, PATH_EXPECTED } from './field-synonyms';
 
 const field = (overrides: Partial<FormField>): FormField => ({
@@ -216,5 +216,27 @@ describe('Extranet de l’assureur A', () => {
       'Avez-vous déjà été résilié ?': 'insuranceHistory.wasTerminated',
       "J'accepte les conditions générales": null,
     });
+  });
+});
+
+describe('questions ajoutées depuis un extranet, reconnues sur un autre extranet', () => {
+  const extra = (label: string, overrides: Partial<FormField> = {}): FormField => field({ label, kind: 'text', inputType: 'text', ...overrides });
+
+  it('reconnaît la même question formulée dans un autre ordre ou au pluriel', () => {
+    const fields = [extra('Annuel kilométrage *')];
+    const mappings = mapExtraPaths(fields, mapFields(fields), ['extra.kilometrage_annuel']);
+    expect(mappings[0]).toMatchObject({ canonicalPath: 'extra.kilometrage_annuel', status: 'mapped' });
+    expect(matchExtraPath(extra('Nombre de sinistres déclarés'), ['extra.nombre_sinistre_declare'])?.score).toBeGreaterThanOrEqual(0.75);
+  });
+
+  it('propose seulement à l’IA une question proche mais différente', () => {
+    const fields = [extra('Kilométrage annuel parcouru estimé')];
+    const [mapping] = mapExtraPaths(fields, mapFields(fields), ['extra.kilometrage_annuel']);
+    expect(mapping.status).toBe('uncertain');
+    expect(mapping.candidates[0].path).toBe('extra.kilometrage_annuel');
+  });
+
+  it('ne rapproche pas des questions sans rapport', () => {
+    expect(matchExtraPath(extra('Usage du véhicule'), ['extra.kilometrage_annuel'])).toBeNull();
   });
 });

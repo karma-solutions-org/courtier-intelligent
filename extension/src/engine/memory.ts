@@ -1,7 +1,7 @@
-import { CanonicalData, CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, type DiscoveredFieldInput, isRelevantField } from '@shared';
+import { CanonicalData, CanonicalPath, isExtraPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, type DiscoveredFieldInput, isRelevantField } from '@shared';
 import { normalize } from './text';
 import type { FormField } from './analyzer';
-import { isCompatible, Mapping } from './mapping';
+import { ACCEPT_THRESHOLD, isCompatible, Mapping, matchExtraPath } from './mapping';
 
 /** Mémoire partagée des formulaires, vue par l'extension (lecture directe, écriture par les functions `memoires-*`). */
 /**
@@ -163,8 +163,13 @@ export function toDiscoveredFields(
       .map(m => m.fieldKey),
   );
   const values = clientValues(quoteData);
+  // La même question déjà ajoutée depuis un autre extranet (autres mots, autre ordre) n'est pas nouvelle.
+  const productExtras = (productPaths ?? []).filter(isExtraPath);
+  const alreadyAsked = (field: FormField) => (matchExtraPath(field, productExtras)?.score ?? 0) >= ACCEPT_THRESHOLD;
   return fields
-    .filter(field => !known.has(field.key) && isRelevantField(field))
+    // Seuls les champs OBLIGATOIRES de l'extranet deviennent des questions (un champ facultatif ne bloque pas le devis),
+    // jamais un fil d'Ariane ou une barre de navigation (« > Conducteur 1 > Véhicule »).
+    .filter(field => !known.has(field.key) && field.required && isRelevantField(field) && !isNavigationLabel(field.label) && !alreadyAsked(field))
     .slice(0, DISCOVERED_MAX_FIELDS_PER_REPORT)
     .map(field => ({
       fieldKey: field.key.slice(0, MAX_FIELD_KEY),
@@ -183,6 +188,12 @@ export function toDiscoveredFields(
     .filter(field => field.label !== '')
     // Lecture ratée de l'extranet (options identiques, ou qui ne sont que le nom technique du champ) : jamais une question.
     .filter(field => !misreadOptions(field.options, field.name));
+}
+
+/** Libellé de navigation (fil d'Ariane, onglets « > Étape 1 > Étape 2 ») : jamais une question. */
+export function isNavigationLabel(label: string): boolean {
+  const text = label.trim();
+  return /^[>›»]/.test(text) || /\s[>›»]\s/.test(text);
 }
 
 /** Options lues de travers : libellés en double, ou recopie du nom technique (« oSexe », « oSexe »). */

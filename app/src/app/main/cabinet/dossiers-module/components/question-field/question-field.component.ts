@@ -150,6 +150,14 @@ const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
       width: 100%;
     }
 
+    /* Le groupe Oui / Non garde la largeur de ses boutons, au lieu de s'étirer sur toute la ligne. */
+    mat-button-toggle-group {
+      align-self: flex-start;
+      /* Dans une colonne étroite (carte d'un assureur), les choix passent à la ligne au lieu d'être coupés. */
+      flex-wrap: wrap;
+      max-width: 100%;
+    }
+
     .label {
       font-size: 14px;
       color: var(--ci-text-muted);

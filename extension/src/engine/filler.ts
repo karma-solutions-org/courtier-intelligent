@@ -1,4 +1,4 @@
-import { customValueOf, type FieldOption, type FormField } from './analyzer';
+import { analyzeForm, customValueOf, isLabelStyledChoice, type FieldOption, type FormField } from './analyzer';
 import type { FillValue } from './plan';
 import { containsPhrase, normalize, words } from './text';
 
@@ -170,18 +170,27 @@ export function matchOption(options: FieldOption[], value: FillValue): FieldOpti
     const exact =
       candidates.find(o => accepted.includes(normalize(o.label))) ??
       candidates.find(o => normalize(o.label) === '' && accepted.includes(normalize(o.value)));
-    if (exact || value) return exact ?? null;
-    // « Non, aucune assurance » : la seule option qui commence par non / aucun.
-    const negative = candidates.filter(o => /^(non|aucun|aucune|jamais)\b/.test(normalize(o.label)));
-    return negative.length === 1 ? negative[0] : null;
+    if (exact) return exact;
+    // « Non, aucune assurance » / « Oui, au moins un » : la seule option qui commence par non / oui.
+    const phrased = value ? /^(oui|yes)\b/ : /^(non|aucun|aucune|jamais)\b/;
+    const starting = candidates.filter(o => phrased.test(normalize(o.label)));
+    return starting.length === 1 ? starting[0] : null;
   }
   const wanted = String(value);
   const wantedNorm = normalize(wanted);
 
-  const exact =
-    candidates.find(o => o.value === wanted) ??
-    candidates.find(o => normalize(o.value) === wantedNorm) ??
-    candidates.find(o => normalize(o.label) === wantedNorm);
+  // Le libellé lisible passe avant la valeur interne : un code « 2 » peut désigner l'option « 1 sinistre ».
+  const byLabel = candidates.find(o => normalize(o.label) === wantedNorm);
+  if (byLabel) return byLabel;
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    // « 15 000 € », « 2 sinistres » : un seul nombre dans le libellé, comparé chiffres seuls.
+    const sameNumber = candidates.filter(o => {
+      const numbers = o.label.match(/\d[\d\s\u00a0\u202f.]*\d|\d/g) ?? [];
+      return numbers.length === 1 && numbers[0].replace(/\D/g, '') === String(Math.abs(value)) && parseRange(o.label) === null;
+    });
+    if (sameNumber.length === 1) return sameNumber[0];
+  }
+  const exact = candidates.find(o => o.value === wanted) ?? candidates.find(o => normalize(o.value) === wantedNorm);
   if (exact) return exact;
   if (typeof value === 'number') {
     const inRange = matchRange(candidates, value);
@@ -332,13 +341,15 @@ async function fillText(
 ): Promise<FillResult> {
   if (typeof value === 'boolean') return fail(field, 'Une réponse oui/non ne se saisit pas dans un champ de texte.');
   const asDate = field.kind === 'date' || options.date === true;
-  const text = asDate ? (typeof value === 'string' ? formatDate(value, field) : null) : String(value);
+  // Champ numérique : « 12 000 » et « 1,5 » (écriture française) deviennent « 12000 » et « 1.5 ».
+  const asNumber = field.kind === 'number' && typeof value === 'string' ? value.replace(/[\s\u00a0\u202f]/g, '').replace(',', '.') : value;
+  const text = asDate ? (typeof value === 'string' ? formatDate(value, field) : null) : String(asNumber);
   if (text === null) return fail(field, `Date illisible : ${String(value)}`);
   // Un navigateur ne tronque pas une valeur écrite par script : la longueur maximale se contrôle ici.
   if (field.maxLength !== null && text.length > field.maxLength) {
     return fail(field, `La valeur dépasse la longueur maximale du champ (${field.maxLength} caractères).`);
   }
-  if (field.kind === 'number' && typeof value !== 'number' && Number.isNaN(Number(value))) return fail(field, `Nombre attendu : ${String(value)}`);
+  if (field.kind === 'number' && typeof value !== 'number' && (text.trim() === '' || Number.isNaN(Number(text)))) return fail(field, `Nombre attendu : ${String(value)}`);
 
   const before = options.suggest ? new Set(suggestionsFor(element.ownerDocument, words(text))) : new Set<HTMLElement>();
   typeInto(element, text);
@@ -351,7 +362,9 @@ async function fillText(
   blur(element);
   // Vérifie ce que l'extranet a gardé (longueur maximale, masque de saisie…).
   const kept = element.value;
-  if (field.kind === 'date' && field.inputType === 'date' ? kept !== text : normalize(kept) !== normalize(text)) {
+  // Un masque de saisie ajoute des séparateurs (« 06 12 34 56 78 ») : seuls les caractères utiles comptent.
+  const bare = (s: string) => normalize(s).replace(/[\s.\-/]+/g, '');
+  if (field.kind === 'date' && field.inputType === 'date' ? kept !== text : bare(kept) !== bare(text)) {
     return fail(field, `L'extranet n'a pas accepté la valeur (« ${kept} »).`);
   }
   return ok(field);
@@ -363,11 +376,25 @@ function fillSplitDate(field: FormField, parts: HTMLElement[], value: FillValue)
   if (!match || parts.length !== 3) return fail(field, `Date illisible : ${String(value)}`);
   const [, year, month, day] = match;
   const texts = field.inputType === 'split-ymd' ? [year, month, day] : [day, month, year];
-  parts.forEach((part, index) => {
-    typeInto(part as HTMLInputElement, texts[index]);
+  for (const [index, part] of parts.entries()) {
+    if (part instanceof HTMLSelectElement) {
+      // Liste jour / mois / année : l'option du nombre (« 5 », « 05 », ou valeur 5 pour « Mai »).
+      const number = Number(texts[index]);
+      const options = liveOptions(part);
+      const option = matchOption(options, number) ?? options.find(o => o.value !== '' && Number(o.value) === number);
+      if (!option) return fail(field, `Aucune option ne correspond à « ${texts[index]} ».`);
+      part.focus();
+      part.selectedIndex = options.indexOf(option);
+      fire(part, 'input');
+      fire(part, 'change');
+    } else typeInto(part as HTMLInputElement, texts[index]);
     blur(part);
+  }
+  const kept = parts.map(part => {
+    if (!(part instanceof HTMLSelectElement)) return (part as HTMLInputElement).value;
+    const label = part.options[part.selectedIndex]?.textContent?.trim() ?? '';
+    return /^\d+$/.test(label) ? label : part.value;
   });
-  const kept = parts.map(part => (part as HTMLInputElement).value);
   return kept.every((text, index) => Number(text) === Number(texts[index]))
     ? ok(field)
     : fail(field, `L'extranet n'a pas accepté la date (« ${kept.join('/')} »).`);
@@ -427,6 +454,28 @@ async function waitForOption(element: HTMLSelectElement, find: (options: FieldOp
   }
 }
 
+/**
+ * Liste qui affiche encore les options du choix précédent (modèles de l'ancienne marque) : si elle change peu après,
+ * on attend la nouvelle liste (au plus `timeoutMs`) ; si rien ne bouge, on n'attend pas plus.
+ */
+async function waitForReload(element: HTMLSelectElement, find: (options: FieldOption[]) => FieldOption | null, timeoutMs: number): Promise<FieldOption | null> {
+  let changed = false;
+  const observer = new MutationObserver(() => (changed = true));
+  observer.observe(element, { childList: true, subtree: true, characterData: true });
+  const started = Date.now();
+  try {
+    while (Date.now() - started < timeoutMs) {
+      if (!changed && Date.now() - started > 400) return null;
+      await sleep(100);
+      const found = find(liveOptions(element));
+      if (found) return found;
+    }
+    return null;
+  } finally {
+    observer.disconnect();
+  }
+}
+
 async function fillSelect(field: FormField, element: HTMLSelectElement, value: FillValue, fillOptions: FillOptions = {}): Promise<FillResult> {
   const find = (options: FieldOption[]) => {
     const candidates = options.length > 1 ? options : field.options;
@@ -434,7 +483,9 @@ async function fillSelect(field: FormField, element: HTMLSelectElement, value: F
   };
   // Liste encore vide ou en cours de chargement : on lui laisse le temps de se remplir avant de conclure.
   const loading = liveOptions(element).length <= 2; // seulement « Sélectionner… » : la liste n'est pas encore chargée
-  const option = find(liveOptions(element)) ?? (loading ? await waitForOption(element, find, fillOptions.listTimeoutMs ?? 2500) : null);
+  const timeoutMs = fillOptions.listTimeoutMs ?? 2500;
+  const option =
+    find(liveOptions(element)) ?? (loading ? await waitForOption(element, find, timeoutMs) : await waitForReload(element, find, timeoutMs));
   if (!option) return fail(field, `Aucune option ne correspond à « ${String(value)} ».`);
   const options = liveOptions(element);
   const index = options.findIndex(o => o.value === option.value && o.label === option.label);
@@ -517,13 +568,23 @@ function fillRadio(field: FormField, radios: HTMLElement[], value: FillValue): F
   if (!option) return fail(field, `Aucune option ne correspond à « ${String(value)} ».`);
   const radio = radios.find(el => (el as HTMLInputElement).value === option.value) as HTMLInputElement | undefined;
   if (!radio) return fail(field, "Le bouton radio est introuvable.");
-  if (!radio.checked) radio.click(); // `click()` coche et émet input + change, comme un clic réel
+  if (!radio.checked) clickChoice(radio); // `click()` coche et émet input + change, comme un clic réel
   return radio.checked ? ok(field) : fail(field, "Le choix n'a pas pu être coché.");
+}
+
+/** Coche un radio / une case. Masqué et dessiné par son libellé : on clique le libellé, comme l'utilisateur. */
+function clickChoice(input: HTMLInputElement): void {
+  const before = input.checked;
+  if (isLabelStyledChoice(input)) {
+    const label = input.labels?.[0] ?? input.closest('label');
+    if (label) realClick(label);
+  }
+  if (input.checked === before) input.click();
 }
 
 function fillCheckbox(field: FormField, element: HTMLInputElement, value: FillValue): FillResult {
   if (typeof value !== 'boolean') return fail(field, 'Réponse oui/non attendue pour une case à cocher.');
-  if (element.checked !== value) element.click();
+  if (element.checked !== value) clickChoice(element);
   return element.checked === value ? ok(field) : fail(field, "La case n'a pas pu être modifiée.");
 }
 
@@ -534,10 +595,12 @@ async function fillAutocomplete(field: FormField, element: HTMLInputElement, val
   typeInto(element, text);
   element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: text.slice(-1) }));
 
-  // Liste de suggestions HTML5 (datalist) : la valeur saisie suffit.
+  // Liste de suggestions HTML5 (datalist) : la valeur saisie doit être l'une des suggestions.
   if (element.hasAttribute('list') && element.list) {
     blur(element);
-    return ok(field);
+    const wantedText = normalize(text);
+    const known = [...element.list.querySelectorAll('option')].some(o => normalize(o.value) === wantedText || normalize(o.textContent) === wantedText);
+    return known ? ok(field) : fail(field, `Aucune suggestion ne correspond à « ${text} » : valeur saisie à vérifier.`);
   }
   const doc = element.ownerDocument;
   const controlled = element.getAttribute('aria-controls');
@@ -556,9 +619,18 @@ async function fillAutocomplete(field: FormField, element: HTMLInputElement, val
     }
     await sleep(40);
   }
-  // Pas de suggestion : le texte saisi est conservé (certains extranets l'acceptent tel quel).
+  // Pas de suggestion : le texte saisi reste, mais rien ne dit que l'extranet l'accepte → à vérifier par le courtier.
   blur(element);
-  return ok(field);
+  return fail(field, `Aucune suggestion ne correspond à « ${text} » : valeur saisie à vérifier.`);
+}
+
+/**
+ * Champ remplacé depuis l'analyse (la page l'a redessiné) : on le retrouve dans une nouvelle analyse de la page, par sa
+ * clé (bâtie sur nom / id / libellé). `null` s'il n'y est plus.
+ */
+function refind(field: FormField, stale: HTMLElement): HTMLElement[] | null {
+  const found = analyzeForm(stale.ownerDocument).elements.get(field.key);
+  return found?.[0]?.isConnected ? found : null;
 }
 
 /**
@@ -566,6 +638,7 @@ async function fillAutocomplete(field: FormField, element: HTMLInputElement, val
  * Gère text, textarea, number, date, select, radio, case à cocher et saisie assistée ; vérifie ensuite la valeur gardée.
  */
 export async function fillField(field: FormField, elements: HTMLElement[], value: FillValue, options: FillOptions = {}): Promise<FillResult> {
+  if (elements[0] && !elements[0].isConnected) elements = refind(field, elements[0]) ?? elements;
   const element = elements[0];
   if (!element?.isConnected) return fail(field, "Le champ n'est plus dans la page.");
   try {

@@ -1,4 +1,4 @@
-import { CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, MissingField, type DiscoveredFieldInput } from '@shared';
+import { CanonicalPath, isExtraPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, MissingField, type DiscoveredFieldInput } from '@shared';
 import type { CapturedOffer, CaptureState, JobContext, JobUpdate, RunField, RunState } from '../shared/messages';
 import { AskAi, resolveWithAi } from './ai-fallback';
 import { analyzeForm, FormAnalysis, isAuthPage } from './analyzer';
@@ -7,7 +7,7 @@ import { detectResultPage, extractFromDom, hasPremium, hasResultHeading, parseAm
 import { captureWithAi, mergeOffers } from './capture-ai';
 import { expectsDate } from './field-synonyms';
 import { fillField, FillResult, parseRange, registrationFor } from './filler';
-import { asCanonicalPath, isCompatible, Mapping, mapFields } from './mapping';
+import { asCanonicalPath, isCompatible, Mapping, mapExtraPaths, mapFields } from './mapping';
 import { applyMemory, MemoryPort, toDiscoveredFields, toMemoryFields, toRequiredPaths } from './memory';
 import { FillPlan, FillValue, planFill, valueOf } from './plan';
 import { detectStepHint, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
@@ -258,7 +258,7 @@ export class FormRunner {
     }
 
     // 1. Synonymes et scoring ; la mémoire partagée tranche ce qu'ils n'ont pas tranché, puis l'IA, pour le reste.
-    let mappings = mapFields(analysis.fields);
+    let mappings = mapExtraPaths(analysis.fields, mapFields(analysis.fields), this.allowedPaths.filter(isExtraPath));
     this.fromMemory = new Set();
     const memory = await this.memoryFor(analysis.fingerprint);
     if (memory) {

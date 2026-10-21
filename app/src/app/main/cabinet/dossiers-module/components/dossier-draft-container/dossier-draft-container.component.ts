@@ -50,6 +50,18 @@ import {
     QuestionFieldComponent,
   ],
   template: `
+    @if (readingPieces()) {
+      <!-- Lecture des pièces du client : écran bloqué jusqu'au remplissage des champs. -->
+      <div class="reading-overlay" role="alertdialog" aria-modal="true" aria-live="assertive">
+        <div class="reading-card">
+          <div class="scan" aria-hidden="true">
+            <mat-icon class="scan-doc">description</mat-icon>
+            <span class="scan-line"></span>
+          </div>
+          <p>{{ structure.clientPiecesReading }}</p>
+        </div>
+      </div>
+    }
     @if (store.dossier(); as dossier) {
       <header>
         <h1>{{ dossier.reference }}</h1>
@@ -267,6 +279,75 @@ import {
       margin-bottom: 16px;
     }
 
+    .reading-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgb(15 23 42 / 55%);
+    }
+
+    .reading-card {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+      max-width: 360px;
+      padding: 32px 40px;
+      border-radius: 12px;
+      background: var(--ci-surface);
+      box-shadow: var(--ci-shadow-sm);
+      text-align: center;
+
+      p {
+        margin: 0;
+        font-weight: 500;
+      }
+    }
+
+    /* Document lu : une ligne de scan passe de haut en bas sur l'icône. */
+    .scan {
+      position: relative;
+      width: 72px;
+      height: 72px;
+      overflow: hidden;
+    }
+
+    .scan-doc {
+      width: 72px;
+      height: 72px;
+      font-size: 72px;
+      color: var(--mat-sys-primary, #0b5cff);
+    }
+
+    .scan-line {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 6px;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--mat-sys-primary, #0b5cff);
+      box-shadow: 0 0 10px 2px var(--mat-sys-primary, #0b5cff);
+      animation: scan 1.4s ease-in-out infinite alternate;
+    }
+
+    @keyframes scan {
+      to {
+        top: 62px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .scan-line {
+        animation: none;
+        top: 34px;
+      }
+    }
+
     .card {
       padding: 24px;
       border: 1px solid var(--ci-border);
@@ -369,6 +450,8 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
   protected readonly stepOf = { documents: 3, questionnaire: 4, summary: 5, missing: 5 } as const;
   protected readonly showMissing = signal(false);
   protected readonly validating = signal(false);
+  /** Pièces du client en cours de lecture : un spinner couvre le formulaire jusqu'au remplissage. */
+  protected readonly readingPieces = signal(false);
   /** Champs manquants figés à l'ouverture : une question remplie reste affichée pendant la saisie. */
   private readonly _missingPaths = signal<CanonicalPath[]>([]);
   protected readonly missingQuestions = computed<Question[]>(() => {
@@ -489,7 +572,7 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
           const toRead = documents.filter(document => document.status === 'uploaded');
           if (!toRead.length) return EMPTY;
           for (const document of documents) if (document.status === 'analyzed') fields.push(...document.ocrFields);
-          this._snackBar.open(this.structure.clientPiecesReading, undefined, { duration: 4000 });
+          this.readingPieces.set(true);
           return from(toRead).pipe(
             concatMap(document =>
               this._documents.analyze(dossierId, document.id).pipe(
@@ -503,6 +586,7 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
         }),
         catchError(() => EMPTY),
         finalize(() => {
+          this.readingPieces.set(false);
           if (this.store.selectedId() !== dossierId || !fields.length) return;
           const answers = this.store.answers();
           const isEmpty = (path: CanonicalPath) => answers[path] === undefined || answers[path] === null || answers[path] === '';
