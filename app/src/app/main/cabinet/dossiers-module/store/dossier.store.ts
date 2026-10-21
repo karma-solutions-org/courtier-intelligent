@@ -147,10 +147,13 @@ export const DossierStore = signalStore(
       needEditable: computed(() =>
         ['complet', 'besoin_valide'].includes(store.dossier()?.status ?? ''),
       ),
-      /** Suggestions de besoin selon les réponses du questionnaire (le courtier les accepte ou les modifie). */
+      /**
+       * Suggestions de besoin selon les réponses du questionnaire (le courtier les accepte ou les modifie).
+       * Une copie de produit du cabinet (`cab-…`) reçoit les suggestions du produit qu'elle remplace.
+       */
       needSuggestion: computed(() =>
         suggestNeed(
-          store.dossier()?.productId ?? '',
+          product()?.replaces ?? store.dossier()?.productId ?? '',
           store.answers(),
           (product()?.guaranteeCatalog ?? []).map((g) => g.code),
         ),
