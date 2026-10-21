@@ -447,9 +447,14 @@ export class MembersPanelComponent {
     role: new FormControl<CabinetRole>('courtier', { nonNullable: true }),
   });
 
-  /** Appareils liés d'un membre : le premier (`device`) puis les suivants (`extraDevices`). */
+  /**
+   * Appareils liés d'un membre : celui de la session en cours (session unique), sinon les anciens champs
+   * `device` puis `extraDevices`.
+   */
   protected devicesOf(member: Member): BoundDevice[] {
-    return [member.device, ...(member.extraDevices ?? [])].filter((device): device is BoundDevice => !!device);
+    const legacy = [member.device, ...(member.extraDevices ?? [])].filter((device): device is BoundDevice => !!device);
+    if (legacy.length || !member.session) return legacy;
+    return [{ id: member.session.id, label: member.session.appareil, boundAt: member.session.ouverteLe }];
   }
 
   protected confirmReset(uid: string): void {
