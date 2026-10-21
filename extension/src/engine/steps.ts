@@ -13,12 +13,40 @@ const LOADING = '[aria-busy="true"], .loading, .spinner, [class*="loader"], [cla
 
 const clean = (text: string | null | undefined) => (text ?? '').replace(/\s+/g, ' ').trim();
 
+const labelOf = (el: HTMLElement) => clean(el instanceof HTMLInputElement ? el.value : el.textContent);
+
+/** Boutons visibles et actifs (et liens qui en jouent le rôle). */
+function visibleButtons(doc: Document): HTMLElement[] {
+  return [...doc.querySelectorAll<HTMLElement>('button, input[type="submit"], input[type="button"], a[role="button"]')].filter(
+    el => !el.hasAttribute('hidden') && !el.closest('[hidden]') && !(el as HTMLButtonElement).disabled && labelOf(el) !== '',
+  );
+}
+
 /** Texte des boutons visibles (et des liens qui en jouent le rôle). */
 export function buttonLabels(doc: Document): string[] {
-  return [...doc.querySelectorAll<HTMLElement>('button, input[type="submit"], input[type="button"], a[role="button"]')]
-    .filter(el => !el.hasAttribute('hidden') && !(el as HTMLButtonElement).disabled)
-    .map(el => clean(el instanceof HTMLInputElement ? el.value : el.textContent))
-    .filter(Boolean);
+  return visibleButtons(doc).map(labelOf);
+}
+
+/**
+ * Bouton « Suivant » de l'étape, s'il y en a un seul sans ambiguïté. Jamais un bouton qui lance le calcul ou
+ * soumet (« Obtenir mon tarif », « Valider ») : celui-là, c'est le courtier qui le clique.
+ */
+export function findNextButton(doc: Document): HTMLElement | null {
+  const candidates = visibleButtons(doc).filter(el => NEXT_BUTTON.test(labelOf(el)) && !FINAL_BUTTON.test(labelOf(el)));
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+const ERROR_SELECTOR =
+  '[aria-invalid="true"], [role="alert"], .error, .errors, .invalid-feedback, .field-error, .form-error, [class*="error-message"]';
+
+/** L'extranet affiche-t-il une erreur de saisie (champ invalide, message d'alerte) ? */
+export function hasValidationErrors(doc: Document): boolean {
+  return [...doc.querySelectorAll<HTMLElement>(ERROR_SELECTOR)].some(
+    el =>
+      !el.closest('[hidden]') &&
+      doc.defaultView?.getComputedStyle(el).display !== 'none' &&
+      (el.getAttribute('aria-invalid') === 'true' || clean(el.textContent) !== ''),
+  );
 }
 
 /**
@@ -45,7 +73,7 @@ export function detectStepHint(doc: Document): StepHint {
 
 /**
  * Dernière étape ? Oui si l'indicateur le dit, ou si la page propose de lancer le calcul (« Obtenir mon tarif »)
- * sans proposer de passer à l'étape suivante. L'extension ne clique jamais sur ces boutons : le courtier soumet lui-même.
+ * sans proposer de passer à l'étape suivante. L'extension ne clique jamais sur ce bouton final : le courtier soumet lui-même.
  */
 export function isFinalStep(doc: Document, hint: StepHint): boolean {
   if (hint.current !== null && hint.total !== null) return hint.current >= hint.total;

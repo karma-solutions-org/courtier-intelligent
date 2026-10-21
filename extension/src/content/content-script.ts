@@ -105,6 +105,7 @@ async function startRunner(job: JobContext): Promise<void> {
     reportDiscovered: async (fingerprint, fields, requiredPaths) =>
       void (await send({ type: 'FIELDS_DISCOVERED', fingerprint, fields, requiredPaths })),
     origin: location.origin,
+    autoAdvance: true,
     // Lecture de la mise en page par l'IA : gardée dans le navigateur (structure seulement), par extranet et formulaire.
     layoutCache: {
       load: async fingerprint => {

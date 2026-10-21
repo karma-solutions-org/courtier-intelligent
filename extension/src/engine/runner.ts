@@ -10,7 +10,7 @@ import { fillField, FillResult, parseRange, registrationFor } from './filler';
 import { asCanonicalPath, isCompatible, Mapping, mapExtraPaths, mapFields } from './mapping';
 import { applyMemory, MemoryPort, toDiscoveredFields, toMemoryFields, toRequiredPaths } from './memory';
 import { FillPlan, FillValue, planFill, valueOf } from './plan';
-import { detectStepHint, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
+import { detectStepHint, findNextButton, hasValidationErrors, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
 
 /** Champs d'adresse : les extranets y proposent souvent des suggestions à choisir (adresse normalisée, commune). */
 const SUGGEST_PATHS: ReadonlySet<string> = new Set(['client.address.street', 'client.address.city', 'vehicle.parkingCity']);
@@ -39,6 +39,8 @@ export interface RunnerPorts {
   layoutCache?: { load(fingerprint: string): Promise<FormLayout | null>; save(fingerprint: string, layout: FormLayout): Promise<void> };
   /** Origine de l'extranet, clé de la mémoire (par défaut : celle de la page). */
   origin?: string;
+  /** Une étape remplie sans manque ni échec : l'extension clique elle-même sur « Suivant » (jamais sur le bouton final). */
+  autoAdvance?: boolean;
   quietMs?: number;
   settleTimeoutMs?: number;
 }
@@ -52,9 +54,10 @@ const MEMORY_MAX_FIELDS = 300;
 /**
  * Remplit l'extranet d'un assureur pour un job de tarification, étape par étape.
  *
- * Règles : l'extension ne clique JAMAIS sur « Suivant » ni sur « Obtenir mon tarif » (le courtier avance et soumet
- * lui-même) ; elle remplit l'étape affichée, signale ce qui manque (`needs_info`), puis surveille la page : quand
- * le courtier passe à l'étape suivante, elle attend la fin du chargement et remplit à nouveau.
+ * Règles : l'extension ne clique JAMAIS sur « Obtenir mon tarif » (le courtier soumet lui-même) ; elle remplit l'étape
+ * affichée, signale ce qui manque (`needs_info`), puis surveille la page : quand l'étape change, elle attend la fin du
+ * chargement et remplit à nouveau. Avec `autoAdvance`, une étape remplie sans manque ni échec est validée par un clic
+ * sur « Suivant » (une fois par étape) ; si l'extranet la refuse, la main revient au courtier.
  */
 export class FormRunner {
   private analysis: FormAnalysis | null = null;
@@ -94,6 +97,12 @@ export class FormRunner {
   private readonly reportedIssues = new Set<string>();
   /** Dernier problème à signaler au courtier dans le side panel (IA indisponible, session expirée…), ou null. */
   private notice: string | null = null;
+  // ── Passage automatique à l'étape suivante ──
+  /** L'étape affichée est remplie sans manque ni échec, et ce n'est pas la dernière. */
+  private stepReady = false;
+  /** Étapes (empreintes) où « Suivant » a déjà été cliqué : un seul essai, l'extranet peut la refuser. */
+  private readonly advancedFrom = new Set<string>();
+  private lastState: RunState | null = null;
 
   constructor(
     private job: JobContext,
@@ -225,6 +234,7 @@ export class FormRunner {
 
   /** `depth` borne les relances quand le remplissage fait apparaître d'autres champs (réponse « Oui » → champ en plus). */
   private async runStep(newStep: boolean, depth = 0): Promise<void> {
+    this.stepReady = false;
     if (this.stopped || this.capturing) return;
     let analysis = analyzeForm(this.ports.doc);
     // Le courtier a soumis le formulaire et l'extranet affiche le tarif sans recharger la page.
@@ -316,8 +326,10 @@ export class FormRunner {
     // 4. Avancement du job : champs manquants, étape en cours ou prêt à soumettre.
     await this.reportProgress(plan, hint);
     // Dernière étape remplie sans échec : la structure est apprise (le courtier valide ensuite sur l'extranet).
-    if (plan.missing.length === 0 && isFinalStep(this.ports.doc, hint)) await this.maybeLearn(this.snapshot);
+    const finalStep = isFinalStep(this.ports.doc, hint);
+    if (plan.missing.length === 0 && finalStep) await this.maybeLearn(this.snapshot);
     this.publishFromPlan(plan, results, hint);
+    this.stepReady = plan.missing.length === 0 && !finalStep && ![...results.values()].some(r => r.status === 'failed');
 
     // Une réponse a pu faire apparaître d'autres champs dans la même étape : on les remplit aussi.
     if (depth < MAX_FOLLOW_UPS && analyzeForm(this.ports.doc).fingerprint !== analysis.fingerprint) {
@@ -326,6 +338,32 @@ export class FormRunner {
       const kept = this.lastStep.keys.filter(key => next.fields.some(f => f.key === key)).length;
       if (this.lastStep.keys.length > 0 && kept / this.lastStep.keys.length >= 0.5) await this.runStep(false, depth + 1);
     }
+    // Toute l'étape est remplie (relances comprises) : on passe à la suivante.
+    if (depth === 0) await this.maybeAdvance();
+  }
+
+  /**
+   * Clique sur « Suivant » quand l'étape est prête (une fois par étape), puis vérifie que l'extranet a bien changé
+   * d'étape, et remplit la nouvelle. Sinon (erreur de saisie, page bloquée), le courtier corrige et avance lui-même.
+   */
+  private async maybeAdvance(): Promise<void> {
+    if (!this.ports.autoAdvance || !this.stepReady || this.stopped || this.capturing || !this.analysis) return;
+    const fingerprint = this.analysis.fingerprint;
+    if (this.advancedFrom.has(fingerprint)) return;
+    const button = findNextButton(this.ports.doc);
+    if (!button) return;
+    this.advancedFrom.add(fingerprint);
+    const before = this.lastStep;
+    button.click();
+    await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
+    if (this.stopped || this.capturing) return;
+    const after = { keys: analyzeForm(this.ports.doc).fields.map(f => f.key), hint: detectStepHint(this.ports.doc) };
+    // Nouvelle étape : remplie tout de suite (la surveillance de la page n'est pas encore active au démarrage).
+    if (isNewStep(before, after)) return this.runStep(true);
+    const message = hasValidationErrors(this.ports.doc)
+      ? 'L’extranet a refusé cette étape : corrigez les champs signalés, puis cliquez vous-même sur « Suivant ».'
+      : 'L’extranet n’est pas passé à l’étape suivante : vérifiez la page, puis cliquez vous-même sur « Suivant ».';
+    if (this.lastState) this.ports.publish({ ...this.lastState, phase: 'waiting_user', message });
   }
 
   private aiResults = new Map<string, Mapping>();
@@ -584,7 +622,7 @@ export class FormRunner {
 
   private publishState(phase: RunState['phase'], fields: RunField[], missing: MissingField[], message: string | null, hint?: StepHint): void {
     const step = hint ?? this.lastStep.hint;
-    this.ports.publish({
+    this.lastState = {
       phase,
       insurerId: this.job.insurerId,
       dossierId: this.job.dossierId,
@@ -595,6 +633,7 @@ export class FormRunner {
       memory: this.memoryStatus,
       assignablePaths: this.allowedPaths,
       message,
-    });
+    };
+    this.ports.publish(this.lastState);
   }
 }
