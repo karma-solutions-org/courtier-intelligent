@@ -6,27 +6,27 @@ import {
   HostListener,
   inject,
   input,
+  linkedSignal,
   OnDestroy,
   OnInit,
   signal,
   untracked,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
-import { CanonicalPath, isAnalyzableDocumentType, OcrField, Question } from '@shared';
+import { CanonicalPath, isAnalyzableDocumentType, OcrField } from '@shared';
 import { catchError, concatMap, EMPTY, finalize, from, map, of, switchMap, take, tap } from 'rxjs';
 import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
-import { displayName } from '../../../assures-module/util/assures.utils';
 import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
 import { DocumentsService } from '../../services/documents.service';
 import { DossierStore } from '../../store/dossier.store';
 import { mergeOcrFields, needsConfirmation } from '../../util/documents.utils';
 import { sectionIndexOf } from '../../util/dossiers.utils';
 import { DocumentImportContainerComponent } from '../document-import/document-import-container.component';
-import { QuestionFieldComponent } from '../question-field/question-field.component';
 import { DossierStepperHeaderComponent } from '../dossier-stepper-header/dossier-stepper-header.component';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 import {
@@ -35,19 +35,20 @@ import {
 } from '../questionnaire-form/questionnaire-form.component';
 
 /**
- * « Nouveau dossier », étapes 3 et 4 : questionnaire section par section (enregistré automatiquement, reprise exacte
- * là où le courtier s'était arrêté), puis récapitulatif avec les champs manquants. Le dossier passe en « complet »
- * d'ici seulement quand rien ne manque.
+ * « Nouveau dossier », étapes 3 à 5 : extranets à utiliser, documents, puis questionnaire section par section
+ * (enregistré automatiquement, reprise exacte là où le courtier s'était arrêté). Le questionnaire ne pose que les
+ * questions des extranets choisis. Une section ne se quitte qu'une fois ses champs obligatoires remplis ; la dernière
+ * fait passer le dossier en « complet ».
  */
 @Component({
   selector: 'app-dossier-draft-container',
   imports: [
     MatButtonModule,
+    MatCheckboxModule,
     MatIconModule,
     DocumentImportContainerComponent,
     DossierStepperHeaderComponent,
     QuestionnaireFormComponent,
-    QuestionFieldComponent,
   ],
   template: `
     @if (readingPieces()) {
@@ -75,13 +76,49 @@ import {
         <p class="error" role="alert">{{ store.error() }}</p>
       }
 
-      @if (view() === 'documents') {
+      @if (view() === 'extranets') {
+        <section class="intro">
+          <h2>{{ structure.extranetsTitle }}</h2>
+          <p>{{ structure.extranetsHint }}</p>
+        </section>
+        @if (store.availableInsurers().length) {
+          <ul class="extranets">
+            @for (insurer of store.availableInsurers(); track insurer.id) {
+              <li>
+                <mat-checkbox [checked]="checkedInsurers().includes(insurer.id)" (change)="toggleInsurer(insurer.id, $event.checked)">
+                  {{ insurer.name }}
+                  @if (insurer.extranetDomains[0]; as domain) {
+                    <span class="domain">{{ domain }}</span>
+                  }
+                </mat-checkbox>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="progress">{{ structure.noExtranet }}</p>
+        }
+        @if (showMissing() && !checkedInsurers().length) {
+          <p class="blocked" role="alert">{{ structure.extranetsRequired }}</p>
+        }
+        <div class="actions">
+          <span class="spacer"></span>
+          <button mat-button type="button" (click)="saveAndQuit()">
+            {{ structure.saveAndQuit }}
+          </button>
+          <button mat-flat-button type="button" (click)="validateInsurers()">
+            {{ structure.validateExtranets }}
+          </button>
+        </div>
+      } @else if (view() === 'documents') {
         <section class="intro">
           <h2>{{ structure.documentsTitle }}</h2>
           <p>{{ structure.documentsHint }}</p>
         </section>
         <app-document-import-container class="documents" />
         <div class="actions">
+          <button mat-button type="button" (click)="view.set('extranets')">
+            {{ structure.toExtranets }}
+          </button>
           <span class="spacer"></span>
           <button mat-button type="button" (click)="saveAndQuit()">
             {{ structure.saveAndQuit }}
@@ -107,6 +144,9 @@ import {
           [showMissing]="showMissing()"
           (answerChanged)="onAnswer($event)"
         />
+        @if (showMissing() && sectionMissing().length) {
+          <p class="blocked" role="alert">{{ structure.sectionIncomplete }}</p>
+        }
         <div class="actions">
           <button
             mat-button
@@ -119,81 +159,8 @@ import {
           <button mat-button type="button" (click)="saveAndQuit()">
             {{ structure.saveAndQuit }}
           </button>
-          <button mat-flat-button type="button" (click)="next()">
-            {{ isLastSection() ? structure.toSummary : structure.next }}
-          </button>
-        </div>
-      } @else if (view() === 'missing') {
-        <section class="card">
-          <h2>{{ structure.fillMissingTitle }}</h2>
-          <p class="hint">{{ structure.fillMissingHint }}</p>
-          <div class="fields">
-            @for (question of missingQuestions(); track question.canonicalPath) {
-              <app-question-field
-                [question]="question"
-                [value]="store.answers()[question.canonicalPath]"
-                [showMissing]="true"
-                (changed)="onAnswer({ path: question.canonicalPath, value: $event })"
-              />
-            }
-          </div>
-        </section>
-        <div class="actions">
-          <button mat-button type="button" (click)="view.set('summary')">
-            {{ structure.cancel }}
-          </button>
-          <span class="spacer"></span>
-          <button mat-flat-button type="button" (click)="saveMissing()">
-            {{ structure.saveMissing }}
-          </button>
-        </div>
-      } @else {
-        <section class="card">
-          <h2>{{ structure.summaryTitle }}</h2>
-          <dl>
-            <dt>{{ structure.assure }}</dt>
-            <dd>{{ store.assure() ? nameOf(store.assure()!) : '—' }}</dd>
-            <dt>{{ structure.product }}</dt>
-            <dd>{{ store.product()?.name ?? dossier.productId }}</dd>
-          </dl>
-
-          @if (store.missing().length) {
-            <div class="missing" role="alert">
-              <h3>{{ structure.missingTitle }} ({{ store.missing().length }})</h3>
-              <p>{{ structure.missingHint }}</p>
-              <ul>
-                @for (path of store.missing(); track path) {
-                  <li>
-                    {{ store.labels().get(path) ?? 'Champ sans libellé' }}
-                    <button mat-button type="button" (click)="fill(path)">
-                      {{ structure.goTo }}
-                    </button>
-                  </li>
-                }
-              </ul>
-              <button mat-flat-button type="button" class="fill-all" (click)="openMissing()">
-                {{ structure.fillMissing }}
-              </button>
-            </div>
-          } @else {
-            <p class="complete"><mat-icon>check_circle</mat-icon>{{ structure.complete }}</p>
-          }
-        </section>
-        <div class="actions">
-          <button mat-button type="button" (click)="backToQuestionnaire()">
-            {{ structure.backToQuestionnaire }}
-          </button>
-          <span class="spacer"></span>
-          <button mat-button type="button" (click)="saveAndQuit()">
-            {{ structure.saveAndQuit }}
-          </button>
-          <button
-            mat-flat-button
-            type="button"
-            [disabled]="store.missing().length > 0 || validating()"
-            (click)="validate()"
-          >
-            {{ structure.validate }}
+          <button mat-flat-button type="button" [disabled]="validating()" (click)="next()">
+            {{ isLastSection() ? structure.finish : structure.next }}
           </button>
         </div>
       }
@@ -226,11 +193,6 @@ import {
       margin: 0 0 16px;
       font-size: 17px;
       font-weight: 600;
-    }
-
-    h3 {
-      margin: 0 0 4px;
-      font-size: 15px;
     }
 
     .save {
@@ -277,6 +239,28 @@ import {
 
     .documents {
       margin-bottom: 16px;
+    }
+
+    .extranets {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+
+      li {
+        padding: 6px 8px;
+        border: 1px solid var(--ci-border);
+        border-radius: 8px;
+        background: var(--ci-surface);
+      }
+
+      .domain {
+        display: block;
+        font-size: 12px;
+        color: var(--ci-text-muted);
+      }
     }
 
     .reading-overlay {
@@ -348,68 +332,6 @@ import {
       }
     }
 
-    .card {
-      padding: 24px;
-      border: 1px solid var(--ci-border);
-      border-radius: 8px;
-      background: var(--ci-surface);
-      box-shadow: var(--ci-shadow-sm);
-    }
-
-    dl {
-      display: grid;
-      grid-template-columns: max-content 1fr;
-      gap: 6px 16px;
-      margin: 0 0 16px;
-    }
-
-    dt {
-      color: var(--ci-text-muted);
-    }
-
-    dd {
-      margin: 0;
-      font-weight: 500;
-    }
-
-    .missing {
-      padding: 14px 16px;
-      border-radius: 8px;
-      color: var(--mat-sys-on-tertiary-container);
-      background: var(--mat-sys-tertiary-container);
-
-      p {
-        margin: 0 0 8px;
-      }
-
-      ul {
-        margin: 0;
-        padding-left: 20px;
-      }
-    }
-
-    .fill-all {
-      margin-top: 12px;
-    }
-
-    .hint {
-      margin: 0 0 16px;
-      color: var(--ci-text-muted);
-    }
-
-    .fields {
-      display: grid;
-      gap: 12px;
-    }
-
-    .complete {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 0;
-      color: var(--ci-success);
-    }
-
     .actions {
       display: flex;
       align-items: center;
@@ -419,6 +341,11 @@ import {
 
     .spacer {
       flex: 1;
+    }
+
+    .blocked {
+      margin: 16px 0 0;
+      color: var(--mat-sys-error);
     }
 
     .error {
@@ -443,25 +370,16 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
   /** Dossier dont les pièces du client ont déjà été reprises pendant cette visite. */
   private _clientPiecesTakenFor: string | null = null;
   protected readonly structure = DOSSIERS_STRUCTURE.draft;
-  protected readonly nameOf = displayName;
 
-  protected readonly view = signal<'documents' | 'questionnaire' | 'summary' | 'missing'>('documents');
+  protected readonly view = signal<'extranets' | 'documents' | 'questionnaire'>('extranets');
   /** Position de chaque vue dans les étapes de « Nouveau dossier ». */
-  protected readonly stepOf = { documents: 3, questionnaire: 4, summary: 5, missing: 5 } as const;
+  protected readonly stepOf = { extranets: 3, documents: 4, questionnaire: 5 } as const;
+  /** Extranets cochés à l'écran : appliqués au questionnaire seulement au clic sur « Valider mon choix ». */
+  protected readonly checkedInsurers = linkedSignal(() => this.store.selectedInsurers());
   protected readonly showMissing = signal(false);
   protected readonly validating = signal(false);
   /** Pièces du client en cours de lecture : un spinner couvre le formulaire jusqu'au remplissage. */
   protected readonly readingPieces = signal(false);
-  /** Champs manquants figés à l'ouverture : une question remplie reste affichée pendant la saisie. */
-  private readonly _missingPaths = signal<CanonicalPath[]>([]);
-  protected readonly missingQuestions = computed<Question[]>(() => {
-    const questions = new Map(
-      this.store.schema().flatMap(section => section.questions).map(q => [q.canonicalPath, q]),
-    );
-    return this._missingPaths()
-      .map(path => questions.get(path))
-      .filter((q): q is Question => !!q);
-  });
 
   /** Section affichée, bornée au questionnaire (la reprise peut venir d'un ancien enregistrement). */
   protected readonly sectionIndex = computed(() =>
@@ -473,6 +391,11 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
   protected readonly isLastSection = computed(
     () => this.sectionIndex() >= this.store.schema().length - 1,
   );
+  /** Champs obligatoires encore vides de la section affichée : « Suivant » reste bloqué tant qu'il y en a. */
+  protected readonly sectionMissing = computed(() => {
+    const paths = new Set(this.currentSection().flatMap(section => section.questions).map(q => q.canonicalPath));
+    return this.store.missing().filter(path => paths.has(path));
+  });
 
   protected readonly saveLabel = computed(() => {
     switch (this.store.saveStatus()) {
@@ -490,6 +413,8 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
   });
 
   private _initialViewSet = false;
+  /** Dossier déjà pré-rempli à l'ouverture : après les extranets, on va droit au questionnaire. */
+  private _prefilled = false;
 
   constructor() {
     effect(() => this.store.select(this.id()));
@@ -501,12 +426,15 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
         this._router.navigate([CabinetRouteContainerModel.DOSSIERS_ROUTE.url, dossier.id]);
         return;
       }
-      // Reprise : un dossier déjà complet rouvre au récapitulatif, un brouillon à la section où le courtier s'était arrêté.
+      // Reprise : un dossier déjà complet ou un brouillon commencé rouvre au questionnaire, à la section où le
+      // courtier s'était arrêté ; un dossier neuf commence par les documents.
       if (!this._initialViewSet) {
         this._initialViewSet = true;
-        if (dossier.status !== 'brouillon') this.view.set('summary');
-        // Brouillon déjà commencé : on reprend au questionnaire ; dossier neuf : on commence par les documents.
-        else if (this.store.sectionIndex() > 0 || Object.keys(dossier.data ?? {}).length) this.view.set('questionnaire');
+        this._prefilled = Object.keys(dossier.data ?? {}).length > 0;
+        // Un brouillon pas encore commencé passe d'abord par le choix des extranets, même pré-rempli (infos du client).
+        if (dossier.status !== 'brouillon' || this.store.sectionIndex() > 0) {
+          this.view.set('questionnaire');
+        }
       }
       // La validation a abouti : le dossier est complet, on ouvre sa fiche.
       if (this.validating() && dossier.status === 'complet') {
@@ -600,6 +528,22 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
       .subscribe();
   }
 
+  protected toggleInsurer(insurerId: string, checked: boolean): void {
+    this.checkedInsurers.update(ids => (checked ? [...ids, insurerId] : ids.filter(id => id !== insurerId)));
+  }
+
+  /** Retient les extranets cochés (au moins un, s'il y en a) puis passe aux documents (au questionnaire si pré-rempli). */
+  protected validateInsurers(): void {
+    if (this.store.availableInsurers().length && !this.checkedInsurers().length) {
+      this.showMissing.set(true);
+      return;
+    }
+    this.showMissing.set(false);
+    this.store.selectInsurers(this.checkedInsurers());
+    this.store.goToSection(0);
+    this.view.set(this._prefilled ? 'questionnaire' : 'documents');
+  }
+
   protected onAnswer({ path, value }: AnswerChange): void {
     this.store.edit(path, value);
   }
@@ -609,35 +553,32 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
     this.store.goToSection(index);
   }
 
+  /**
+   * Passe à la section suivante seulement si la section affichée est remplie ; sinon les champs manquants sont
+   * signalés. À la dernière section, le dossier passe en « complet » (ou renvoie à la première section incomplète).
+   */
   protected next(): void {
-    if (this.isLastSection()) {
-      this.store.saveNow({ sectionIndex: this.sectionIndex() });
-      this.view.set('summary');
+    if (this.sectionMissing().length) {
+      this.showMissing.set(true);
       return;
     }
-    this.goTo(this.sectionIndex() + 1);
-  }
-
-  protected backToQuestionnaire(): void {
-    this.view.set('questionnaire');
-  }
-
-  /** Depuis le récapitulatif : retourne à la section du champ manquant, en le signalant. */
-  protected fill(path: CanonicalPath): void {
-    this.store.goToSection(sectionIndexOf(this.store.schema(), path));
-    this.view.set('questionnaire');
-    this.showMissing.set(true);
-  }
-
-  /** Depuis le récapitulatif : n'affiche que les questions obligatoires encore vides. */
-  protected openMissing(): void {
-    this._missingPaths.set([...this.store.missing()]);
-    this.view.set('missing');
-  }
-
-  protected saveMissing(): void {
+    if (!this.isLastSection()) {
+      this.goTo(this.sectionIndex() + 1);
+      return;
+    }
+    const missing = this.store.missing();
+    if (missing.length) {
+      this.goTo(sectionIndexOf(this.store.schema(), missing[0]));
+      this.showMissing.set(true);
+      return;
+    }
     this.store.saveNow({ sectionIndex: this.sectionIndex() });
-    this.view.set('summary');
+    const dossier = this.store.dossier();
+    if (dossier && dossier.status !== 'brouillon') {
+      this._router.navigate([CabinetRouteContainerModel.DOSSIERS_ROUTE.url, dossier.id]);
+      return;
+    }
+    this.validate();
   }
 
   protected saveAndQuit(): void {

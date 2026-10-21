@@ -19,6 +19,7 @@ import {
   DossierStatus,
   EDITABLE_DOSSIER_STATUSES,
   Insurer,
+  insurersForProduct,
   Member,
   NeedAnalysis,
   NeedInput,
@@ -82,6 +83,11 @@ interface DossierState {
   products: Product[];
   /** Catalogue des assureurs (onglet Tarification, historique). */
   insurers: Insurer[];
+  /**
+   * Extranets choisis pour ce dossier (étape « Extranets ») : seules leurs questions sont posées. Vide : ceux du cabinet.
+   * Pas encore enregistré côté serveur : le choix est perdu au rechargement de la page.
+   */
+  selectedInsurers: string[];
   assure: Assure | null;
   /** Réponses affichées : copie locale du dossier, modifiée à la frappe (l'enregistrement suit). */
   answers: CanonicalData;
@@ -113,6 +119,7 @@ export const DossierStore = signalStore(
     members: [],
     products: [],
     insurers: [],
+    selectedInsurers: [],
     assure: null,
     answers: {},
     answersFor: null,
@@ -128,13 +135,28 @@ export const DossierStore = signalStore(
     const product = computed(
       () => store.products().find((p) => p.id === store.dossier()?.productId) ?? null,
     );
-    /** Sans les questions découvertes sur l'extranet d'un assureur que le cabinet n'utilise pas. */
-    const schema = computed(() =>
-      schemaForCabinet(product()?.questionnaireSchema ?? [], cabinetStatus.cabinet()?.enabledInsurers ?? []),
+    /** Assureurs du cabinet qui proposent le produit du dossier : extranets proposés à l'étape « Extranets ». */
+    const availableInsurers = computed(() =>
+      insurersForProduct(
+        store.insurers(),
+        store.dossier()?.productId ?? '',
+        cabinetStatus.cabinet()?.enabledInsurers ?? [],
+        product()?.replaces ?? null,
+      ),
     );
+    /**
+     * Sans les questions découvertes sur l'extranet d'un assureur non retenu : ceux choisis pour le dossier,
+     * à défaut ceux du cabinet.
+     */
+    const schema = computed(() => {
+      const selected = store.selectedInsurers();
+      const insurers = selected.length ? selected : (cabinetStatus.cabinet()?.enabledInsurers ?? []);
+      return schemaForCabinet(product()?.questionnaireSchema ?? [], insurers);
+    });
     const missing = computed<CanonicalPath[]>(() => computeMissing(schema(), store.answers()));
     return {
       product,
+      availableInsurers,
       schema,
       /** Champs obligatoires manquants, calculés à chaque frappe (le serveur refait le calcul à l'enregistrement). */
       missing,
@@ -304,6 +326,7 @@ export const DossierStore = signalStore(
           eventsHasMore: false,
           eventsLoadingMore: false,
           assure: null,
+          selectedInsurers: [],
           answers: {},
           answersFor: null,
           pending: {},
@@ -311,6 +334,8 @@ export const DossierStore = signalStore(
           error: null,
         }),
       setAutosave: (autosave: boolean) => patchState(store, { autosave }),
+      /** Extranets retenus pour le dossier : le questionnaire ne pose que leurs questions. */
+      selectInsurers: (selectedInsurers: string[]) => patchState(store, { selectedInsurers }),
       /** Fin du défilement de l'historique : demande la tranche suivante. */
       loadMoreEvents: () => {
         if (store.eventsHasMore() && !store.eventsLoadingMore()) {
