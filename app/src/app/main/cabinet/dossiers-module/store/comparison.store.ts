@@ -8,7 +8,7 @@ import {
   withState,
 } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import { DOSSIER_STATUSES, DossierStatus, isTransitionAllowed, Offer } from '@shared';
+import { DOSSIER_STATUSES, DossierStatus, isOfferToReview, isTransitionAllowed, Offer } from '@shared';
 import { catchError, EMPTY, exhaustMap, pipe, switchMap, tap } from 'rxjs';
 import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
@@ -51,7 +51,10 @@ export const ComparisonStore = signalStore(
   withComputed((store, dossierStore = inject(DossierStore)) => ({
     columns: computed<ComparisonColumn[]>(() => {
       const names = dossierStore.insurerNames();
-      return [...store.offers()]
+      // Un tarif lu par l'extension n'est comparé qu'une fois vérifié par le courtier.
+      return store
+        .offers()
+        .filter((offer) => !isOfferToReview(offer))
         .sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
         .map((offer) => ({
           insurerId: offer.id,
@@ -63,6 +66,11 @@ export const ComparisonStore = signalStore(
     staleNames: computed(() => {
       const names = dossierStore.insurerNames();
       return store.offers().filter((offer) => offer.stale).map((offer) => names.get(offer.id) ?? offer.id);
+    }),
+    /** Tarifs lus par l'extension pas encore vérifiés : hors comparatif. */
+    toReviewNames: computed(() => {
+      const names = dossierStore.insurerNames();
+      return store.offers().filter(isOfferToReview).map((offer) => names.get(offer.id) ?? offer.id);
     }),
     /** Après la décision (avant l'envoi de la proposition), on peut revenir au comparatif. */
     canReopen: computed(() => {

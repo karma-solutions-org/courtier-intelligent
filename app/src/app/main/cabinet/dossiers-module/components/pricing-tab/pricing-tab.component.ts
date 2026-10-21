@@ -59,6 +59,7 @@ const TEXT = {
             (openExtranet)="openExtranet(card)"
             (answered)="complete(card, $event)"
             (manualEntry)="openManualEntry(card)"
+            (validate)="store.validateOffer(card.insurer.id)"
           />
         }
       </div>

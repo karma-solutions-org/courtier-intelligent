@@ -68,6 +68,18 @@ export class PricingService {
     });
   }
 
+  /**
+   * Le courtier valide le tarif lu par l'extension (« à vérifier »). Seule écriture directe de l'app sur une offre :
+   * les règles Firestore n'y autorisent que l'état de vérification, son auteur et sa date.
+   */
+  validateOffer(cabinetId: string, dossierId: string, insurerId: string, uid: string): Observable<void> {
+    return this._database.update(`ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_offers/${insurerId}`, {
+      review: 'validated',
+      reviewedBy: uid,
+      reviewedAt: this._database.serverTimestamp(),
+    });
+  }
+
   uploadQuoteDocument(path: string, file: Blob): Observable<string> {
     return this._storage.upload(path, file);
   }

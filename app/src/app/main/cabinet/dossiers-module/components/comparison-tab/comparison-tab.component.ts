@@ -38,6 +38,13 @@ import { COMPARISON_STRUCTURE } from './comparison-tab.structure';
           Relancez-les depuis l'étape Tarification.
         </p>
       }
+      @if (store.toReviewNames().length) {
+        <p class="error" role="status">
+          <mat-icon>warning</mat-icon>
+          Tarifs à vérifier, absents du comparatif : {{ store.toReviewNames().join(', ') }}.
+          Validez-les ou corrigez-les depuis l'étape Tarification.
+        </p>
+      }
       @if (decision(); as decision) {
         <p class="decided" role="status">
           <mat-icon>check_circle</mat-icon>

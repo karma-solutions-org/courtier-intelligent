@@ -387,8 +387,8 @@ export class FormRunner {
 
   /**
    * Capture du tarif (E10-1, E10-2) : si la page est celle du résultat (ou si le courtier le demande), lit l'offre dans
-   * le DOM, puis demande à l'IA ce qui manque (prime introuvable, garanties absentes). L'offre est proposée au courtier
-   * dans le side panel : rien n'est enregistré sans sa confirmation. Renvoie vrai quand la page est traitée comme un résultat.
+   * le DOM, puis demande à l'IA ce qui manque (prime introuvable, garanties absentes). Le service worker enregistre
+   * l'offre « à vérifier » : le courtier la valide ou la corrige dans l'app. Renvoie vrai quand la page est traitée comme un résultat.
    */
   private async tryCapture(force: boolean, analysis: FormAnalysis = analyzeForm(this.ports.doc)): Promise<boolean> {
     if (this.stopped) return true;

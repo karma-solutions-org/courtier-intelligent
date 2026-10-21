@@ -394,21 +394,51 @@ async function deniedCause(user: ExtensionUser, dossierId: string, insurerId: st
 }
 
 async function confirmCapture(edits: CaptureEdits): Promise<CaptureResponse> {
-  const user = await signedInUser();
   const tabId = await activeTabId();
-  const run = tabId !== undefined ? runByTab.get(tabId) : undefined;
-  if (!user || tabId === undefined || !run || run.phase !== 'capture_review' || !run.capture?.offer) {
+  return tabId === undefined ? { ok: false, message: 'Aucun tarif à confirmer sur cet onglet.' } : submitCapture(tabId, edits);
+}
+
+/**
+ * Tarif lu sur la page de résultat : enregistré aussitôt, sans attendre le side panel. Il arrive « à vérifier » dans
+ * l'onglet Tarification de l'app, où le courtier le valide ou le corrige.
+ */
+function autoSubmitCapture(tabId: number, run: RunState): void {
+  if (run.phase !== 'capture_review' || !run.capture?.offer) return;
+  void submitCapture(tabId, {}).then(response => {
+    if (!response.ok) {
+      const current = runByTab.get(tabId);
+      if (current) runByTab.set(tabId, { ...current, message: response.message });
+      void broadcast();
+    }
+  });
+}
+
+async function submitCapture(tabId: number, edits: Partial<CaptureEdits>): Promise<CaptureResponse> {
+  const user = await signedInUser();
+  const run = runByTab.get(tabId);
+  if (!user || !run || run.phase !== 'capture_review' || !run.capture?.offer) {
     return { ok: false, message: 'Aucun tarif à confirmer sur cet onglet.' };
   }
+  // Un seul envoi par tarif lu (l'état de la page peut être republié pendant l'écriture).
+  runByTab.set(tabId, { ...run, phase: 'capturing' });
   const offer = sanitizeOffer({ ...run.capture.offer, ...edits });
-  if (!hasPremium(offer)) return { ok: false, message: 'Indiquez au moins la prime annuelle ou la prime mensuelle.' };
+  if (!hasPremium(offer)) {
+    runByTab.set(tabId, run);
+    return { ok: false, message: 'Indiquez au moins la prime annuelle ou la prime mensuelle.' };
+  }
   try {
     await writeCapturedOffer(user, run.dossierId, run.insurerId, offer);
   } catch (error) {
+    // Le tarif reste affiché dans le side panel : le courtier peut le renvoyer de là.
+    runByTab.set(tabId, run);
     await report(run.insurerId, pagesByTab.get(tabId)?.origin ?? '', 'write', 'offer_write_failed');
     return { ok: false, message: (await deniedCause(user, run.dossierId, run.insurerId, error)).message };
   }
-  finishCapture(tabId, run, { phase: 'captured', capture: { ...run.capture, offer }, message: 'Tarif enregistré : il apparaît dans le dossier.' });
+  finishCapture(tabId, run, {
+    phase: 'captured',
+    capture: { ...run.capture, offer },
+    message: 'Tarif envoyé dans l’application : vérifiez-le dans l’onglet Tarification du dossier.',
+  });
   return { ok: true };
 }
 
@@ -721,8 +751,12 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     case 'RUN_STATE':
       if (!message.state) runByTab.delete(tab!.tabId);
       // Un avancement n'est accepté que pour le job suivi par l'onglet.
-      else if (jobMatches(jobByTab.get(tab!.tabId), message.state.dossierId, message.state.insurerId)) runByTab.set(tab!.tabId, message.state);
-      else return false;
+      else if (jobMatches(jobByTab.get(tab!.tabId), message.state.dossierId, message.state.insurerId)) {
+        // Un envoi du tarif est déjà en cours : l'état republié par la page ne le relance pas.
+        if (message.state.phase === 'capture_review' && runByTab.get(tab!.tabId)?.phase === 'capturing' && runByTab.get(tab!.tabId)?.capture?.offer) return false;
+        runByTab.set(tab!.tabId, message.state);
+        autoSubmitCapture(tab!.tabId, message.state);
+      } else return false;
       void broadcast();
       return false;
 

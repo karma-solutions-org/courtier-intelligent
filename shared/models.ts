@@ -429,7 +429,16 @@ export interface Offer {
   /** Données du dossier modifiées après la capture (`tarification-completer`) : l'offre est à refaire. */
   stale?: boolean;
   staleSince?: TimestampLike | null;
+  /**
+   * Offre lue par l'extension (`source: 'auto'`) : `pending` tant que le courtier ne l'a pas vérifiée dans l'onglet
+   * Tarification, `validated` ensuite. Absent : offre manuelle, ou capturée avant cette vérification (déjà confirmée).
+   */
+  review?: OfferReview | null;
+  reviewedBy?: string | null;
+  reviewedAt?: TimestampLike | null;
 }
+
+export type OfferReview = 'pending' | 'validated';
 
 /**
  * cabinets/{t}/dossiers/{d}/documents/{id} : écrit par les functions (devis joint à une offre saisie à la main,

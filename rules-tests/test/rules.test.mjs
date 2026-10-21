@@ -319,6 +319,36 @@ describe('offers (extension writeCapturedOffer batch)', () => {
     await assertFails(capture('axa', capturedOffer({ capturedAt: new Date(0) })));
     await assertFails(capture('axa', capturedOffer({ guarantees: Array.from({ length: 61 }, () => ({ label: 'g' })) })));
   });
+  it('auto offer written « to review » (pending) only', async () => {
+    await assertSucceeds(capture('axa', capturedOffer({ review: 'pending' })));
+    await setJobStatus('axa', 'awaiting_submit');
+    await assertFails(capture('axa', capturedOffer({ review: 'validated' })));
+  });
+});
+
+describe('offer review (app validates an auto offer)', () => {
+  const offerPath = id => `ci_cabinets/${A}/ci_dossiers/${D}/ci_offers/${id}`;
+  const validation = (uid = 'brokerA') => ({ review: 'validated', reviewedBy: uid, reviewedAt: serverTimestamp() });
+  async function seedOffer(id, data) {
+    await env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), offerPath(id)), data));
+  }
+
+  it('member validates a pending auto offer', async () => {
+    await seedOffer('axa', { ...capturedOffer({ capturedAt: null }), review: 'pending' });
+    await assertSucceeds(updateDoc(doc(app('brokerA'), offerPath('axa')), validation()));
+  });
+  it('denied: other fields, other reviewer, wrong state', async () => {
+    await seedOffer('axa', { ...capturedOffer({ capturedAt: null }), review: 'pending' });
+    await assertFails(updateDoc(doc(app('brokerA'), offerPath('axa')), { ...validation(), premiumAnnual: 1 }));
+    await assertFails(updateDoc(doc(app('brokerA'), offerPath('axa')), validation('adminA')));
+    await assertFails(updateDoc(doc(app('brokerA'), offerPath('axa')), { review: 'pending', reviewedBy: 'brokerA', reviewedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(app('adminB'), offerPath('axa')), validation('adminB')));
+  });
+  it('denied on a manual or already confirmed offer', async () => {
+    await seedOffer('allianz', capturedOffer({ capturedAt: null }));
+    await assertFails(updateDoc(doc(app('brokerA'), offerPath('allianz')), validation()));
+    await assertFails(updateDoc(doc(app('brokerA'), offerPath('manual')), validation()));
+  });
 });
 
 describe('documents', () => {

@@ -8,6 +8,7 @@ import {
   ACTIVE_QUOTE_JOB_STATUSES,
   canLaunchQuoteJob,
   CanonicalData,
+  isOfferToReview,
   QUOTE_JOB_STATUS_LABELS,
   Question,
 } from '@shared';
@@ -17,6 +18,11 @@ import { MissingFieldsFormComponent } from '../missing-fields-form/missing-field
 const TEXT = {
   notStarted: 'Non lancée',
   manual: 'Saisie manuelle',
+  toReview: 'À vérifier',
+  reviewHint:
+    "Tarif lu automatiquement sur l'extranet : comparez-le au devis affiché par l'assureur, puis validez-le ou corrigez-le.",
+  validate: 'Valider le tarif',
+  correct: 'Corriger',
   price: 'Tarifer',
   retry: 'Relancer',
   openExtranet: "Ouvrir l'extranet",
@@ -85,6 +91,9 @@ const TEXT = {
             <span class="badge">{{ text.manual }}</span>
           }
         </div>
+        @if (toReview()) {
+          <p class="hint">{{ text.reviewHint }}</p>
+        }
         @if (offer.stale) {
           <p class="error" role="status">{{ text.stale }}</p>
         }
@@ -155,8 +164,13 @@ const TEXT = {
             {{ text.cancel }}
           </button>
         }
+        @if (toReview()) {
+          <button mat-flat-button type="button" [disabled]="busy()" (click)="validate.emit()">
+            <mat-icon>check</mat-icon>{{ text.validate }}
+          </button>
+        }
         <button mat-button type="button" [disabled]="!canPrice() || busy()" (click)="manualEntry.emit()">
-          {{ offer ? text.editOffer : text.manualEntry }}
+          {{ toReview() ? text.correct : offer ? text.editOffer : text.manualEntry }}
         </button>
       </footer>
     </article>
@@ -353,8 +367,11 @@ export class QuoteCardComponent {
   readonly answered = output<CanonicalData>();
   /** Ouvre la saisie manuelle de l'offre (ou sa correction). */
   readonly manualEntry = output<void>();
+  /** Valide le tarif lu par l'extension (« à vérifier »). */
+  readonly validate = output<void>();
 
   protected readonly text = TEXT;
+  protected readonly toReview = computed(() => isOfferToReview(this.card().offer));
 
   /** Pas encore lancée, échouée ou annulée ; ou tarif obtenu mais périmé (données du dossier modifiées depuis). */
   protected readonly canLaunch = computed(() => {
@@ -369,6 +386,7 @@ export class QuoteCardComponent {
 
   protected readonly statusLabel = computed(() => {
     const { job, offer } = this.card();
+    if (isOfferToReview(offer)) return TEXT.toReview;
     if (offer) return QUOTE_JOB_STATUS_LABELS.captured;
     return job ? QUOTE_JOB_STATUS_LABELS[job.status] : TEXT.notStarted;
   });
@@ -376,7 +394,7 @@ export class QuoteCardComponent {
   /** Couleur du statut : en cours, action du courtier attendue, obtenu, échec. */
   protected readonly tone = computed(() => {
     const { job, offer } = this.card();
-    if (offer?.stale) return 'action';
+    if (offer?.stale || isOfferToReview(offer)) return 'action';
     if (offer || job?.status === 'captured') return 'ok';
     switch (job?.status) {
       case 'failed':

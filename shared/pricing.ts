@@ -21,6 +21,14 @@ export function canLaunchQuoteJob(job: Pick<QuoteJob, 'status'> | null | undefin
 }
 
 /**
+ * Tarif lu par l'extension que le courtier n'a pas encore vérifié : affiché « À vérifier », hors comparatif tant
+ * qu'il n'est pas validé (ou corrigé, ce qui en fait une offre saisie à la main).
+ */
+export function isOfferToReview(offer: Pick<Offer, 'source' | 'review'> | null | undefined): boolean {
+  return !!offer && offer.source === 'auto' && offer.review === 'pending';
+}
+
+/**
  * Assureurs proposés pour un produit : ceux qui le tarifent, parmi ceux activés par le cabinet (aucun choix = tous).
  * Un assureur du catalogue modifié ou retiré par le cabinet n'est plus proposé.
  * `replacedProductId` : produit du catalogue que ce produit du cabinet remplace (ex. « auto » copié en « cab-auto ») ;

@@ -243,6 +243,7 @@ export function watchJob(user: ExtensionUser, dossierId: string, insurerId: stri
  * Enregistre l'offre capturée et passe le job à `captured`, en une seule écriture (tout ou rien). Les règles Firestore
  * n'acceptent qu'une offre `source: auto` aux champs attendus, sur un job du courtier. Le code de chaque garantie
  * (référentiel du produit) est posé ensuite côté serveur : l'extension écrit le libellé lu sur la page.
+ * L'offre arrive « à vérifier » (`review: pending`) : le courtier la valide ou la corrige dans l'onglet Tarification.
  */
 export async function writeCapturedOffer(user: ExtensionUser, dossierId: string, insurerId: string, offer: CapturedOffer): Promise<void> {
   const { firestore } = getFirebase();
@@ -257,6 +258,7 @@ export async function writeCapturedOffer(user: ExtensionUser, dossierId: string,
     exclusions: offer.exclusions,
     source: 'auto',
     capturedAt: serverTimestamp(),
+    review: 'pending',
   });
   batch.update(doc(firestore, `${base}/ci_quoteJobs/${insurerId}`), {
     status: 'captured',

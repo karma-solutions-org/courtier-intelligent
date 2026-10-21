@@ -153,8 +153,22 @@
         && job.get('status', null) in ciExtRunnableStatuses()
         && request.resource.data.source == 'auto'
         && request.resource.data.keys().hasOnly(['quoteNumber', 'premiumAnnual', 'premiumMonthly', 'deductibles',
-                                                 'guarantees', 'exclusions', 'source', 'capturedAt'])
+                                                 'guarantees', 'exclusions', 'source', 'capturedAt', 'review'])
+        // Sans confirmation dans l'extension : le tarif lu arrive « à vérifier » dans l'onglet Tarification.
+        && request.resource.data.get('review', 'pending') == 'pending'
         && ciExtOfferValid(request.resource.data);
+    }
+
+    // Le courtier valide dans l'app un tarif lu par l'extension (à vérifier) : seuls l'état de vérification, son
+    // auteur et sa date changent. Une correction passe par la saisie manuelle (function tarification-saisirOffre).
+    function ciOfferReviewValid() {
+      let next = request.resource.data;
+      return resource.data.get('source', null) == 'auto'
+        && resource.data.get('review', null) == 'pending'
+        && next.diff(resource.data).affectedKeys().hasOnly(['review', 'reviewedBy', 'reviewedAt'])
+        && next.review == 'validated'
+        && next.reviewedBy == request.auth.uid
+        && next.reviewedAt == request.time;
     }
 
     // La requête du side panel : « mes jobs en cours », tous dossiers confondus.
@@ -261,6 +275,8 @@
 
         match /ci_offers/{insurerId} {
           allow read: if ciActive(cabinetId);
+          // Seule exception écrite par l'app : la validation d'un tarif lu par l'extension (voir ciOfferReviewValid).
+          allow update: if ciActive(cabinetId) && ciOfferReviewValid();
         }
 
         match /ci_documents/{documentId} {

@@ -45,7 +45,8 @@ type Action =
   | { kind: 'launch'; insurerId: string; target: Window | null }
   | { kind: 'complete'; insurerId: string; answers: CanonicalData }
   | { kind: 'cancel'; insurerId: string }
-  | { kind: 'manual'; insurerId: string; submission: ManualOfferSubmission };
+  | { kind: 'manual'; insurerId: string; submission: ManualOfferSubmission }
+  | { kind: 'validate'; insurerId: string };
 
 interface PricingState {
   jobs: QuoteJob[];
@@ -159,6 +160,14 @@ export const PricingStore = signalStore(
               ),
               tap(() => patchState(store, { successMessage: 'Offre enregistrée.' })),
             );
+          case 'validate': {
+            const cabinetId = authStore.cabinetId();
+            const uid = authStore.user()?.uid;
+            if (!cabinetId || !uid) return EMPTY;
+            return service
+              .validateOffer(cabinetId, dossierId, action.insurerId, uid)
+              .pipe(tap(() => patchState(store, { successMessage: 'Tarif validé.' })));
+          }
         }
       };
 
@@ -232,6 +241,8 @@ export const PricingStore = signalStore(
       store._act({ kind: 'complete', insurerId, answers }),
     saveManualOffer: (insurerId: string, submission: ManualOfferSubmission) =>
       store._act({ kind: 'manual', insurerId, submission }),
+    /** Tarif lu par l'extension, vérifié par le courtier : il entre dans le comparatif. */
+    validateOffer: (insurerId: string) => store._act({ kind: 'validate', insurerId }),
   })),
   withHooks({
     onInit: (store) => {
