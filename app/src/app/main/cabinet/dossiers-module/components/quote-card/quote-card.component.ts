@@ -20,6 +20,8 @@ const TEXT = {
   price: 'Tarifer',
   retry: 'Relancer',
   openExtranet: "Ouvrir l'extranet",
+  manualEntry: "Saisir l'offre",
+  editOffer: "Corriger l'offre",
   requested: "Ouvrez l'extranet de l'assureur : l'extension prend le relais.",
   resuming: "Informations enregistrées : l'extension reprend le remplissage.",
   awaitingSubmit: "Formulaire rempli : vérifiez-le et validez-le vous-même sur l'extranet.",
@@ -153,6 +155,9 @@ const TEXT = {
             {{ text.cancel }}
           </button>
         }
+        <button mat-button type="button" [disabled]="!canPrice() || busy()" (click)="manualEntry.emit()">
+          {{ offer ? text.editOffer : text.manualEntry }}
+        </button>
       </footer>
     </article>
   `,
@@ -346,6 +351,8 @@ export class QuoteCardComponent {
   /** Annule le job en cours (bloqué, extension fermée…). */
   readonly cancel = output<void>();
   readonly answered = output<CanonicalData>();
+  /** Ouvre la saisie manuelle de l'offre (ou sa correction). */
+  readonly manualEntry = output<void>();
 
   protected readonly text = TEXT;
 

@@ -6,14 +6,18 @@ import { CanonicalData, questionsOf } from '@shared';
 import { openConfirmDialog } from '../../../../../core/components/confirm-dialog/confirm-dialog.component';
 import { ExtensionStore } from '../../../../commons/extension-module/store/extension.store';
 import { DossierStore } from '../../store/dossier.store';
-import { PricingCard, PricingStore } from '../../store/pricing.store';
+import { ManualOfferSubmission, PricingCard, PricingStore } from '../../store/pricing.store';
+import {
+  ManualOfferDialogComponent,
+  ManualOfferDialogData,
+} from '../manual-offer-dialog/manual-offer-dialog.component';
 import { QuoteCardComponent } from '../quote-card/quote-card.component';
 
 const TEXT = {
   needNotValidated: 'Validez la couverture souhaitée (étape Couverture) pour lancer les tarifications.',
   closed: 'La tarification est terminée pour ce dossier : les offres reçues restent consultables.',
   noExtension:
-    'Extension Chrome non détectée : installez-la et connectez-vous pour remplir les extranets automatiquement.',
+    'Extension Chrome non détectée : installez-la et connectez-vous pour remplir les extranets automatiquement. La saisie manuelle reste possible.',
   loading: 'Chargement des tarifications…',
   noInsurer:
     'Aucun assureur ne tarifie ce produit pour votre cabinet. Un administrateur peut en activer dans Paramètres.',
@@ -54,6 +58,7 @@ const TEXT = {
             (cancel)="cancel(card)"
             (openExtranet)="openExtranet(card)"
             (answered)="complete(card, $event)"
+            (manualEntry)="openManualEntry(card)"
           />
         }
       </div>
@@ -156,5 +161,19 @@ export class PricingTabComponent {
 
   protected complete(card: PricingCard, answers: CanonicalData): void {
     this.store.complete(card.insurer.id, answers);
+  }
+
+  /** Saisie (ou correction) de l'offre à la main : l'offre est enregistrée à la fermeture du dialogue. */
+  protected openManualEntry(card: PricingCard): void {
+    this._dialog
+      .open<ManualOfferDialogComponent, ManualOfferDialogData, ManualOfferSubmission>(ManualOfferDialogComponent, {
+        data: { insurerName: card.insurer.name, guarantees: this.dossierStore.guarantees(), offer: card.offer },
+        width: '720px',
+        maxWidth: '95vw',
+      })
+      .afterClosed()
+      .subscribe((submission) => {
+        if (submission) this.store.saveManualOffer(card.insurer.id, submission);
+      });
   }
 }

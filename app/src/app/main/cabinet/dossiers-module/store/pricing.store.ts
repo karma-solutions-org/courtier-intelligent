@@ -12,15 +12,17 @@ import {
   CanonicalData,
   Insurer,
   insurersForProduct,
+  ManualOfferInput,
   Offer,
   PRICING_DOSSIER_STATUSES,
+  quoteDocumentsFolder,
   QuoteJob,
 } from '@shared';
-import { catchError, EMPTY, filter, merge, mergeMap, Observable, pipe, switchMap, tap } from 'rxjs';
+import { catchError, EMPTY, filter, map, merge, mergeMap, Observable, of, pipe, switchMap, tap } from 'rxjs';
 import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
 import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-status.store';
-import { PricingService } from '../services/pricing.service';
+import { PricingService, QuoteDocumentRef } from '../services/pricing.service';
 import { DossierStore } from './dossier.store';
 
 /** Message unique après l'annulation d'une tarification (snackbar et carte de l'assureur). */
@@ -33,10 +35,17 @@ export interface PricingCard {
   offer: Offer | null;
 }
 
+/** Saisie manuelle : l'offre et, éventuellement, le devis à joindre. */
+export interface ManualOfferSubmission {
+  offer: ManualOfferInput;
+  file: File | null;
+}
+
 type Action =
   | { kind: 'launch'; insurerId: string; target: Window | null }
   | { kind: 'complete'; insurerId: string; answers: CanonicalData }
-  | { kind: 'cancel'; insurerId: string };
+  | { kind: 'cancel'; insurerId: string }
+  | { kind: 'manual'; insurerId: string; submission: ManualOfferSubmission };
 
 interface PricingState {
   jobs: QuoteJob[];
@@ -95,6 +104,20 @@ export const PricingStore = signalStore(
         });
 
       /** Envoie le devis dans Storage (rangé dans le dossier, nommé d'après l'assureur), avant d'enregistrer l'offre. */
+      const upload = (
+        dossierId: string,
+        insurerId: string,
+        file: File | null,
+      ): Observable<QuoteDocumentRef | null> => {
+        if (!file) return of(null);
+        const extension =
+          file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf';
+        const storagePath = `${quoteDocumentsFolder(authStore.cabinetId()!, dossierId)}/${insurerId}-${Date.now()}.${extension}`;
+        return service
+          .uploadQuoteDocument(storagePath, file)
+          .pipe(map(() => ({ storagePath, fileName: file.name })));
+      };
+
       const perform = (action: Action): Observable<unknown> => {
         const dossierId = dossierStore.selectedId();
         if (!dossierId) {
@@ -129,6 +152,13 @@ export const PricingStore = signalStore(
                   }),
                 ),
               );
+          case 'manual':
+            return upload(dossierId, action.insurerId, action.submission.file).pipe(
+              switchMap((document) =>
+                service.saveManualOffer(dossierId, action.insurerId, action.submission.offer, document),
+              ),
+              tap(() => patchState(store, { successMessage: 'Offre enregistrée.' })),
+            );
         }
       };
 
@@ -200,6 +230,8 @@ export const PricingStore = signalStore(
     cancel: (insurerId: string) => store._act({ kind: 'cancel', insurerId }),
     complete: (insurerId: string, answers: CanonicalData) =>
       store._act({ kind: 'complete', insurerId, answers }),
+    saveManualOffer: (insurerId: string, submission: ManualOfferSubmission) =>
+      store._act({ kind: 'manual', insurerId, submission }),
   })),
   withHooks({
     onInit: (store) => {
