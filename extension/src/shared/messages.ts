@@ -1,4 +1,4 @@
-import type { CanonicalData, CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, DiscoveredFieldInput, MissingField, QuoteJobStatus } from '@shared';
+import type { CanonicalData, CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, DiscoveredFieldInput, MissingField, NavAction, QuoteJobStatus } from '@shared';
 
 /** Utilisateur connecté dans l'extension (affiché dans le side panel). */
 export interface ExtensionUser {
@@ -40,7 +40,46 @@ export interface JobContext {
    * un champ reconnu sur l'une d'elles n'est pas « nouveau ». Absent : produit illisible, on se rabat sur quoteData.
    */
   productPaths?: string[];
+  /** Produit du dossier : choisit le profil d'extranet (chemin d'accès propre à chaque produit). */
+  productId?: string | null;
 }
+
+/**
+ * Chemin d'accès au formulaire de devis sur l'onglet (profil d'extranet, brique 1).
+ * none : pas de chemin enregistré · recording : le courtier montre le chemin · replaying : l'extension le rejoue ·
+ * done : formulaire atteint (ou chemin déjà passé) · failed : un clic n'a pas pu être rejoué.
+ */
+export interface TabEntry {
+  dossierId: string;
+  insurerId: string;
+  productId: string;
+  origin: string;
+  mode: 'none' | 'recording' | 'replaying' | 'done' | 'failed';
+  /** Clics enregistrés (apprentissage) ou à rejouer. */
+  actions: NavAction[];
+  /** Prochain clic à rejouer. */
+  index: number;
+  message: string | null;
+}
+
+/** Ce que le side panel affiche du chemin d'accès de l'onglet actif. */
+export interface EntryPanelState {
+  mode: TabEntry['mode'];
+  /** Un chemin est déjà enregistré pour cet extranet et ce produit. */
+  hasProfile: boolean;
+  labels: string[];
+  index: number;
+  message: string | null;
+}
+
+/** Réponse aux commandes d'apprentissage du side panel (ENTRY_RECORD_*). */
+export type EntryResponse = { ok: true } | { ok: false; message: string };
+
+/** Réponse à ENTRY_GET : ce que la page doit faire du chemin d'accès. */
+export type EntryInstruction =
+  | { mode: 'none' }
+  | { mode: 'record' }
+  | { mode: 'replay'; action: NavAction; index: number; total: number };
 
 /** Modification du job écrite par l'extension (les règles Firestore n'autorisent que ces champs). */
 /** Réponse à UPDATE_JOB : la cause exacte d'un échec, affichée telle quelle dans le side panel. */
@@ -131,6 +170,8 @@ export interface PanelState {
   job: CurrentJob | null;
   /** Remplissage en cours sur l'onglet actif (null : aucune page d'assureur analysée). */
   run: RunState | null;
+  /** Chemin d'accès au formulaire sur l'onglet actif (null : pas de tarification sur cet onglet). */
+  entry: EntryPanelState | null;
 }
 
 /** Messages internes à l'extension (content script ↔ service worker ↔ side panel). */
@@ -162,7 +203,16 @@ export type ExtensionMessage =
   | { type: 'MEMORY_TOUCH'; key: string }
   | { type: 'MEMORY_INVALIDATE'; key: string }
   // Champs sans équivalent dans l'application : ajoutés au questionnaire par la function champs-signaler.
-  | { type: 'FIELDS_DISCOVERED'; fingerprint: string; fields: DiscoveredFieldInput[]; requiredPaths?: string[] };
+  | { type: 'FIELDS_DISCOVERED'; fingerprint: string; fields: DiscoveredFieldInput[]; requiredPaths?: string[] }
+  // Chemin d'accès au formulaire (profil d'extranet). Side panel → service worker : apprentissage sur l'onglet actif.
+  | { type: 'ENTRY_RECORD_START' }
+  | { type: 'ENTRY_RECORD_SAVE' }
+  | { type: 'ENTRY_RECORD_CANCEL' }
+  // Content script → service worker : quoi faire sur cette page, clic enregistré, clic rejoué, rejeu impossible.
+  | { type: 'ENTRY_GET' }
+  | { type: 'ENTRY_RECORDED'; action: NavAction }
+  | { type: 'ENTRY_CLICKED'; index: number }
+  | { type: 'ENTRY_FAILED'; index: number; reason: 'not_found' | 'skipped' };
 
 /** Réponse à GET_ACCESS_REQUEST : l'onglet actif est l'extranet d'un assureur auquel l'extension n'a pas accès. */
 export interface AccessRequest {
@@ -182,7 +232,10 @@ export type TabMessage =
   /** Lire le tarif de la page affichée (détection manquée, ou nouvel essai). */
   | { type: 'CAPTURE_NOW' }
   /** La capture est terminée (offre enregistrée ou échec signalé) : la page n'a plus rien à faire. */
-  | { type: 'CAPTURE_DONE' };
+  | { type: 'CAPTURE_DONE' }
+  /** Apprentissage du chemin d'accès : la page enregistre les clics de navigation (et ne remplit plus), puis reprend. */
+  | { type: 'ENTRY_RECORD_START' }
+  | { type: 'ENTRY_RECORD_STOP' };
 
 /** Réponse à CONFIRM_CAPTURE et REJECT_CAPTURE. */
 export type CaptureResponse = { ok: true } | { ok: false; message: string };

@@ -1,8 +1,12 @@
+import { matchesUrlPattern } from '@shared';
+import { isAuthPage } from '../engine/analyzer';
+import { describeClick, findActionTarget } from '../engine/entry-path';
 import { JobUpdateError } from '../engine/runner';
 import type { FormLayout } from '../engine/layout-ai';
 import { LoadedMemory, MemoryPort, type MemorySaveOutcome } from '../engine/memory';
 import { FormRunner } from '../engine/runner';
-import { AskAiResponse, ExtensionMessage, JobContext, JobUpdate, RUNNER_PORT, type UpdateJobResponse, RunState, TabMessage } from '../shared/messages';
+import { waitForSettled } from '../engine/steps';
+import { AskAiResponse, EntryInstruction, ExtensionMessage, JobContext, JobUpdate, RUNNER_PORT, type UpdateJobResponse, RunState, TabMessage } from '../shared/messages';
 
 /** Compte les champs de formulaire visibles (affiché dans le side panel). */
 function countVisibleFields(): number {
@@ -12,6 +16,10 @@ function countVisibleFields(): number {
 }
 
 let runner: FormRunner | null = null;
+/** Arrête le remplissage de la page (apprentissage du chemin d'accès), ou null sans remplissage. */
+let stopRunner: (() => void) | null = null;
+/** Job de la page (page principale) : le remplissage reprend avec lui après l'apprentissage. */
+let currentJob: JobContext | null = null;
 
 /** Arrête le remplissage en cours (fermeture de la page ou extension rechargée). */
 const teardowns: (() => void)[] = [];
@@ -136,6 +144,12 @@ async function startRunner(job: JobContext): Promise<void> {
     runner?.stop();
   };
   teardowns.push(stop);
+  stopRunner = () => {
+    stop();
+    runner = null;
+    stopRunner = null;
+    void send({ type: 'RUN_STATE', state: null }).catch(() => undefined);
+  };
   window.addEventListener('pagehide', () => {
     stop();
     void send({ type: 'RUN_STATE', state: null }).catch(() => undefined);
@@ -152,6 +166,19 @@ function respond(action: Promise<unknown>, sendResponse: (response: boolean) => 
 chrome.runtime.onMessage.addListener((message: TabMessage, sender, sendResponse) => {
   // Seul le service worker de cette extension nous parle (jamais un autre onglet).
   if (sender.id !== chrome.runtime.id || sender.tab) return false;
+  // Apprentissage du chemin d'accès : envoyé à la seule page principale.
+  if (message.type === 'ENTRY_RECORD_START') {
+    stopRunner?.();
+    startRecording();
+    sendResponse(true);
+    return false;
+  }
+  if (message.type === 'ENTRY_RECORD_STOP') {
+    stopRecording();
+    if (currentJob && !runner) void startRunner(currentJob).catch(() => undefined);
+    sendResponse(true);
+    return false;
+  }
   // Le message est envoyé à tous les cadres de l'onglet : seul celui qui remplit répond (les autres laissent la main).
   if (!runner) return false;
   switch (message.type) {
@@ -194,6 +221,62 @@ async function waitForFields(timeoutMs = 15_000): Promise<boolean> {
   return true;
 }
 
+// ── Chemin d'accès au formulaire (profil d'extranet) ────────────────────────
+/** Apprentissage : chaque clic de navigation du courtier est envoyé au service worker. */
+const recordClick = (event: MouseEvent) => {
+  const action = describeClick(event.target, location.href);
+  if (action) void send({ type: 'ENTRY_RECORDED', action }).catch(() => undefined);
+};
+
+function startRecording(): void {
+  document.removeEventListener('click', recordClick, true);
+  document.addEventListener('click', recordClick, true);
+}
+
+function stopRecording(): void {
+  document.removeEventListener('click', recordClick, true);
+}
+
+/** Délai pour trouver le bouton du prochain clic (menu chargé après coup, animation). */
+const ENTRY_TARGET_TIMEOUT_MS = 10_000;
+
+/**
+ * Rejoue le chemin d'accès enregistré, clic par clic, tant que la page reste la même (application d'une seule page) ;
+ * une page rechargée reprend au clic suivant (l'avancement est gardé par le service worker, noté AVANT chaque clic).
+ * Renvoie `recording` si le courtier apprend le chemin, `done` quand il faut remplir la page.
+ */
+async function runEntry(): Promise<'recording' | 'done'> {
+  for (;;) {
+    const instruction = await send<EntryInstruction | false>({ type: 'ENTRY_GET' }).catch(() => false as const);
+    if (!instruction || instruction.mode === 'none') return 'done';
+    if (instruction.mode === 'record') {
+      startRecording();
+      return 'recording';
+    }
+    // Page de connexion : le courtier se connecte lui-même, le chemin reprendra sur la page suivante.
+    if (isAuthPage(document)) return 'done';
+    const { action, index } = instruction;
+    // Le premier clic se fait sur la page où il a été appris : ailleurs (formulaire déjà ouvert), le chemin est passé.
+    if (index === 0 && !matchesUrlPattern(location.href, action.urlPattern)) {
+      await send({ type: 'ENTRY_FAILED', index, reason: 'skipped' }).catch(() => undefined);
+      return 'done';
+    }
+    let target = findActionTarget(document, action);
+    for (let waited = 0; !target && waited < ENTRY_TARGET_TIMEOUT_MS; waited += 500) {
+      await delay(500);
+      target = findActionTarget(document, action);
+    }
+    if (!target) {
+      await send({ type: 'ENTRY_FAILED', index, reason: 'not_found' }).catch(() => undefined);
+      return 'done';
+    }
+    // Avancement non noté (service worker injoignable) : on ne clique pas, la page se remplit telle quelle.
+    if (!(await send<boolean>({ type: 'ENTRY_CLICKED', index }).catch(() => false))) return 'done';
+    target.click();
+    await waitForSettled(document);
+  }
+}
+
 /**
  * Le script tourne dans chaque cadre de l'extranet. Seul le cadre qui porte le formulaire remplit : une iframe sans
  * champ (publicité, menu…) reste muette ; la page principale qui ne fait qu'inclure le formulaire dans une iframe aussi.
@@ -212,7 +295,13 @@ async function main(): Promise<void> {
   }
   // Y a-t-il un job de tarification pour l'assureur de cet extranet ?
   const job = await findJob();
-  if (job) await startRunner(job);
+  if (!job) return;
+  // Page principale : d'abord le chemin d'accès jusqu'au formulaire (appris ou rejoué), puis le remplissage.
+  if (isTopFrame) {
+    currentJob = job;
+    if ((await runEntry()) === 'recording') return;
+  }
+  await startRunner(job);
 }
 
 void main().catch(() => undefined);

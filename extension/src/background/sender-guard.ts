@@ -18,6 +18,9 @@ export const PANEL_COMMANDS: ReadonlySet<string> = new Set<ExtensionMessage['typ
   'MANUAL_MAP',
   'REFILL',
   'CAPTURE_NOW',
+  'ENTRY_RECORD_START',
+  'ENTRY_RECORD_SAVE',
+  'ENTRY_RECORD_CANCEL',
 ]);
 
 /** Commandes réservées au content script d'un onglet (cadre principal). */
@@ -33,6 +36,10 @@ export const TAB_COMMANDS: ReadonlySet<string> = new Set<ExtensionMessage['type'
   'MEMORY_TOUCH',
   'MEMORY_INVALIDATE',
   'FIELDS_DISCOVERED',
+  'ENTRY_GET',
+  'ENTRY_RECORDED',
+  'ENTRY_CLICKED',
+  'ENTRY_FAILED',
 ]);
 
 /** Commandes d'onglet qui exigent en plus un remplissage en cours sur cet onglet (job suivi). */
@@ -45,6 +52,10 @@ export const JOB_COMMANDS: ReadonlySet<string> = new Set<ExtensionMessage['type'
   'MEMORY_TOUCH',
   'MEMORY_INVALIDATE',
   'FIELDS_DISCOVERED',
+  'ENTRY_GET',
+  'ENTRY_RECORDED',
+  'ENTRY_CLICKED',
+  'ENTRY_FAILED',
 ]);
 
 type Sender = Pick<chrome.runtime.MessageSender, 'tab' | 'url' | 'frameId' | 'id'>;

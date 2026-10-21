@@ -9,6 +9,8 @@ import {
   CaptureResponse,
   ConnectResponse,
   CurrentJob,
+  EntryPanelState,
+  EntryResponse,
   ExtensionMessage,
   ExtensionUser,
   ExternalMessage,
@@ -31,8 +33,23 @@ import { startLiveWatch } from './live';
 import { invalidateMemory, loadMemory, reportDiscoveredFields, saveMemory, touchMemory } from './memory-service';
 import { countRequested, extranetPatterns, insurerForOrigin, JobRef } from './origin-match';
 import { checkSender, externalOriginsFromMatches, JOB_COMMANDS, jobMatches, MemoryKeyRegistry, sanitizeAiRequest } from './sender-guard';
-import { AI_SYSTEM_PROMPTS } from '@shared';
+import { AI_SYSTEM_PROMPTS, sanitizeNavAction } from '@shared';
 import { memoryKeyFor } from '../engine/memory';
+import {
+  entryClicked,
+  entryFailed,
+  entryPanelState,
+  entryRecorded,
+  initialEntry,
+  instructionFor,
+  loadProfile,
+  profileFrom,
+  readTabEntry,
+  removeTabEntry,
+  saveProfile,
+  startRecording,
+  writeTabEntry,
+} from './entry-service';
 
 // Un clic sur l'icône de l'extension ouvre le side panel.
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(console.error);
@@ -63,11 +80,20 @@ async function activeTabId(): Promise<number | undefined> {
 async function panelState(authState?: AuthState): Promise<PanelState> {
   const state = authState ?? (await auth.getState());
   const tabId = await activeTabId();
+  const signedIn = state.status === 'signed_in';
   return {
     auth: state,
-    job: state.status === 'signed_in' ? currentJob : null,
-    run: state.status === 'signed_in' && tabId !== undefined ? (runByTab.get(tabId) ?? null) : null,
+    job: signedIn ? currentJob : null,
+    run: signedIn && tabId !== undefined ? (runByTab.get(tabId) ?? null) : null,
+    entry: signedIn && tabId !== undefined ? await entryPanelFor(tabId) : null,
   };
+}
+
+/** Chemin d'accès de l'onglet, pour le side panel (null : pas de tarification sur cet onglet). */
+async function entryPanelFor(tabId: number): Promise<EntryPanelState | null> {
+  const entry = await readTabEntry(tabId);
+  if (!entry) return null;
+  return entryPanelState(entry, (await loadProfile(entry.insurerId, entry.productId)) !== null);
 }
 
 async function broadcast(authState?: AuthState): Promise<void> {
@@ -527,6 +553,79 @@ function tabJob(tabId: number): { dossierId: string; insurerId: string } | undef
   return jobByTab.get(tabId) ?? runByTab.get(tabId);
 }
 
+// ── Chemin d'accès au formulaire (profil d'extranet, brique 1) ──────────────
+/**
+ * Un onglet commence un job (page principale) : il rejoue le chemin d'accès enregistré pour cet extranet et ce produit.
+ * Un onglet qui reprend le même job (page suivante du chemin, rechargement) garde son état.
+ */
+async function ensureTabEntry(tabId: number, job: JobContext, origin: string): Promise<void> {
+  const current = await readTabEntry(tabId);
+  if (current && current.dossierId === job.dossierId && current.insurerId === job.insurerId) return;
+  if (!job.productId) {
+    await removeTabEntry(tabId);
+    return;
+  }
+  const productId = job.productId;
+  await writeTabEntry(tabId, initialEntry({ ...job, productId }, origin, await loadProfile(job.insurerId, productId)));
+}
+
+/** Transmet une commande d'apprentissage à la page principale de l'onglet. */
+function sendToTopFrame(tabId: number, message: TabMessage): void {
+  chrome.tabs.sendMessage(tabId, message, { frameId: 0 }).catch(() => undefined);
+}
+
+/** Commandes d'apprentissage du side panel, sur l'onglet actif. */
+async function entryCommand(type: 'ENTRY_RECORD_START' | 'ENTRY_RECORD_SAVE' | 'ENTRY_RECORD_CANCEL'): Promise<EntryResponse> {
+  const tabId = await activeTabId();
+  const entry = tabId !== undefined ? await readTabEntry(tabId) : null;
+  if (tabId === undefined || !entry) {
+    return { ok: false, message: 'Lancez d’abord une tarification depuis l’application, puis ouvrez l’extranet dans cet onglet.' };
+  }
+  if (type === 'ENTRY_RECORD_START') {
+    await writeTabEntry(tabId, startRecording(entry));
+    sendToTopFrame(tabId, { type: 'ENTRY_RECORD_START' });
+  } else if (entry.mode !== 'recording') {
+    return { ok: false, message: 'Aucun apprentissage en cours sur cet onglet.' };
+  } else if (type === 'ENTRY_RECORD_SAVE') {
+    const profile = profileFrom(entry, await loadProfile(entry.insurerId, entry.productId));
+    if (!profile) return { ok: false, message: 'Aucun clic enregistré : cliquez jusqu’au formulaire de devis avant d’enregistrer.' };
+    await saveProfile(profile);
+    await writeTabEntry(tabId, {
+      ...entry,
+      mode: 'done',
+      index: entry.actions.length,
+      message: `Chemin enregistré (${profile.entry.length} clic${profile.entry.length > 1 ? 's' : ''}) : il sera rejoué à la prochaine tarification sur cet extranet.`,
+    });
+    sendToTopFrame(tabId, { type: 'ENTRY_RECORD_STOP' });
+  } else {
+    await writeTabEntry(tabId, { ...entry, mode: 'done', actions: [], index: 0, message: null });
+    sendToTopFrame(tabId, { type: 'ENTRY_RECORD_STOP' });
+  }
+  void broadcast();
+  return { ok: true };
+}
+
+/** Messages de la page sur le chemin d'accès : seulement la page principale, pour le job suivi par l'onglet. */
+async function entryFromTab(tabId: number, message: Extract<ExtensionMessage, { type: `ENTRY_${'GET' | 'RECORDED' | 'CLICKED' | 'FAILED'}` }>): Promise<unknown> {
+  const entry = await readTabEntry(tabId);
+  if (!entry || !jobMatches(jobByTab.get(tabId), entry.dossierId, entry.insurerId)) return message.type === 'ENTRY_GET' ? instructionFor(null) : false;
+  if (message.type === 'ENTRY_GET') return instructionFor(entry);
+  let next = entry;
+  if (message.type === 'ENTRY_RECORDED') {
+    const action = sanitizeNavAction(message.action);
+    if (action) next = entryRecorded(entry, action);
+  } else if (message.type === 'ENTRY_CLICKED') {
+    next = entryClicked(entry, Number(message.index));
+  } else {
+    next = entryFailed(entry, Number(message.index), message.reason === 'skipped' ? 'skipped' : 'not_found');
+  }
+  if (next !== entry) {
+    await writeTabEntry(tabId, next);
+    void broadcast();
+  }
+  return true;
+}
+
 /** Prompts système fixes de l'IA, par usage : la page ne choisit que l'usage. */
 const AI_PROMPTS: Readonly<Record<string, string>> = AI_SYSTEM_PROMPTS;
 /** Clés de mémoire calculées par onglet (MEMORY_TOUCH/INVALIDATE n'acceptent que celles de l'origine de l'onglet). */
@@ -581,11 +680,34 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         .then(async user => {
           const found = user ? await findTabJob(user, tabId, origin) : null;
           if (user && found) startJobWatch(tabId, user, found);
+          // Le chemin d'accès se joue dans la page principale (l'origine de l'extranet, pas celle d'une iframe).
+          if (found && sender.frameId === 0) await ensureTabEntry(tabId, found, origin).catch(() => undefined);
           sendResponse(found);
         })
         .catch(() => sendResponse(null));
       return true;
     }
+
+    case 'ENTRY_GET':
+    case 'ENTRY_RECORDED':
+    case 'ENTRY_CLICKED':
+    case 'ENTRY_FAILED':
+      if (sender.frameId !== 0) {
+        sendResponse(message.type === 'ENTRY_GET' ? instructionFor(null) : false);
+        return false;
+      }
+      entryFromTab(tab!.tabId, message)
+        .then(sendResponse)
+        .catch(() => sendResponse(false));
+      return true;
+
+    case 'ENTRY_RECORD_START':
+    case 'ENTRY_RECORD_SAVE':
+    case 'ENTRY_RECORD_CANCEL':
+      entryCommand(message.type)
+        .then(sendResponse)
+        .catch(error => sendResponse({ ok: false, message: toUserMessage(error) } satisfies EntryResponse));
+      return true;
 
     case 'UPDATE_JOB':
       // Seul le job suivi par cet onglet peut être mis à jour.
@@ -737,6 +859,7 @@ chrome.tabs.onRemoved.addListener(tabId => {
   memoryKeys.forget(tabId);
   stopJobWatch(tabId);
   void unpinJob(tabId);
+  void removeTabEntry(tabId);
 });
 // Le side panel montre l'avancement de l'onglet actif : il change avec lui.
 chrome.tabs.onActivated.addListener(() => void broadcast());

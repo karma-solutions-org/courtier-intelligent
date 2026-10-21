@@ -50,6 +50,18 @@
           <p id="job-error" class="error" hidden></p>
         </section>
 
+        <!-- Chemin d'accès au formulaire de devis : appris une fois par le courtier, rejoué ensuite -->
+        <section id="entry" class="card" hidden>
+          <p class="label">Chemin d'accès au formulaire</p>
+          <p id="entry-status" class="value"></p>
+          <p id="entry-message" class="notice" role="status" hidden></p>
+          <ol id="entry-actions" class="list" hidden></ol>
+          <p id="entry-error" class="error" role="alert" hidden></p>
+          <button id="entry-save" type="button" hidden>Enregistrer le chemin</button>
+          <button id="entry-cancel" type="button" class="link" hidden>Annuler l’apprentissage</button>
+          <button id="entry-start" type="button" class="link" hidden></button>
+        </section>
+
         <!-- Remplissage de l'extranet ouvert dans l'onglet actif -->
         <section id="run" class="card" hidden>
           <p class="label">Remplissage de l'extranet</p>

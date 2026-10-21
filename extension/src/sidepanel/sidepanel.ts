@@ -1,6 +1,6 @@
 import { describeJob } from '../background/jobs';
 import { CaptureView, describeRun, parseAmountInput, ProblemRow, RunView } from './run-view';
-import { AccessRequest, ActivePage, CaptureResponse, ExtensionMessage, PanelState, PortMessage, SIDE_PANEL_PORT, SignInResponse } from '../shared/messages';
+import { AccessRequest, ActivePage, CaptureResponse, EntryPanelState, EntryResponse, ExtensionMessage, PanelState, PortMessage, SIDE_PANEL_PORT, SignInResponse } from '../shared/messages';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -24,6 +24,7 @@ const send = <T>(message: ExtensionMessage): Promise<T> => chrome.runtime.sendMe
 function render(state: PanelState): void {
   const signedIn = state.auth.status === 'signed_in';
   renderRun(state);
+  renderEntry(state.entry);
   loginSection.hidden = signedIn;
   connectedSection.hidden = !signedIn;
 
@@ -111,6 +112,41 @@ function renderRun(state: PanelState): void {
   $('capture-now').hidden = !view.canCapture;
   renderCapture(view.capture);
 }
+
+// ── Chemin d'accès au formulaire (profil d'extranet) ────────────────────────
+const ENTRY_STATUS: Record<EntryPanelState['mode'], string> = {
+  none: 'Aucun chemin enregistré pour cet extranet et ce produit.',
+  recording: 'Apprentissage en cours',
+  replaying: 'Rejeu du chemin enregistré',
+  done: 'Chemin d’accès terminé',
+  failed: 'Rejeu interrompu',
+};
+
+function renderEntry(entry: EntryPanelState | null): void {
+  $('entry').hidden = !entry;
+  if (!entry) return;
+  const recording = entry.mode === 'recording';
+  $('entry-status').textContent =
+    entry.mode === 'replaying' ? `${ENTRY_STATUS.replaying} : clic ${entry.index + 1} sur ${entry.labels.length}` : ENTRY_STATUS[entry.mode];
+  setText($('entry-message'), entry.message);
+  const list = $('entry-actions');
+  list.hidden = entry.labels.length === 0 || (!recording && entry.mode !== 'replaying');
+  list.replaceChildren(...entry.labels.map((label, index) => el('li', label, entry.mode === 'replaying' && index < entry.index ? 'muted' : undefined)));
+  $('entry-save').hidden = !recording;
+  $('entry-cancel').hidden = !recording;
+  const start = $('entry-start');
+  start.hidden = recording || entry.mode === 'replaying';
+  start.textContent = entry.hasProfile ? 'Réapprendre le chemin d’accès' : 'Apprendre le chemin d’accès';
+}
+
+async function entryCommand(type: 'ENTRY_RECORD_START' | 'ENTRY_RECORD_SAVE' | 'ENTRY_RECORD_CANCEL'): Promise<void> {
+  const response = await send<EntryResponse>({ type }).catch(() => ({ ok: false, message: 'L’extension ne répond pas.' }) as EntryResponse);
+  setText($('entry-error'), response.ok ? null : response.message);
+}
+
+$('entry-start').addEventListener('click', () => void entryCommand('ENTRY_RECORD_START'));
+$('entry-save').addEventListener('click', () => void entryCommand('ENTRY_RECORD_SAVE'));
+$('entry-cancel').addEventListener('click', () => void entryCommand('ENTRY_RECORD_CANCEL'));
 
 // ── Capture du tarif (page de résultat) ─────────────────────────────────────
 const captureForm = $<HTMLFormElement>('capture-form');

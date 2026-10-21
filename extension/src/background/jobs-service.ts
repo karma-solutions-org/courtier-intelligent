@@ -114,32 +114,51 @@ export async function findJobForOrigin(user: ExtensionUser, origin: string, pick
   if (!insurerForOrigin(origin, insurers)) return null;
   const job = pickJobForOrigin(await loadRecentJobs(user), insurers, origin, pick);
   if (!job) return null;
+  // Produit du dossier : il choisit le profil d'extranet (chemin d'accès au formulaire).
+  const productId = await loadProductId(user, job.dossierId);
   // Chemins du produit copiés dans le job par `tarification-lancer` ; à défaut (ancien job), lecture du produit.
-  if (job.productPaths?.length) return job;
-  const productPaths = await loadProductPaths(user, job.dossierId);
-  return productPaths ? { ...job, productPaths } : job;
+  if (job.productPaths?.length || !productId) return { ...job, productId };
+  const productPaths = await loadProductPaths(user, productId);
+  return productPaths ? { ...job, productId, productPaths } : { ...job, productId };
 }
 
-/** Questions du produit par dossier : un produit change rarement pendant un remplissage. */
+/** Produit de chaque dossier : il ne change pas une fois le dossier créé. */
+const productIdCache = new Map<string, string>();
+
+/** Produit du dossier, ou null s'il est illisible (règles, réseau). */
+async function loadProductId(user: ExtensionUser, dossierId: string): Promise<string | null> {
+  const path = `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}`;
+  const cached = productIdCache.get(path);
+  if (cached) return cached;
+  try {
+    const dossier = await getDoc(doc(getFirebase().firestore, path));
+    const productId = dossier.get('productId');
+    if (typeof productId !== 'string' || !productId) return null;
+    productIdCache.set(path, productId);
+    return productId;
+  } catch {
+    return null;
+  }
+}
+
+/** Questions de chaque produit : un produit change rarement pendant un remplissage. */
 const productPathsCache = new Map<string, string[]>();
 
 /**
- * Chemins de toutes les questions du produit du dossier (questionnaire complet, conditions comprises), ou null si le
- * dossier ou le produit est illisible (règles, réseau) : l'appelant se rabat alors sur les clés de quoteData.
+ * Chemins de toutes les questions du produit (questionnaire complet, conditions comprises), ou null si le produit est
+ * illisible (règles, réseau) : l'appelant se rabat alors sur les clés de quoteData.
  */
-async function loadProductPaths(user: ExtensionUser, dossierId: string): Promise<string[] | null> {
-  const cached = productPathsCache.get(dossierId);
+async function loadProductPaths(user: ExtensionUser, productId: string): Promise<string[] | null> {
+  const cacheKey = `${user.cabinetId}/${productId}`;
+  const cached = productPathsCache.get(cacheKey);
   if (cached) return cached;
   try {
     const { firestore } = getFirebase();
-    const dossier = await getDoc(doc(firestore, `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}`));
-    const productId = dossier.get('productId');
-    if (typeof productId !== 'string' || !productId) return null;
     const product = await getDoc(doc(firestore, productDocPath(user.cabinetId, productId)));
     const schema = product.get('questionnaireSchema') as QuestionnaireSection[] | undefined;
     if (!Array.isArray(schema)) return null;
     const paths = [...new Set(questionsOf(schema).map(question => question.canonicalPath as string))];
-    productPathsCache.set(dossierId, paths);
+    productPathsCache.set(cacheKey, paths);
     return paths;
   } catch {
     return null;
