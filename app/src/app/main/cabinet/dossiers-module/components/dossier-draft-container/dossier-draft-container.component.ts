@@ -444,8 +444,10 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
     effect(() => {
       // Pièces importées à la création du client (carte grise, permis…) : reprises dans le dossier, lues, et rangées
       // dans les champs vides. Ici et non dans l'étape Documents : un dossier pré-rempli s'ouvre au questionnaire.
+      // Pas pendant le choix des extranets : la lecture commence une fois ce choix validé.
       const dossier = this.store.dossier();
       if (!dossier || !this.store.editable() || !this.store.product() || this._clientPiecesTakenFor === dossier.id) return;
+      if (this.view() === 'extranets') return;
       this._clientPiecesTakenFor = dossier.id;
       untracked(() => this.takeClientPieces(dossier.id));
     });
