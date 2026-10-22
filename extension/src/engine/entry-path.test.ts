@@ -20,6 +20,10 @@ describe('sanitizeNavAction', () => {
   it('refuse les boutons qui engagent le client', () => {
     expect(sanitizeNavAction({ label: 'Souscrire le contrat', selector: null, urlPattern: '/x' })).toBeNull();
     expect(sanitizeNavAction({ label: 'Payer', selector: null, urlPattern: '/x' })).toBeNull();
+    for (const label of ['Valider', 'Valider le devis', 'Confirmer', 'Envoyer', 'Émettre le contrat', "J'accepte", 'Adhérer', 'Finaliser']) {
+      expect(sanitizeNavAction({ label, selector: null, urlPattern: '/x' })).toBeNull();
+    }
+    expect(sanitizeNavAction({ label: 'Nouveau devis', selector: null, urlPattern: '/x' })).not.toBeNull();
     expect(sanitizeNavAction({ label: 'Tarificateur', selector: '#menu', urlPattern: '/accueil' })).toEqual({
       label: 'Tarificateur',
       selector: '#menu',

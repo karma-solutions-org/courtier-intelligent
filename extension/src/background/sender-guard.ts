@@ -40,6 +40,7 @@ export const TAB_COMMANDS: ReadonlySet<string> = new Set<ExtensionMessage['type'
   'ENTRY_RECORDED',
   'ENTRY_CLICKED',
   'ENTRY_FAILED',
+  'ENTRY_FORM_REACHED',
 ]);
 
 /** Commandes d'onglet qui exigent en plus un remplissage en cours sur cet onglet (job suivi). */
@@ -56,6 +57,7 @@ export const JOB_COMMANDS: ReadonlySet<string> = new Set<ExtensionMessage['type'
   'ENTRY_RECORDED',
   'ENTRY_CLICKED',
   'ENTRY_FAILED',
+  'ENTRY_FORM_REACHED',
 ]);
 
 type Sender = Pick<chrome.runtime.MessageSender, 'tab' | 'url' | 'frameId' | 'id'>;

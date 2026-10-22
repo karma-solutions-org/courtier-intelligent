@@ -41,6 +41,11 @@ export interface RunnerPorts {
   origin?: string;
   /** Une étape remplie sans manque ni échec : l'extension clique elle-même sur « Suivant » (jamais sur le bouton final). */
   autoAdvance?: boolean;
+  /**
+   * Formulaire de devis reconnu (au moins FORM_MIN_MAPPED champs reliés au dossier), une fois par remplissage : fin de
+   * l'apprentissage automatique du chemin d'accès.
+   */
+  formReached?(): void;
   quietMs?: number;
   settleTimeoutMs?: number;
 }
@@ -50,6 +55,8 @@ const MAX_FOLLOW_UPS = 3;
 /** Part de champs mappés par la mémoire dont le remplissage échoue à partir de laquelle la mémoire est invalidée. */
 const MEMORY_FAILURE_RATIO = 0.3;
 const MEMORY_MAX_FIELDS = 300;
+/** Champs reliés au dossier à partir desquels la page est un formulaire de devis (pas une recherche ou une connexion). */
+const FORM_MIN_MAPPED = 3;
 
 /**
  * Remplit l'extranet d'un assureur pour un job de tarification, étape par étape.
@@ -103,6 +110,7 @@ export class FormRunner {
   /** Étapes (empreintes) où « Suivant » a déjà été cliqué : un seul essai, l'extranet peut la refuser. */
   private readonly advancedFrom = new Set<string>();
   private lastState: RunState | null = null;
+  private formReachedSent = false;
 
   constructor(
     private job: JobContext,
@@ -287,7 +295,12 @@ export class FormRunner {
       mappings = mappings.map(m => this.aiResults.get(m.fieldKey) ?? m);
     }
     this.mappings = this.applyManual(mappings);
-    if (!this.mappings.some(m => m.status === 'mapped' && m.canonicalPath !== null)) await this.reportIssue('mapping', 'no_field_mapped');
+    const mappedCount = this.mappings.filter(m => m.status === 'mapped' && m.canonicalPath !== null).length;
+    if (mappedCount === 0) await this.reportIssue('mapping', 'no_field_mapped');
+    if (!this.formReachedSent && mappedCount >= FORM_MIN_MAPPED) {
+      this.formReachedSent = true;
+      this.ports.formReached?.();
+    }
 
     // 2. Plan : quoi remplir, quoi demander au courtier, quoi laisser.
     const plan = planFill(analysis.fields, this.mappings, this.job.quoteData);

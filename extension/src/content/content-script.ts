@@ -114,6 +114,11 @@ async function startRunner(job: JobContext): Promise<void> {
       void (await send({ type: 'FIELDS_DISCOVERED', fingerprint, fields, requiredPaths })),
     origin: location.origin,
     autoAdvance: true,
+    // Formulaire de devis atteint : l'apprentissage automatique du chemin d'accès s'arrête et l'enregistre.
+    formReached: () => {
+      stopRecording();
+      void send({ type: 'ENTRY_FORM_REACHED' }).catch(() => undefined);
+    },
     // Lecture de la mise en page par l'IA : gardée dans le navigateur (structure seulement), par extranet et formulaire.
     layoutCache: {
       load: async fingerprint => {
@@ -224,6 +229,8 @@ async function waitForFields(timeoutMs = 15_000): Promise<boolean> {
 // ── Chemin d'accès au formulaire (profil d'extranet) ────────────────────────
 /** Apprentissage : chaque clic de navigation du courtier est envoyé au service worker. */
 const recordClick = (event: MouseEvent) => {
+  // La connexion n'est pas un clic du chemin (« Se connecter ») : le rejeu attend que le courtier se connecte.
+  if (isAuthPage(document)) return;
   const action = describeClick(event.target, location.href);
   if (action) void send({ type: 'ENTRY_RECORDED', action }).catch(() => undefined);
 };
@@ -251,7 +258,8 @@ async function runEntry(): Promise<'recording' | 'done'> {
     if (!instruction || instruction.mode === 'none') return 'done';
     if (instruction.mode === 'record') {
       startRecording();
-      return 'recording';
+      // Apprentissage automatique : la page se remplit quand même, le chemin s'enregistre au formulaire de devis.
+      return instruction.auto ? 'done' : 'recording';
     }
     // Page de connexion : le courtier se connecte lui-même, le chemin reprendra sur la page suivante.
     if (isAuthPage(document)) return 'done';

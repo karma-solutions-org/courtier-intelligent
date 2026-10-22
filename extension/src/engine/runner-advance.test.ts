@@ -58,15 +58,19 @@ describe('FormRunner : passage automatique à l’étape suivante', () => {
   let runner: FormRunner;
   let clicked: string[];
 
+  let formReached: ReturnType<typeof vi.fn<() => void>>;
+
   const create = (onNext: () => void) => {
     ax = mountAssureurA(document);
     document.getElementById('next')!.addEventListener('click', onNext);
+    formReached = vi.fn<() => void>();
     runner = new FormRunner(job(), {
       doc: document,
       report: async update => void reports.push(update),
       publish: state => void states.push(state),
       askAi: vi.fn<AskAi>(async () => '{"mappings":[]}'),
       autoAdvance: true,
+      formReached,
       quietMs: 40,
       settleTimeoutMs: 1000,
     });
@@ -98,6 +102,8 @@ describe('FormRunner : passage automatique à l’étape suivante', () => {
     expect(ax.step).toBe(3);
     expect(clicked.filter(id => id === 'next')).toHaveLength(2);
     expect(clicked).not.toContain('submit');
+    // Formulaire de devis reconnu dès la première étape, signalé une seule fois.
+    expect(formReached).toHaveBeenCalledTimes(1);
   });
 
   it('rend la main au courtier quand l’extranet refuse l’étape', async () => {

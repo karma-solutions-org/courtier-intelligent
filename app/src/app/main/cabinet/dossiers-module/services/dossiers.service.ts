@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { Assure, CanonicalPath, NeedInput, CanonicalValue, Dossier, DossierEvent, DossierStatus, Insurer, Member, Product } from '@shared';
-import { combineLatest, map, Observable, of } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
 
@@ -79,26 +79,14 @@ export class DossiersService {
       .pipe(map((events) => ({ events, hasMore: events.length >= limit })));
   }
 
-  /**
-   * Produits vus par le cabinet (questionnaire compris) : catalogue global et produits du cabinet,
-   * archivés compris pour que leurs dossiers restent lisibles (un nouveau dossier les écarte).
-   */
-  watchProducts(cabinetId: string): Observable<Product[]> {
-    return combineLatest([
-      this._database.watchCollection<Product>('ci_products'),
-      this._database.watchCollection<Product>(`ci_cabinets/${cabinetId}/ci_products`),
-    ]).pipe(map(([global, cabinet]) => [...global, ...cabinet]));
+  /** Produits du catalogue (questionnaire compris), publiés depuis le dépôt back : les mêmes pour tous les cabinets. */
+  watchProducts(): Observable<Product[]> {
+    return this._database.watchCollection<Product>('ci_products');
   }
 
-  /**
-   * Assureurs vus par le cabinet (tarification, historique) : catalogue global et assureurs du cabinet,
-   * archivés compris pour que l'historique garde leur nom (la tarification les écarte).
-   */
-  watchInsurers(cabinetId: string): Observable<Insurer[]> {
-    return combineLatest([
-      this._database.watchCollection<Insurer>('ci_insurers'),
-      this._database.watchCollection<Insurer>(`ci_cabinets/${cabinetId}/ci_insurers`),
-    ]).pipe(map(([global, cabinet]) => [...global, ...cabinet]));
+  /** Assureurs et leurs extranets (tarification, historique), publiés comme les produits. */
+  watchInsurers(): Observable<Insurer[]> {
+    return this._database.watchCollection<Insurer>('ci_insurers');
   }
 
   watchMembers(cabinetId: string): Observable<Member[]> {

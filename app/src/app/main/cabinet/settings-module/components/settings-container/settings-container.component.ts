@@ -57,12 +57,6 @@ import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
             [enabledInsurers]="store.cabinet()?.enabledInsurers ?? []"
             [isPending]="store.isPending()"
             (saved)="store.saveCatalogChoices($event)"
-            (insurerAdded)="store.addInsurer($event)"
-            (insurerUpdated)="store.updateInsurer($event)"
-            (insurerArchived)="store.archiveInsurer($event)"
-            (productCreated)="store.createProduct($event)"
-            (productUpdated)="store.updateProduct($event)"
-            (productArchived)="store.archiveProduct($event)"
           />
         </div>
       </mat-tab>

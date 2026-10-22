@@ -123,18 +123,18 @@ describe('pickJobForOrigin', () => {
   it('plusieurs assureurs sur le même domaine : prend le job de celui qui en a un (démos sur localhost)', () => {
     const localInsurers: InsurerInfo[] = [
       { id: 'assureur-test-local', name: 'Assureur Test', extranetDomains: ['localhost:8091'] },
-      { id: 'cab-habitation-demo', name: 'Habitation Démo', extranetDomains: ['localhost:8091'] },
+      { id: 'assureur-habitat-demo', name: 'Habitation Démo', extranetDomains: ['localhost:8091'] },
     ];
-    const picked = pickJobForOrigin([job('cab-habitation-demo', 'requested', 'd-hab')], localInsurers, 'http://localhost:8091/index.html', {
+    const picked = pickJobForOrigin([job('assureur-habitat-demo', 'requested', 'd-hab')], localInsurers, 'http://localhost:8091/index.html', {
       allowLocalhost: true,
     });
 
-    expect(picked).toMatchObject({ insurerId: 'cab-habitation-demo', insurerName: 'Habitation Démo', dossierId: 'd-hab' });
+    expect(picked).toMatchObject({ insurerId: 'assureur-habitat-demo', insurerName: 'Habitation Démo', dossierId: 'd-hab' });
   });
 
   it("l'application elle-même n'est jamais un extranet, même sur le domaine d'un extranet de démo", () => {
-    const localInsurers: InsurerInfo[] = [{ id: 'cab-habitation-demo', name: 'Habitation Démo', extranetDomains: ['localhost:8091'] }];
-    const jobs = [job('cab-habitation-demo', 'requested', 'd-hab')];
+    const localInsurers: InsurerInfo[] = [{ id: 'assureur-habitat-demo', name: 'Habitation Démo', extranetDomains: ['localhost:8091'] }];
+    const jobs = [job('assureur-habitat-demo', 'requested', 'd-hab')];
     expect(pickJobForOrigin(jobs, localInsurers, 'http://localhost:4200/espace/parametres', { allowLocalhost: true })).toBeNull();
     expect(pickJobForOrigin(jobs, localInsurers, 'http://localhost:8091/devis-etape1.html', { allowLocalhost: true })).not.toBeNull();
   });

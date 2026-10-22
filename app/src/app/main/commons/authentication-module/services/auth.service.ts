@@ -47,7 +47,10 @@ export class AuthService {
 
   /** Crée le cabinet de l'utilisateur connecté (adresse vérifiée), qui en devient l'admin. */
   createCabinet(cabinetName: string): Observable<void> {
-    return this._backend.call('cabinets-creerMonCabinet', { name: cabinetName.trim() }).pipe(
+    // Token rechargé avant l'appel : celui en cache peut dater d'avant le clic sur le lien de vérification
+    // (page rouverte ou rechargée) et le serveur refuserait alors une adresse pourtant vérifiée.
+    return this._authProvider.refreshToken().pipe(
+      switchMap(() => this._backend.call('cabinets-creerMonCabinet', { name: cabinetName.trim() })),
       // Le cabinet et le rôle viennent d'être posés côté serveur : on recharge le token.
       switchMap(() => this._authProvider.refreshToken()),
       tap(() => savePendingCabinetName(null)),

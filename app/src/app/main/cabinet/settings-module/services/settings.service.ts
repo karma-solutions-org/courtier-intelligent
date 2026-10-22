@@ -1,26 +1,11 @@
 import { inject, Injectable } from '@angular/core';
-import { AuditLogEntry, Cabinet, CabinetRole, Insurer, Invitation, Member, MemberStatus, mergeInsurers, mergeProducts, Product } from '@shared';
-import { combineLatest, map, Observable, switchMap } from 'rxjs';
+import { AuditLogEntry, Cabinet, CabinetRole, Insurer, Invitation, Member, MemberStatus, Product } from '@shared';
+import { map, Observable, switchMap } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
 import { StorageProvider } from '../../../../core/providers/storage.provider';
 import { CabinetInfoModel } from '../models/cabinet-info.model';
 import { CatalogChoicesModel } from '../models/catalog-choices.model';
-
-/** Saisie d'un produit propre au cabinet (éditeur). */
-export interface CabinetProductInput {
-  id: string;
-  name: string;
-  questionnaireSchema: Product['questionnaireSchema'];
-  guaranteeCatalog: Product['guaranteeCatalog'];
-}
-
-/** Saisie d'un assureur propre au cabinet. */
-export interface CabinetInsurerInput {
-  name: string;
-  extranetUrl: string;
-  productsSupported: string[];
-}
 
 @Injectable({ providedIn: 'root' })
 export class SettingsService {
@@ -80,48 +65,14 @@ export class SettingsService {
     return this._backend.call('equipe-reinitialiserAppareil', { uid });
   }
 
-  /** Produits proposés au cabinet : catalogue global et produits créés par le cabinet (hors archivés). */
-  watchProducts(cabinetId: string): Observable<Product[]> {
-    return combineLatest([
-      this._database.watchCollection<Product>('ci_products'),
-      this._database.watchCollection<Product>(`ci_cabinets/${cabinetId}/ci_products`),
-    ]).pipe(map(([global, cabinet]) => mergeProducts(global, cabinet)));
+  /** Produits du catalogue, publiés depuis le dépôt back : le cabinet choisit ceux qu'il utilise, sans les modifier. */
+  watchProducts(): Observable<Product[]> {
+    return this._database.watchCollection<Product>('ci_products').pipe(map(sortByName));
   }
 
-  /** Produit propre au cabinet : création (copie d'un produit ou vierge), modification, retrait (functions produits-*). */
-  createProduct(name: string, baseProductId: string | null): Observable<{ id: string }> {
-    return this._backend.call('produits-creer', { name, baseProductId });
-  }
-
-  /** Un produit du catalogue global est copié dans le cabinet : l'identifiant renvoyé est celui de la copie. */
-  updateProduct(product: CabinetProductInput): Observable<{ ok: boolean; id: string }> {
-    return this._backend.call('produits-modifier', product);
-  }
-
-  archiveProduct(id: string): Observable<{ ok: boolean }> {
-    return this._backend.call('produits-archiver', { id });
-  }
-
-  /** Assureurs proposés au cabinet : catalogue global et assureurs ajoutés par le cabinet (hors archivés). */
-  watchInsurers(cabinetId: string): Observable<Insurer[]> {
-    return combineLatest([
-      this._database.watchCollection<Insurer>('ci_insurers'),
-      this._database.watchCollection<Insurer>(`ci_cabinets/${cabinetId}/ci_insurers`),
-    ]).pipe(map(([global, cabinet]) => mergeInsurers(global, cabinet)));
-  }
-
-  /** Assureur propre au cabinet : ajout, modification, retrait (functions assureurs-*, admin). */
-  addInsurer(insurer: CabinetInsurerInput): Observable<{ id: string }> {
-    return this._backend.call('assureurs-ajouter', insurer);
-  }
-
-  /** Un assureur du catalogue global est copié dans le cabinet : l'identifiant renvoyé est celui de la copie. */
-  updateInsurer(id: string, insurer: CabinetInsurerInput): Observable<{ ok: boolean; id: string }> {
-    return this._backend.call('assureurs-modifier', { id, ...insurer });
-  }
-
-  archiveInsurer(id: string): Observable<{ ok: boolean }> {
-    return this._backend.call('assureurs-archiver', { id });
+  /** Assureurs et leurs extranets, publiés comme les produits : le cabinet choisit, sans ajouter ni modifier. */
+  watchInsurers(): Observable<Insurer[]> {
+    return this._database.watchCollection<Insurer>('ci_insurers').pipe(map(sortByName));
   }
 
   /** Assureurs et produits que le cabinet utilise : seuls ceux-ci sont ensuite proposés. */
@@ -133,3 +84,5 @@ export class SettingsService {
     return this._backend.call('equipe-activerMembre', { uid, status });
   }
 }
+
+const sortByName = <T extends { name: string }>(items: T[]): T[] => [...items].sort((a, b) => a.name.localeCompare(b.name, 'fr'));

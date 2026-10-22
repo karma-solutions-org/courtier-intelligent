@@ -1,68 +1,58 @@
 import { TestBed } from '@angular/core/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { Insurer, Product } from '@shared';
-import { CabinetInsurerInput } from '../../services/settings.service';
+import { CatalogChoicesModel } from '../../models/catalog-choices.model';
 import { CatalogPanelComponent } from './catalog-panel.component';
 
-const product = (id: string): Product => ({ id, name: 'Habitation', active: true, questionnaireSchema: [], guaranteeCatalog: [] });
+const PRODUCT: Product = { id: 'auto', name: 'Auto', active: true, questionnaireSchema: [], guaranteeCatalog: [] };
 
-/** Assureur créé avant que son produit soit supprimé : il pointe encore vers l'ancien produit (archivé). */
-const INSURER: Insurer = {
-  id: 'cab-assureur-a',
-  name: 'Assureur Habitation A',
-  extranetUrl: 'http://localhost:8091/',
-  extranetDomains: ['localhost:8091'],
-  productsSupported: ['cab-habitation-old'],
-  custom: true,
+const ALLIANZ: Insurer = {
+  id: 'allianz',
+  name: 'Allianz',
+  logo: 'insurers/allianz.webp',
+  extranetUrl: 'https://authentification-courtage.allianz.fr/am/XUI/?realm=courtiers',
+  extranetDomains: ['authentification-courtage.allianz.fr'],
+  productsSupported: ['auto'],
 };
 
+async function setup() {
+  TestBed.configureTestingModule({ providers: [{ provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } }] });
+  const fixture = TestBed.createComponent(CatalogPanelComponent);
+  fixture.componentRef.setInput('products', [PRODUCT]);
+  fixture.componentRef.setInput('insurers', [ALLIANZ, { ...ALLIANZ, id: 'luxior', name: 'Luxior', logo: null }]);
+  await fixture.whenStable();
+  return { fixture, element: fixture.nativeElement as HTMLElement };
+}
+
 describe('CatalogPanelComponent', () => {
-  it("modifier un assureur dont le produit a été supprimé : n'envoie que les produits encore proposés", async () => {
-    TestBed.configureTestingModule({ providers: [{ provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } }] });
-    const fixture = TestBed.createComponent(CatalogPanelComponent);
-    // Seul le nouveau produit est proposé : l'ancien, archivé, n'est plus dans la liste.
-    fixture.componentRef.setInput('products', [product('cab-habitation-new')]);
-    fixture.componentRef.setInput('insurers', [INSURER]);
-    await fixture.whenStable();
-
-    const sent: { id: string; insurer: CabinetInsurerInput }[] = [];
-    fixture.componentInstance.insurerUpdated.subscribe(event => sent.push(event));
-    const panel = fixture.componentInstance as unknown as {
-      openForm(insurer: Insurer): void;
-      formProducts: { set(ids: string[]): void; (): string[] };
-      submit(): void;
-    };
-
-    panel.openForm(INSURER);
-    // L'ancien produit n'est plus coché en douce.
-    expect(panel.formProducts()).toEqual([]);
-
-    panel.formProducts.set(['cab-habitation-new']);
-    panel.submit();
-    expect(sent).toEqual([{ id: 'cab-assureur-a', insurer: expect.objectContaining({ productsSupported: ['cab-habitation-new'] }) }]);
+  it("le catalogue est en lecture seule : ni ajout, ni modification, ni retrait d'assureur ou de produit", async () => {
+    const { element } = await setup();
+    expect(element.querySelector('form')).toBeNull();
+    expect(element.querySelector('[aria-label^="Modifier"]')).toBeNull();
+    expect(element.querySelector('[aria-label^="Retirer"]')).toBeNull();
+    expect(element.textContent).not.toContain('Ajouter un assureur');
+    expect(element.textContent).not.toContain('Nouveau produit');
   });
 
-  it('un assureur du catalogue global peut aussi être modifié et retiré', async () => {
-    TestBed.configureTestingModule({ providers: [{ provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } }] });
-    const fixture = TestBed.createComponent(CatalogPanelComponent);
-    const global: Insurer = { ...INSURER, id: 'assureur-a', name: 'Assureur A', custom: undefined };
-    fixture.componentRef.setInput('insurers', [global]);
-    await fixture.whenStable();
-
-    const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('[aria-label="Modifier Assureur A"]')).not.toBeNull();
-    expect(element.querySelector('.badge')).toBeNull();
-    expect(element.querySelectorAll('.danger-text').length).toBe(1);
+  it("chaque assureur affiche son logo (ou son initiale) et un lien vers son extranet", async () => {
+    const { element } = await setup();
+    expect(element.querySelector<HTMLImageElement>('img.logo')?.getAttribute('src')).toBe('insurers/allianz.webp');
+    expect(element.querySelector('.initial')?.textContent?.trim()).toBe('L');
+    const link = element.querySelector<HTMLAnchorElement>('[aria-label="Ouvrir l\'extranet de Allianz"]');
+    expect(link?.href).toBe(ALLIANZ.extranetUrl);
+    expect(link?.rel).toBe('noopener noreferrer');
   });
 
-  it('un produit du catalogue global (Auto) peut aussi être modifié et retiré', async () => {
-    TestBed.configureTestingModule({ providers: [{ provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } }] });
-    const fixture = TestBed.createComponent(CatalogPanelComponent);
-    fixture.componentRef.setInput('products', [{ ...product('auto'), name: 'Auto' }]);
+  it("n'enregistre que les choix encore au catalogue (un assureur ou produit retiré est oublié)", async () => {
+    const { fixture } = await setup();
+    fixture.componentRef.setInput('enabledInsurers', ['allianz', 'assureur-a']);
+    fixture.componentRef.setInput('enabledProducts', ['auto', 'habitation']);
     await fixture.whenStable();
 
-    const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('[aria-label="Modifier Auto"]')).not.toBeNull();
-    expect(element.querySelector('[aria-label="Retirer Auto"]')).not.toBeNull();
+    const sent: CatalogChoicesModel[] = [];
+    fixture.componentInstance.saved.subscribe(choices => sent.push(choices));
+    (fixture.componentInstance as unknown as { save(): void }).save();
+
+    expect(sent).toEqual([{ enabledInsurers: ['allianz'], enabledProducts: ['auto'] }]);
   });
 });

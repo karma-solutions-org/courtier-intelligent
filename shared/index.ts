@@ -14,8 +14,6 @@ export * from './proposal';
 export * from './assure-format';
 export * from './assure-documents';
 export * from './discovered-fields';
-export * from './cabinet-insurers';
-export * from './cabinet-products';
 export * from './vehicle-lookup';
 export * from './ai-prompts';
 export * from './extranet-profiles';

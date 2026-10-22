@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "description": "Remplit les extranets des assureurs à partir des dossiers Courtier Intelligent.",
   "minimum_chrome_version": "116",
-  "host_permissions": [
+  "optional_host_permissions": [
     "https://*/*",
     "http://localhost/*"
   ],
@@ -26,6 +26,7 @@
   "externally_connectable": {
     "matches": [
       "http://localhost:4200/*",
+      "http://127.0.0.1:4200/*",
       "https://courtier-intelligent-test.web.app/*",
       "https://courtier-intelligent-test.firebaseapp.com/*"
     ]

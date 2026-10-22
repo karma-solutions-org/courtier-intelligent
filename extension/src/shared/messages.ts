@@ -55,6 +55,11 @@ export interface TabEntry {
   productId: string;
   origin: string;
   mode: 'none' | 'recording' | 'replaying' | 'done' | 'failed';
+  /**
+   * Apprentissage automatique (premier passage, aucun chemin enregistré) : la page continue de remplir et le chemin
+   * s'enregistre seul quand le formulaire de devis est reconnu. Sinon, lancé depuis le side panel.
+   */
+  auto?: boolean;
   /** Clics enregistrés (apprentissage) ou à rejouer. */
   actions: NavAction[];
   /** Prochain clic à rejouer. */
@@ -78,7 +83,7 @@ export type EntryResponse = { ok: true } | { ok: false; message: string };
 /** Réponse à ENTRY_GET : ce que la page doit faire du chemin d'accès. */
 export type EntryInstruction =
   | { mode: 'none' }
-  | { mode: 'record' }
+  | { mode: 'record'; auto: boolean }
   | { mode: 'replay'; action: NavAction; index: number; total: number };
 
 /** Modification du job écrite par l'extension (les règles Firestore n'autorisent que ces champs). */
@@ -212,7 +217,9 @@ export type ExtensionMessage =
   | { type: 'ENTRY_GET' }
   | { type: 'ENTRY_RECORDED'; action: NavAction }
   | { type: 'ENTRY_CLICKED'; index: number }
-  | { type: 'ENTRY_FAILED'; index: number; reason: 'not_found' | 'skipped' };
+  | { type: 'ENTRY_FAILED'; index: number; reason: 'not_found' | 'skipped' }
+  // Content script → service worker : le formulaire de devis est reconnu (fin de l'apprentissage automatique).
+  | { type: 'ENTRY_FORM_REACHED' };
 
 /** Réponse à GET_ACCESS_REQUEST : l'onglet actif est l'extranet d'un assureur auquel l'extension n'a pas accès. */
 export interface AccessRequest {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { buttonLabels, detectStepHint, isFinalStep, isLoading, isNewStep, waitForSettled } from './steps';
+import { buttonLabels, detectStepHint, findNextButton, isFinalStep, isLoading, isNewStep, waitForSettled } from './steps';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -34,6 +34,21 @@ describe('detectStepHint', () => {
   it('ignore une barre de progression indéterminée ou d’un chargement', () => {
     document.body.innerHTML = '<div role="progressbar"></div><div role="progressbar" aria-valuenow="50" aria-valuemax="100"></div>';
     expect(detectStepHint(document)).toEqual({ current: null, total: null });
+  });
+});
+
+describe('findNextButton', () => {
+  it.each(['Continuer vers la souscription', 'Suivant : paiement', 'Continuer et valider', 'Valider cette étape', 'Poursuivre et confirmer'])(
+    'ne clique jamais « %s »',
+    label => {
+      document.body.innerHTML = `<button type="button">${label}</button>`;
+      expect(findNextButton(document)).toBeNull();
+    },
+  );
+
+  it('clique un simple « Suivant »', () => {
+    document.body.innerHTML = '<button type="button">Suivant</button><button type="button">Obtenir mon tarif</button>';
+    expect(findNextButton(document)?.textContent).toBe('Suivant');
   });
 });
 

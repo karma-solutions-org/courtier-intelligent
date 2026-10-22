@@ -141,7 +141,6 @@ export const DossierStore = signalStore(
         store.insurers(),
         store.dossier()?.productId ?? '',
         cabinetStatus.cabinet()?.enabledInsurers ?? [],
-        product()?.replaces ?? null,
       ),
     );
     /**
@@ -169,13 +168,10 @@ export const DossierStore = signalStore(
       needEditable: computed(() =>
         ['complet', 'besoin_valide'].includes(store.dossier()?.status ?? ''),
       ),
-      /**
-       * Suggestions de besoin selon les réponses du questionnaire (le courtier les accepte ou les modifie).
-       * Une copie de produit du cabinet (`cab-…`) reçoit les suggestions du produit qu'elle remplace.
-       */
+      /** Suggestions de besoin selon les réponses du questionnaire (le courtier les accepte ou les modifie). */
       needSuggestion: computed(() =>
         suggestNeed(
-          product()?.replaces ?? store.dossier()?.productId ?? '',
+          store.dossier()?.productId ?? '',
           store.answers(),
           (product()?.guaranteeCatalog ?? []).map((g) => g.code),
         ),
@@ -443,8 +439,8 @@ export const DossierStore = signalStore(
                   }),
                 ),
               ),
-              guard(service.watchProducts(cabinet).pipe(tap((products) => patchState(store, { products })))),
-              guard(service.watchInsurers(cabinet).pipe(tap((insurers) => patchState(store, { insurers })))),
+              guard(service.watchProducts().pipe(tap((products) => patchState(store, { products })))),
+              guard(service.watchInsurers().pipe(tap((insurers) => patchState(store, { insurers })))),
               guard(service.watchMembers(cabinet).pipe(tap((members) => patchState(store, { members })))),
             );
           }),

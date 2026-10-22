@@ -1,7 +1,7 @@
 import type { ExtranetProfile, NavAction } from '@shared';
 import { describe, expect, it } from 'vitest';
 import type { JobContext } from '../shared/messages';
-import { entryClicked, entryFailed, entryRecorded, initialEntry, instructionFor, profileFrom, startRecording } from './entry-service';
+import { entryClicked, entryFailed, entryFormReached, entryRecorded, initialEntry, instructionFor, profileFrom, startRecording } from './entry-service';
 
 const ORIGIN = 'https://zeole.zephir.fr';
 const job: JobContext & { productId: string } = {
@@ -24,8 +24,26 @@ const profile: ExtranetProfile = {
 };
 
 describe('entry-service', () => {
-  it('sans profil, rien à rejouer', () => {
-    expect(instructionFor(initialEntry(job, ORIGIN, null))).toEqual({ mode: 'none' });
+  it('sans profil, apprentissage automatique ; formulaire reconnu → profil enregistré', () => {
+    let entry = initialEntry(job, ORIGIN, null);
+    expect(instructionFor(entry)).toEqual({ mode: 'record', auto: true });
+    entry = entryRecorded(entryRecorded(entry, action('Tarificateur')), action('Auto'));
+    const reached = entryFormReached(entry, null);
+    expect(reached.profile).toMatchObject({ version: 1, origin: ORIGIN, entry: [action('Tarificateur'), action('Auto')] });
+    expect(reached.entry.mode).toBe('done');
+    expect(instructionFor(reached.entry)).toEqual({ mode: 'none' });
+  });
+
+  it('formulaire ouvert directement (aucun clic) : rien à apprendre', () => {
+    const reached = entryFormReached(initialEntry(job, ORIGIN, null), null);
+    expect(reached.profile).toBeNull();
+    expect(reached.entry.mode).toBe('done');
+  });
+
+  it('l’apprentissage lancé à la main ne s’arrête pas tout seul', () => {
+    const manual = startRecording(initialEntry(job, ORIGIN, profile));
+    expect(instructionFor(manual)).toEqual({ mode: 'record', auto: false });
+    expect(entryFormReached(manual, profile).entry).toBe(manual);
   });
 
   it('rejoue le profil clic par clic, puis laisse remplir', () => {
@@ -39,8 +57,8 @@ describe('entry-service', () => {
     expect(instructionFor(entry)).toEqual({ mode: 'none' });
   });
 
-  it('un profil d’une autre origine n’est pas rejoué', () => {
-    expect(initialEntry(job, 'https://autre.fr', profile).mode).toBe('none');
+  it('un profil d’une autre origine n’est pas rejoué (on réapprend)', () => {
+    expect(initialEntry(job, 'https://autre.fr', profile).mode).toBe('recording');
   });
 
   it('un bouton introuvable interrompt le rejeu avec un message', () => {
@@ -52,7 +70,7 @@ describe('entry-service', () => {
 
   it('apprend un chemin (doublons ignorés) et en fait un profil versionné', () => {
     let entry = startRecording(initialEntry(job, ORIGIN, null));
-    expect(instructionFor(entry)).toEqual({ mode: 'record' });
+    expect(instructionFor(entry)).toEqual({ mode: 'record', auto: false });
     entry = entryRecorded(entryRecorded(entryRecorded(entry, action('Tarificateur')), action('Tarificateur')), action('Auto'));
     expect(entry.actions.map(a => a.label)).toEqual(['Tarificateur', 'Auto']);
     expect(profileFrom(entry, profile)).toMatchObject({ version: 2, origin: ORIGIN, entry: [action('Tarificateur'), action('Auto')] });

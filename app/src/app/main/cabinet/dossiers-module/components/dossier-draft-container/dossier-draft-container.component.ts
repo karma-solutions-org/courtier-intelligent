@@ -444,10 +444,10 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
     effect(() => {
       // Pièces importées à la création du client (carte grise, permis…) : reprises dans le dossier, lues, et rangées
       // dans les champs vides. Ici et non dans l'étape Documents : un dossier pré-rempli s'ouvre au questionnaire.
-      // Pas pendant le choix des extranets : la lecture commence une fois ce choix validé.
+      // La lecture commence à l'arrivée sur le questionnaire (pas pendant les extranets ni les documents).
       const dossier = this.store.dossier();
       if (!dossier || !this.store.editable() || !this.store.product() || this._clientPiecesTakenFor === dossier.id) return;
-      if (this.view() === 'extranets') return;
+      if (this.view() !== 'questionnaire') return;
       this._clientPiecesTakenFor = dossier.id;
       untracked(() => this.takeClientPieces(dossier.id));
     });
@@ -493,6 +493,8 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
     const cabinetId = this._authStore.cabinetId();
     if (!cabinetId) return;
     const fields: OcrField[] = [];
+    // Écran de lecture affiché tout de suite, sans attendre la reprise des pièces côté serveur.
+    this.readingPieces.set(true);
     this._documents
       .takeClientPieces(dossierId)
       .pipe(
@@ -502,7 +504,6 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
           const toRead = documents.filter(document => document.status === 'uploaded');
           if (!toRead.length) return EMPTY;
           for (const document of documents) if (document.status === 'analyzed') fields.push(...document.ocrFields);
-          this.readingPieces.set(true);
           return from(toRead).pipe(
             concatMap(document =>
               this._documents.analyze(dossierId, document.id).pipe(

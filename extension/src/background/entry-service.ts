@@ -13,7 +13,10 @@ const PROFILE_PREFIX = 'extranetProfile:';
 
 // ── Transitions (pures) ─────────────────────────────────────────────────────
 
-/** État d'un onglet qui commence un job : rejeu du profil s'il y en a un. */
+/**
+ * État d'un onglet qui commence un job : rejeu du profil s'il y en a un ; sinon apprentissage automatique (premier
+ * passage sur cet extranet pour ce produit) : les clics du courtier sont retenus jusqu'au formulaire de devis.
+ */
 export function initialEntry(job: JobContext & { productId: string }, origin: string, profile: ExtranetProfile | null): TabEntry {
   const replay = !!profile && profile.origin === origin && profile.entry.length > 0;
   return {
@@ -21,16 +24,19 @@ export function initialEntry(job: JobContext & { productId: string }, origin: st
     insurerId: job.insurerId,
     productId: job.productId,
     origin,
-    mode: replay ? 'replaying' : 'none',
+    mode: replay ? 'replaying' : 'recording',
+    auto: !replay,
     actions: replay ? profile.entry : [],
     index: 0,
-    message: null,
+    message: replay
+      ? null
+      : 'Premier passage sur cet extranet : allez jusqu’au formulaire de devis, le chemin sera retenu et rejoué les fois suivantes.',
   };
 }
 
 /** Ce que la page doit faire : enregistrer les clics, rejouer le prochain, ou rien (remplir). */
 export function instructionFor(entry: TabEntry | null): EntryInstruction {
-  if (entry?.mode === 'recording') return { mode: 'record' };
+  if (entry?.mode === 'recording') return { mode: 'record', auto: entry.auto === true };
   if (entry?.mode === 'replaying' && entry.index < entry.actions.length) {
     return { mode: 'replay', action: entry.actions[entry.index], index: entry.index, total: entry.actions.length };
   }
@@ -62,6 +68,7 @@ export function startRecording(entry: TabEntry): TabEntry {
   return {
     ...entry,
     mode: 'recording',
+    auto: false,
     actions: [],
     index: 0,
     message: 'Apprentissage : cliquez comme d’habitude jusqu’au formulaire de devis, puis « Enregistrer le chemin ».',
@@ -88,6 +95,25 @@ export function profileFrom(entry: TabEntry, previous: ExtranetProfile | null): 
     status: 'draft',
     entry: actions,
   };
+}
+
+/**
+ * Formulaire de devis reconnu pendant l'apprentissage automatique : le chemin suivi jusque-là devient le profil.
+ * Aucun clic retenu (extranet ouvert directement sur le formulaire) : rien à apprendre, l'onglet passe à « done ».
+ */
+export function entryFormReached(entry: TabEntry, previous: ExtranetProfile | null): { entry: TabEntry; profile: ExtranetProfile | null } {
+  if (entry.mode !== 'recording' || !entry.auto) return { entry, profile: null };
+  const profile = profileFrom(entry, previous);
+  const done: TabEntry = {
+    ...entry,
+    mode: 'done',
+    auto: false,
+    index: entry.actions.length,
+    message: profile
+      ? `Chemin d’accès retenu (${profile.entry.length} clic${profile.entry.length > 1 ? 's' : ''}) : il sera rejoué à la prochaine tarification sur cet extranet.`
+      : null,
+  };
+  return { entry: done, profile };
 }
 
 export function entryPanelState(entry: TabEntry, hasProfile: boolean): EntryPanelState {

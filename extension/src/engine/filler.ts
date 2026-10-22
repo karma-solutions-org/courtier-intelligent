@@ -1,3 +1,4 @@
+import { FORBIDDEN_NAV_LABEL } from '@shared';
 import { analyzeForm, customValueOf, isLabelStyledChoice, type FieldOption, type FormField } from './analyzer';
 import type { FillValue } from './plan';
 import { containsPhrase, normalize, words } from './text';
@@ -318,7 +319,7 @@ async function pickSuggestion(element: HTMLElement, text: string, before: Set<HT
   try {
     while (Date.now() - started < timeoutMs) {
       if (!changed && Date.now() - started > 400) return false;
-      const match = suggestionsFor(element.ownerDocument, wanted).find(el => !before.has(el) && !el.contains(element));
+      const match = suggestionsFor(element.ownerDocument, wanted).find(el => !before.has(el) && !el.contains(element) && !isForbiddenClick(el));
       if (match) {
         match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
         match.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
@@ -500,8 +501,22 @@ async function fillSelect(field: FormField, element: HTMLSelectElement, value: F
   return selected() ? ok(field) : fail(field, "L'option n'a pas pu être sélectionnée.");
 }
 
+/**
+ * Bouton ou lien qui valide l'opération (« Valider », « Souscrire », envoi du formulaire…) : jamais cliqué en
+ * remplissant un champ. L'extension ne fait que récupérer le tarif.
+ */
+function isForbiddenClick(element: HTMLElement): boolean {
+  const control = element.closest<HTMLElement>('button, input[type="submit"], input[type="button"], a[href], [role="button"], [role="link"]');
+  if (!control) return false;
+  if (control instanceof HTMLInputElement && control.type === 'submit') return true;
+  if (control instanceof HTMLButtonElement && control.type === 'submit' && control.form) return true;
+  const label = control instanceof HTMLInputElement ? control.value : control.textContent;
+  return FORBIDDEN_NAV_LABEL.test(`${label ?? ''} ${control.getAttribute('aria-label') ?? ''}`);
+}
+
 /** Clic comme un vrai pointeur (les composants maison écoutent souvent mousedown / pointerdown, pas seulement click). */
 function realClick(element: HTMLElement): void {
+  if (isForbiddenClick(element)) return;
   for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
     element.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
   }
@@ -608,7 +623,7 @@ async function fillAutocomplete(field: FormField, element: HTMLInputElement, val
   const wanted = normalize(text);
   while (Date.now() < deadline) {
     const root: ParentNode = (controlled && doc.getElementById(controlled)) || doc;
-    const suggestions = [...root.querySelectorAll<HTMLElement>('[role="option"], [role="listbox"] li')];
+    const suggestions = [...root.querySelectorAll<HTMLElement>('[role="option"], [role="listbox"] li')].filter(s => !isForbiddenClick(s));
     const match =
       suggestions.find(s => normalize(s.textContent) === wanted) ?? suggestions.find(s => normalize(s.textContent).includes(wanted));
     if (match) {

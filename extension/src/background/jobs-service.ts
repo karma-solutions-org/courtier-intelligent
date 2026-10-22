@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getFirebase } from '../shared/firebase';
-import { productDocPath, questionsOf, type ExtensionReportIssue, type ExtensionReportStep, type QuestionnaireSection } from '@shared';
+import { questionsOf, type ExtensionReportIssue, type ExtensionReportStep, type QuestionnaireSection } from '@shared';
 import type { CapturedOffer, ExtensionUser, JobContext, JobUpdate } from '../shared/messages';
 import { insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin, PickOptions } from './origin-match';
 
@@ -32,14 +32,6 @@ export const RECENT_JOBS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 const INSURERS_CACHE_KEY = 'insurers';
 
-/** Cabinet du compte connecté (claim `ci_cabinet_id`), ou null sans connexion. */
-async function currentCabinetId(): Promise<string | null> {
-  const user = getFirebase().auth.currentUser;
-  if (!user) return null;
-  const claim = (await user.getIdTokenResult()).claims['ci_cabinet_id'];
-  return typeof claim === 'string' ? claim : null;
-}
-
 const toInsurerInfo = (d: DocumentSnapshot): InsurerInfo => ({
   id: d.id,
   name: String(d.get('name') ?? d.id),
@@ -47,29 +39,34 @@ const toInsurerInfo = (d: DocumentSnapshot): InsurerInfo => ({
 });
 
 /**
- * Assureurs reconnus : catalogue global et assureurs ajoutés par le cabinet (hors archivés).
+ * Assureurs reconnus : le catalogue, le même pour tous les cabinets.
  * Gardés en mémoire de session : le service worker redémarre souvent et chaque page web ouverte lui demande
- * « est-ce un extranet ? » — on ne relit pas Firestore à chaque fois. Le cache est propre au cabinet connecté.
+ * « est-ce un extranet ? » — on ne relit pas Firestore à chaque fois.
  */
-export async function loadInsurers(): Promise<InsurerInfo[]> {
-  const cabinetId = await currentCabinetId();
+export async function loadInsurers({ fresh = false }: { fresh?: boolean } = {}): Promise<InsurerInfo[]> {
   const cached = (await chrome.storage.session.get(INSURERS_CACHE_KEY))[INSURERS_CACHE_KEY] as
-    | { at: number; cabinetId: string | null; value: InsurerInfo[] }
+    | { at: number; value: InsurerInfo[] }
     | undefined;
-  if (cached && cached.cabinetId === cabinetId && Date.now() - cached.at < INSURERS_TTL_MS) return cached.value;
-  const { firestore } = getFirebase();
-  const [global, cabinet] = await Promise.all([
-    getDocs(collection(firestore, 'ci_insurers')),
-    cabinetId ? getDocs(collection(firestore, `ci_cabinets/${cabinetId}/ci_insurers`)).catch(() => null) : Promise.resolve(null),
-  ]);
-  // Assureurs du catalogue modifiés ou retirés par le cabinet : remplacés par sa fiche (champ `replaces`).
-  const replaced = new Set(cabinet?.docs.map(d => d.get('replaces') as string | undefined).filter(Boolean) ?? []);
-  const value = [
-    ...global.docs.filter(d => !replaced.has(d.id)).map(toInsurerInfo),
-    ...(cabinet?.docs.filter(d => d.get('archived') !== true).map(toInsurerInfo) ?? []),
-  ];
-  await chrome.storage.session.set({ [INSURERS_CACHE_KEY]: { at: Date.now(), cabinetId, value } });
+  if (!fresh && cached && Date.now() - cached.at < INSURERS_TTL_MS) return cached.value;
+  const snapshot = await getDocs(collection(getFirebase().firestore, 'ci_insurers'));
+  const value = snapshot.docs.map(toInsurerInfo);
+  await chrome.storage.session.set({ [INSURERS_CACHE_KEY]: { at: Date.now(), value } });
   return value;
+}
+
+/** Délai minimal entre deux relectures forcées du catalogue (une page inconnue ne relit pas Firestore à chaque chargement). */
+const INSURERS_REFRESH_MIN_MS = 30 * 1000;
+let lastForcedRefresh = 0;
+
+/**
+ * Assureurs, avec celui de `origin` s'il existe : un extranet publié au catalogue depuis la dernière lecture est
+ * reconnu tout de suite, sans attendre la fin du cache (relecture forcée au plus toutes les 30 s).
+ */
+export async function loadInsurersFor(origin: string): Promise<InsurerInfo[]> {
+  const insurers = await loadInsurers();
+  if (insurerForOrigin(origin, insurers) || Date.now() - lastForcedRefresh < INSURERS_REFRESH_MIN_MS) return insurers;
+  lastForcedRefresh = Date.now();
+  return loadInsurers({ fresh: true });
 }
 
 /**
@@ -109,7 +106,7 @@ const toRecord = (d: DocumentSnapshot): JobRecord => ({
 
 /** Le job à exécuter sur la page d'un extranet (ou `null` : rien à faire ici). `pick` : job épinglé à l'onglet, jobs des autres onglets. */
 export async function findJobForOrigin(user: ExtensionUser, origin: string, pick: Pick<PickOptions, 'pinned' | 'exclude'> = {}): Promise<JobContext | null> {
-  const insurers = await loadInsurers();
+  const insurers = await loadInsurersFor(origin);
   // Une page qui n'est l'extranet d'aucun assureur ne déclenche aucune requête de jobs.
   if (!insurerForOrigin(origin, insurers)) return null;
   const job = pickJobForOrigin(await loadRecentJobs(user), insurers, origin, pick);
@@ -118,7 +115,7 @@ export async function findJobForOrigin(user: ExtensionUser, origin: string, pick
   const productId = await loadProductId(user, job.dossierId);
   // Chemins du produit copiés dans le job par `tarification-lancer` ; à défaut (ancien job), lecture du produit.
   if (job.productPaths?.length || !productId) return { ...job, productId };
-  const productPaths = await loadProductPaths(user, productId);
+  const productPaths = await loadProductPaths(productId);
   return productPaths ? { ...job, productId, productPaths } : { ...job, productId };
 }
 
@@ -148,17 +145,16 @@ const productPathsCache = new Map<string, string[]>();
  * Chemins de toutes les questions du produit (questionnaire complet, conditions comprises), ou null si le produit est
  * illisible (règles, réseau) : l'appelant se rabat alors sur les clés de quoteData.
  */
-async function loadProductPaths(user: ExtensionUser, productId: string): Promise<string[] | null> {
-  const cacheKey = `${user.cabinetId}/${productId}`;
-  const cached = productPathsCache.get(cacheKey);
+async function loadProductPaths(productId: string): Promise<string[] | null> {
+  const cached = productPathsCache.get(productId);
   if (cached) return cached;
   try {
     const { firestore } = getFirebase();
-    const product = await getDoc(doc(firestore, productDocPath(user.cabinetId, productId)));
+    const product = await getDoc(doc(firestore, `ci_products/${productId}`));
     const schema = product.get('questionnaireSchema') as QuestionnaireSection[] | undefined;
     if (!Array.isArray(schema)) return null;
     const paths = [...new Set(questionsOf(schema).map(question => question.canonicalPath as string))];
-    productPathsCache.set(cacheKey, paths);
+    productPathsCache.set(productId, paths);
     return paths;
   } catch {
     return null;

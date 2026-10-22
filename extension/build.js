@@ -10,14 +10,16 @@ const dist = path.join(root, 'dist');
 const isWatch = process.argv.includes('--watch');
 // `--emulators` : l'extension vise les emulators Firebase locaux (auth 9099, firestore 8080, functions 5001).
 const useEmulators = process.argv.includes('--emulators');
-// `--demo` : vrai projet Firebase de test, mais localhost autorisé (app sur localhost:4200, faux extranet sur localhost:8090).
-const allowLocalhost = useEmulators || process.argv.includes('--demo');
+// Localhost est TOUJOURS autorisé en développement (npm run build, watch, etc.).
+// Seul un build de release pour le store (--release ou --prod) retire localhost.
+const isRelease = process.argv.includes('--release') || process.argv.includes('--prod');
+const allowLocalhost = !isRelease;
 
 const isLocalhost = pattern => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//i.test(pattern);
 
 /**
  * Manifest du build : le source garde les entrées localhost (développement) ; hors `--emulators` et `--demo`, elles sont retirées
- * de `externally_connectable.matches` et `host_permissions` (le service worker lit la liste via getManifest()).
+ * de `externally_connectable.matches` et `optional_host_permissions` (le service worker lit la liste via getManifest()).
  */
 function buildManifest() {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
@@ -25,8 +27,8 @@ function buildManifest() {
     if (manifest.externally_connectable?.matches) {
       manifest.externally_connectable.matches = manifest.externally_connectable.matches.filter(p => !isLocalhost(p));
     }
-    if (manifest.host_permissions) {
-      manifest.host_permissions = manifest.host_permissions.filter(p => !isLocalhost(p));
+    if (manifest.optional_host_permissions) {
+      manifest.optional_host_permissions = manifest.optional_host_permissions.filter(p => !isLocalhost(p));
     }
   }
   return manifest;

@@ -74,8 +74,7 @@ export const PricingStore = signalStore(
       cards: computed<PricingCard[]>(() => {
         const productId = dossierStore.dossier()?.productId ?? '';
         const enabled = cabinetStatus.cabinet()?.enabledInsurers ?? [];
-        const replacedProductId = dossierStore.product()?.replaces ?? null;
-        return insurersForProduct(dossierStore.insurers(), productId, enabled, replacedProductId).map((insurer) => ({
+        return insurersForProduct(dossierStore.insurers(), productId, enabled).map((insurer) => ({
           insurer,
           job: store.jobs().find((j) => j.id === insurer.id) ?? null,
           offer: store.offers().find((o) => o.id === insurer.id) ?? null,

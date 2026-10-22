@@ -28,7 +28,7 @@ import {
 } from '../shared/messages';
 import { createAuthController, MESSAGES, toAiMessage, toUserMessage, UserFacingError } from './auth-controller';
 import { APP_DEVICE_KEY, firebaseAuthPort, firebaseBackendPort, firestoreSessionPort } from './firebase-adapters';
-import { addExtensionReport, askAi, explainJobDenied, findJobForOrigin, listRecentJobs, loadInsurers, updateJob, watchJob, watchRecentJobs, writeCapturedOffer } from './jobs-service';
+import { addExtensionReport, askAi, explainJobDenied, findJobForOrigin, listRecentJobs, loadInsurers, loadInsurersFor, updateJob, watchJob, watchRecentJobs, writeCapturedOffer } from './jobs-service';
 import { startLiveWatch } from './live';
 import { invalidateMemory, loadMemory, reportDiscoveredFields, saveMemory, touchMemory } from './memory-service';
 import { countRequested, extranetPatterns, insurerForOrigin, JobRef } from './origin-match';
@@ -38,6 +38,7 @@ import { memoryKeyFor } from '../engine/memory';
 import {
   entryClicked,
   entryFailed,
+  entryFormReached,
   entryPanelState,
   entryRecorded,
   initialEntry,
@@ -522,7 +523,8 @@ async function accessRequest(): Promise<AccessRequest | null> {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   const origin = originOnly(tab?.url);
   if (!origin) return null;
-  const insurer = insurerForOrigin(origin, await loadInsurers());
+  // Un extranet publié au catalogue il y a quelques minutes est reconnu tout de suite.
+  const insurer = insurerForOrigin(origin, await loadInsurersFor(origin));
   if (!insurer) return null;
   const origins = extranetPatterns(insurer.extranetDomains);
   if (origins.length === 0 || (await chrome.permissions.contains({ origins }))) return null;
@@ -531,10 +533,12 @@ async function accessRequest(): Promise<AccessRequest | null> {
 
 /** Accès accordé depuis le side panel : enregistrement, puis injection immédiate dans l'onglet actif (sans recharger). */
 async function onAccessGranted(): Promise<boolean> {
-  await syncContentScripts();
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   const origin = originOnly(tab?.url);
-  if (tab?.id === undefined || !origin || !insurerForOrigin(origin, await loadInsurers())) return false;
+  // Catalogue à jour avant l'enregistrement du script : il doit couvrir l'extranet qui vient d'être autorisé.
+  const insurers = origin ? await loadInsurersFor(origin) : [];
+  await syncContentScripts();
+  if (tab?.id === undefined || !origin || !insurerForOrigin(origin, insurers)) return false;
   try {
     await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: [CONTENT_SCRIPT_FILE] });
     return true;
@@ -562,10 +566,16 @@ async function ensureInjected(tabId: number, url: string | undefined): Promise<v
   // Laisse au script enregistré le temps de se signaler (PAGE_DETECTED) avant d'injecter nous-mêmes.
   await new Promise(resolve => setTimeout(resolve, 1500));
   if (pagesByTab.has(tabId)) return;
+  // Vérifie si l'onglet existe toujours (l'utilisateur a pu le fermer pendant le délai).
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab) return;
   const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [CONTENT_SCRIPT_ID] });
   if (!registered.length) await syncContentScripts();
   await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: [CONTENT_SCRIPT_FILE] }).catch(error => {
-    console.error('Injection du content script impossible', error);
+    const msg = error instanceof Error ? error.message : String(error);
+    if (!msg.includes('No tab with id') && !msg.includes('tab was closed')) {
+      console.warn('Injection du content script impossible', error);
+    }
   });
 }
 
@@ -636,12 +646,19 @@ async function entryCommand(type: 'ENTRY_RECORD_START' | 'ENTRY_RECORD_SAVE' | '
 }
 
 /** Messages de la page sur le chemin d'accès : seulement la page principale, pour le job suivi par l'onglet. */
-async function entryFromTab(tabId: number, message: Extract<ExtensionMessage, { type: `ENTRY_${'GET' | 'RECORDED' | 'CLICKED' | 'FAILED'}` }>): Promise<unknown> {
+async function entryFromTab(
+  tabId: number,
+  message: Extract<ExtensionMessage, { type: `ENTRY_${'GET' | 'RECORDED' | 'CLICKED' | 'FAILED' | 'FORM_REACHED'}` }>,
+): Promise<unknown> {
   const entry = await readTabEntry(tabId);
   if (!entry || !jobMatches(jobByTab.get(tabId), entry.dossierId, entry.insurerId)) return message.type === 'ENTRY_GET' ? instructionFor(null) : false;
   if (message.type === 'ENTRY_GET') return instructionFor(entry);
   let next = entry;
-  if (message.type === 'ENTRY_RECORDED') {
+  if (message.type === 'ENTRY_FORM_REACHED') {
+    const reached = entryFormReached(entry, await loadProfile(entry.insurerId, entry.productId));
+    if (reached.profile) await saveProfile(reached.profile);
+    next = reached.entry;
+  } else if (message.type === 'ENTRY_RECORDED') {
     const action = sanitizeNavAction(message.action);
     if (action) next = entryRecorded(entry, action);
   } else if (message.type === 'ENTRY_CLICKED') {
@@ -722,7 +739,9 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     case 'ENTRY_RECORDED':
     case 'ENTRY_CLICKED':
     case 'ENTRY_FAILED':
-      if (sender.frameId !== 0) {
+    case 'ENTRY_FORM_REACHED':
+      // Le formulaire peut être dans une iframe : sa reconnaissance compte, le reste du chemin se joue en page principale.
+      if (sender.frameId !== 0 && message.type !== 'ENTRY_FORM_REACHED') {
         sendResponse(message.type === 'ENTRY_GET' ? instructionFor(null) : false);
         return false;
       }

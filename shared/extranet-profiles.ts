@@ -35,11 +35,12 @@ export const NAV_URL_PATTERN_MAX = 200;
 export const ENTRY_MAX_ACTIONS = 15;
 
 /**
- * Boutons que l'extension ne clique JAMAIS, même enregistrés : ils engagent le client (souscription, signature,
- * paiement) ou détruisent des données. Le courtier les clique lui-même.
+ * Boutons que l'extension ne clique JAMAIS, même enregistrés : ils valident l'opération ou engagent le client
+ * (validation, confirmation, envoi, souscription, signature, paiement) ou détruisent des données. L'extension ne fait
+ * que récupérer le tarif : le courtier clique ces boutons lui-même. Début de mot (accents compris), toute la suite.
  */
 export const FORBIDDEN_NAV_LABEL =
-  /\b(souscri\w*|sign(er|ature)|pa(yer|iement)|r[ée]gler|commander|supprimer|effacer|r[ée]silier|d[ée]connexion|se d[ée]connecter)\b/i;
+  /(?<!\p{L})(valid|confirm|envo[iy]|transm|[ée]mett|[ée]mission|accept|adh[ée]r|adh[ée]sion|finalis|termin|engag|contracter|souscri|sign(er|ature)|pa(yer|iement)|r[ée]gl(er|ement)|command|supprim|effac|r[ée]sili|d[ée]connex|se d[ée]connecter)/iu;
 
 const cleanLabel = (text: string) => text.replace(/\s+/g, ' ').trim();
 

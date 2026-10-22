@@ -1,4 +1,5 @@
 /** Parcours en plusieurs étapes : où en est-on, la page est-elle chargée, est-ce la dernière étape ? */
+import { FORBIDDEN_NAV_LABEL } from '@shared';
 
 export interface StepHint {
   current: number | null;
@@ -6,7 +7,7 @@ export interface StepHint {
 }
 
 const STEP_TEXT = /(?:etape|étape|step)\s*(\d+)\s*(?:\/|sur|of|de)\s*(\d+)/i;
-const NEXT_BUTTON = /^(suivant|continuer|etape suivante|étape suivante|next|poursuivre|passer a l etape|valider cette etape|valider cette étape)/i;
+const NEXT_BUTTON = /^(suivant|continuer|etape suivante|étape suivante|next|poursuivre|passer a l etape)/i;
 const FINAL_BUTTON =
   /((obtenir|calculer|voir|decouvrir|découvrir|connaitre|connaître)\b.{0,25}(tarif|devis|prix|offre|cotisation))|^(valider|envoyer|souscrire|terminer|finaliser|confirmer)\b/i;
 const LOADING = '[aria-busy="true"], .loading, .spinner, [class*="loader"], [class*="spinner"], [role="progressbar"]:not([aria-valuenow])';
@@ -28,11 +29,14 @@ export function buttonLabels(doc: Document): string[] {
 }
 
 /**
- * Bouton « Suivant » de l'étape, s'il y en a un seul sans ambiguïté. Jamais un bouton qui lance le calcul ou
- * soumet (« Obtenir mon tarif », « Valider ») : celui-là, c'est le courtier qui le clique.
+ * Bouton « Suivant » de l'étape, s'il y en a un seul sans ambiguïté. Jamais un bouton qui lance le calcul, valide
+ * ou engage le client (« Obtenir mon tarif », « Valider », « Continuer vers la souscription ») : le courtier le clique.
  */
 export function findNextButton(doc: Document): HTMLElement | null {
-  const candidates = visibleButtons(doc).filter(el => NEXT_BUTTON.test(labelOf(el)) && !FINAL_BUTTON.test(labelOf(el)));
+  const candidates = visibleButtons(doc).filter(el => {
+    const label = labelOf(el);
+    return NEXT_BUTTON.test(label) && !FINAL_BUTTON.test(label) && !FORBIDDEN_NAV_LABEL.test(label);
+  });
   return candidates.length === 1 ? candidates[0] : null;
 }
 
