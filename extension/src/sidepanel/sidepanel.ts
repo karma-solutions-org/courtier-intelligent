@@ -137,6 +137,8 @@ function renderEntry(entry: EntryPanelState | null): void {
   const start = $('entry-start');
   start.hidden = recording || entry.mode === 'replaying';
   start.textContent = entry.hasProfile ? 'Réapprendre le chemin d’accès' : 'Apprendre le chemin d’accès';
+  catalogSnippet = entry.catalogSnippet;
+  $('entry-copy').hidden = recording || !catalogSnippet;
 }
 
 async function entryCommand(type: 'ENTRY_RECORD_START' | 'ENTRY_RECORD_SAVE' | 'ENTRY_RECORD_CANCEL'): Promise<void> {
@@ -144,6 +146,17 @@ async function entryCommand(type: 'ENTRY_RECORD_START' | 'ENTRY_RECORD_SAVE' | '
   setText($('entry-error'), response.ok ? null : response.message);
 }
 
+/** Chemin appris dans ce navigateur, à coller dans `entryPaths` du JSON de l'assureur. */
+let catalogSnippet: string | null = null;
+$('entry-copy').addEventListener('click', () => {
+  if (!catalogSnippet) return;
+  navigator.clipboard.writeText(catalogSnippet).then(
+    () => setText($('entry-error'), null),
+    () => setText($('entry-error'), 'Copie impossible : autorisez le presse-papiers.'),
+  );
+  $('entry-copy').textContent = 'Chemin copié';
+  setTimeout(() => ($('entry-copy').textContent = 'Copier le chemin pour le catalogue'), 2000);
+});
 $('entry-start').addEventListener('click', () => void entryCommand('ENTRY_RECORD_START'));
 $('entry-save').addEventListener('click', () => void entryCommand('ENTRY_RECORD_SAVE'));
 $('entry-cancel').addEventListener('click', () => void entryCommand('ENTRY_RECORD_CANCEL'));

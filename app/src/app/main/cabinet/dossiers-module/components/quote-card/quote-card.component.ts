@@ -60,8 +60,12 @@ const TEXT = {
     <article class="card" [attr.data-tone]="tone()" [attr.aria-label]="card().insurer.name">
       <header>
         <h3>
-          <span class="insurer-mark" aria-hidden="true">{{ card().insurer.name.charAt(0) }}</span
-          >{{ card().insurer.name }}
+          @if (card().insurer.logo; as logo) {
+            <img class="insurer-logo" [src]="logo" alt="" loading="lazy" />
+          } @else {
+            <span class="insurer-mark" aria-hidden="true">{{ card().insurer.name.charAt(0) }}</span>
+          }
+          {{ card().insurer.name }}
         </h3>
         <span class="status" [class]="tone()">{{ statusLabel() }}</span>
       </header>
@@ -311,6 +315,15 @@ const TEXT = {
       font-weight: 600;
       color: var(--ci-navy-900);
       background: var(--ci-navy-50);
+    }
+
+    .insurer-logo {
+      flex-shrink: 0;
+      width: 64px;
+      height: 32px;
+      border-radius: 8px;
+      object-fit: contain;
+      background: #fff;
     }
 
     .status {

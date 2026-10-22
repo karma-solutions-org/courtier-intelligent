@@ -176,3 +176,13 @@ describe('analyzeForm : les champs de recherche du site sont ignorés', () => {
     expect(analyzeForm(document).fields.map(f => f.name)).toEqual(['nom']);
   });
 });
+
+describe('Champ obligatoire sans astérisque (Angular, Zephir)', () => {
+  it('un contrôle « ng-invalid » est obligatoire, un contrôle valide non', () => {
+    document.body.innerHTML = `<label for="u">Usage</label><select id="u" name="usage" formcontrolname="usage" class="ng-invalid"><option value="">--</option><option value="1">Privé</option></select>
+      <label for="c">Commentaire</label><input id="c" name="commentaire" class="ng-valid" />`;
+    const { fields } = analyzeForm(document);
+    expect(fields.find(f => f.label === 'Usage')?.required).toBe(true);
+    expect(fields.find(f => f.label === 'Commentaire')?.required).toBe(false);
+  });
+});

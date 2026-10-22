@@ -40,6 +40,57 @@ export function findNextButton(doc: Document): HTMLElement | null {
   return candidates.length === 1 ? candidates[0] : null;
 }
 
+const SEARCH_BUTTON = /^(rechercher|recherche|chercher|trouver|valider la recherche|search)$/i;
+
+/**
+ * Bouton « Rechercher » du bloc qu'on vient de remplir (recherche du véhicule « Par caractéristique ») : parmi les
+ * boutons de recherche, celui dont le bloc contient le plus de champs remplis. Chaque bloc s'arrête avant d'englober
+ * un autre bouton de recherche. Égalité ou aucun champ rempli : `null`.
+ */
+export function findSearchButton(doc: Document, filled: readonly HTMLElement[]): HTMLElement | null {
+  const buttons = visibleButtons(doc).filter(el => SEARCH_BUTTON.test(labelOf(el)) && !FORBIDDEN_NAV_LABEL.test(labelOf(el)));
+  const scored = buttons.map(button => {
+    let block: HTMLElement = button;
+    for (let parent = button.parentElement; parent && !buttons.some(other => other !== button && parent!.contains(other)); parent = parent.parentElement) {
+      block = parent;
+    }
+    return { button, count: filled.filter(el => block.contains(el)).length };
+  });
+  scored.sort((a, b) => b.count - a.count);
+  const [best, second] = scored;
+  return best && best.count > 0 && (!second || best.count > second.count) ? best.button : null;
+}
+
+/** Lignes de résultats d'une recherche (tableau visible à en-têtes) : `null` sans tableau de résultats. */
+export function findResultRows(doc: Document): { headers: string[]; rows: HTMLTableRowElement[] } | null {
+  for (const table of doc.querySelectorAll('table')) {
+    if (table.closest('[hidden]')) continue;
+    const headers = [...table.querySelectorAll('thead th, thead td')].map(cell => clean(cell.textContent));
+    const rows = [...table.querySelectorAll<HTMLTableRowElement>('tbody tr')].filter(row => row.cells.length >= 2);
+    if (headers.length >= 2 && rows.length > 0) return { headers, rows };
+  }
+  return null;
+}
+
+/**
+ * Ligne de résultat à choisir : la plus proche de la valeur du véhicule au dossier (colonne « Valeur »), sinon la
+ * première. Le courtier n'intervient pas : il faut un véhicule pour obtenir le tarif.
+ */
+export function pickResultRow(found: { headers: string[]; rows: HTMLTableRowElement[] }, vehicleValue: number | null): HTMLTableRowElement {
+  const column = found.headers.findIndex(header => /valeur|prix/i.test(header));
+  if (vehicleValue === null || column < 0) return found.rows[0];
+  const amount = (row: HTMLTableRowElement) => Number((row.cells[column]?.textContent ?? '').replace(/[^\d]/g, ''));
+  const distance = (row: HTMLTableRowElement) => (amount(row) ? Math.abs(amount(row) - vehicleValue) : Infinity);
+  return found.rows.reduce((best, row) => (distance(row) < distance(best) ? row : best));
+}
+
+/** Clique la ligne : son bouton, lien ou bouton radio s'il en a un, sinon la ligne elle-même. */
+export function clickRow(row: HTMLTableRowElement): void {
+  const target = row.querySelector<HTMLElement>('input[type="radio"], input[type="checkbox"], button, a') ?? row.cells[0] ?? row;
+  target.click();
+  if (target !== row) row.click();
+}
+
 const ERROR_SELECTOR =
   '[aria-invalid="true"], [role="alert"], .error, .errors, .invalid-feedback, .field-error, .form-error, [class*="error-message"]';
 

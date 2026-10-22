@@ -310,13 +310,18 @@ describe('matchVersion (désignation la plus proche)', () => {
     expect(matchVersion(options, VERSION)?.label).toBe('2.0 DCI 90 L1H1 CONFORT');
   });
 
-  it('ne choisit rien quand deux désignations sont aussi proches', () => {
+  it('à égalité, prend la première désignation de la liste', () => {
     const options = opt('2.0 DCI 90 L1H1 CONFORT', '2.0 DCI 90 L2H1 CONFORT');
-    expect(matchVersion(options, VERSION)).toBeNull();
+    expect(matchVersion(options, VERSION)?.label).toBe('2.0 DCI 90 L1H1 CONFORT');
   });
 
-  it('ne choisit rien sans nombre en commun', () => {
-    expect(matchVersion(opt('FOURGON CONFORT', 'FOURGON GRAND CONFORT'), VERSION)).toBeNull();
+  it('sans nombre en commun, prend la première option (le tarif doit sortir)', () => {
+    expect(matchVersion(opt('Sélectionner', 'FOURGON CONFORT', 'FOURGON GRAND CONFORT'), VERSION)?.label).toBe('FOURGON CONFORT');
+  });
+
+  it('lit les nombres collés aux lettres (Zephir : « 2.5DCI »)', () => {
+    const options = opt('GENERATION 2.0DCI 115', 'GENERATION 2.5DCI 140 EXPRESSION', 'GENERATION 2.5DCI 140 PRIVILEGE', 'GENERATION L1H1 2.0DCI 90');
+    expect(matchVersion(options, '2.5 dCi 140 ch Gazole')?.label).toBe('GENERATION 2.5DCI 140 EXPRESSION');
   });
 });
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { buttonLabels, detectStepHint, findNextButton, isFinalStep, isLoading, isNewStep, waitForSettled } from './steps';
+import { buttonLabels, detectStepHint, findNextButton, findResultRows, findSearchButton, isFinalStep, isLoading, isNewStep, pickResultRow, waitForSettled } from './steps';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -152,5 +152,33 @@ describe('isNewStep', () => {
   it('le premier formulaire affiché est une étape', () => {
     expect(isNewStep(step([]), step(['a']))).toBe(true);
     expect(isNewStep(step([]), step([]))).toBe(false);
+  });
+});
+
+describe('Recherche du véhicule (Zephir)', () => {
+  const PAGE = `
+    <div class="panel"><input id="immat" value="CM359VC" /><button id="b1">Rechercher</button></div>
+    <div class="panel"><select id="marque"></select><select id="modele"></select><select id="designation"></select><button id="b2">Rechercher</button></div>`;
+  const el = (id: string) => document.getElementById(id)!;
+
+  it('choisit le « Rechercher » du bloc qui contient le plus de champs remplis', () => {
+    document.body.innerHTML = PAGE;
+    expect(findSearchButton(document, [el('immat'), el('marque'), el('modele'), el('designation')])?.id).toBe('b2');
+  });
+
+  it('ne choisit rien sans champ rempli', () => {
+    document.body.innerHTML = PAGE;
+    expect(findSearchButton(document, [])).toBeNull();
+  });
+
+  const TABLE = `<table><thead><tr><th>Désignation</th><th>Type mines</th><th>Valeur d'achat</th></tr></thead><tbody>
+    <tr id="r1"><td>CONFORT</td><td>FLGMA6</td><td>25,236</td></tr>
+    <tr id="r2"><td>CONFORT</td><td>FLFMA6</td><td>28,883</td></tr></tbody></table>`;
+
+  it('prend la ligne la plus proche de la valeur du véhicule, sinon la première', () => {
+    document.body.innerHTML = TABLE;
+    const found = findResultRows(document)!;
+    expect(pickResultRow(found, 29000).id).toBe('r2');
+    expect(pickResultRow(found, null).id).toBe('r1');
   });
 });

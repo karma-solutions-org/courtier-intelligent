@@ -107,6 +107,15 @@ const CHOICE_SYNONYMS: Record<string, string[]> = {
   fausse_declaration: ['fausse declaration', 'declaration inexacte'],
   alcoolemie: ['alcool', 'alcoolemie', 'stupefiants'],
   autre: ['autre', 'autres'],
+  // Catégorie socio-professionnelle.
+  salarie_prive: ['salarie', 'salarie du prive', 'salarie secteur prive', 'employe', 'salarie non cadre'],
+  salarie_public: ['fonctionnaire', 'salarie du public', 'agent public', 'secteur public'],
+  cadre: ['cadre', 'cadre superieur', 'profession intermediaire'],
+  artisan_commercant: ['artisan', 'commercant', 'artisan commercant', 'chef d entreprise'],
+  profession_liberale: ['profession liberale', 'liberal', 'travailleur independant'],
+  retraite: ['retraite', 'retraites'],
+  etudiant: ['etudiant', 'eleve', 'apprenti'],
+  sans_profession: ['sans profession', 'sans emploi', 'demandeur d emploi', 'chomeur', 'au foyer'],
   // Type de sinistre.
   materiel: ['materiel', 'dommages materiels', 'accident materiel', 'dommage materiel'],
   corporel: ['corporel', 'dommages corporels', 'accident corporel', 'dommage corporel'],
@@ -208,6 +217,13 @@ export function matchOption(options: FieldOption[], value: FillValue): FieldOpti
   if (wantedWords.length > 0) {
     const overlapping = candidates.filter(o => wantedWords.every(word => words(o.label).includes(word)));
     if (overlapping.length === 1) return overlapping[0];
+    // Dernier recours : l'option qui partage le plus de mots (début de mot, 4 lettres au moins : « prive » ↔ « privé »,
+    // « salarie » ↔ « salariés »), si elle est seule en tête.
+    const near = (a: string, b: string) => a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a));
+    const scored = candidates
+      .map(o => ({ o, score: wantedWords.filter(w => words(o.label).some(l => l === w || near(l, w))).length }))
+      .sort((a, b) => b.score - a.score);
+    if (scored[0]?.score > 0 && (scored.length === 1 || scored[0].score > scored[1].score)) return scored[0].o;
   }
   return null;
 }
@@ -243,20 +259,24 @@ export function registrationFor(field: FormField, element: HTMLElement | undefin
   return wantsCompact ? compact : value;
 }
 
+/** Mots d'une désignation, nombres détachés des lettres : « 2.5DCI » → 2, 5, dci ; « 140CH » → 140, ch. */
+const versionWords = (text: string) => words(text.replace(/[()]/g, ' ').replace(/(\d)([a-z])/gi, '$1 $2').replace(/([a-z])(\d)/gi, '$1 $2'));
+
 /**
  * Version du véhicule (« 2.0 90 ch Gazole Fourgon (FLA0A6) ») face aux désignations d'un extranet (« 2.0 DCI 90 L1H1… ») :
- * on compte les éléments communs, les nombres (cylindrée, puissance) comptant double. L'option retenue doit avoir au moins
- * un nombre en commun et devancer nettement les autres ; sinon `null` (le courtier choisit).
+ * on compte les éléments communs, les nombres (cylindrée, puissance) comptant double. Le courtier n'intervient pas :
+ * il faut toujours une désignation pour obtenir le tarif. À égalité (la finition n'est pas connue au dossier), la
+ * première de la liste l'emporte ; sans aucun nombre en commun, la première option de la liste.
  */
 export function matchVersion(options: FieldOption[], value: FillValue): FieldOption | null {
   if (typeof value !== 'string') return null;
-  const tokens = new Set(words(value.replace(/[()]/g, ' ')));
-  const isNumber = (token: string) => /^\d+(\.\d+)?$/.test(token);
-  // « 2.0 » s'écrit aussi « 2,0 » ou « 2l » : la virgule est déjà un séparateur pour `words`, on garde aussi « 2 0 ».
+  const tokens = new Set(versionWords(value));
+  const isNumber = (token: string) => /^\d+$/.test(token);
   const scored = options
     .filter(option => option.value !== '' || option.label !== '')
+    .filter(option => !/^(choisir|selectionner|select)/.test(normalize(option.label)))
     .map(option => {
-      const label = words(option.label.replace(/(\d),(\d)/g, '$1.$2'));
+      const label = versionWords(option.label);
       let score = 0;
       let numbers = 0;
       for (const token of new Set(label)) {
@@ -269,9 +289,7 @@ export function matchVersion(options: FieldOption[], value: FillValue): FieldOpt
       return { option, score, numbers };
     })
     .sort((a, b) => b.score - a.score);
-  const [best, second] = scored;
-  if (!best || best.numbers === 0 || best.score < 3) return null;
-  return !second || best.score > second.score ? best.option : null;
+  return scored[0]?.option ?? null;
 }
 
 // ── Remplissage par type de champ ───────────────────────────────────────────

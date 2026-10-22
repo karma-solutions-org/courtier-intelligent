@@ -1,4 +1,4 @@
-import { matchesUrlPattern, sanitizeEntry, sanitizeNavAction, urlPatternOf } from '@shared';
+import { matchesUrlPattern, sanitizeCatalogEntryPath, sanitizeEntry, sanitizeNavAction, urlPatternOf } from '@shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { describeClick, findActionTarget } from './entry-path';
 
@@ -65,5 +65,19 @@ describe('findActionTarget', () => {
   it('ignore un élément masqué', () => {
     document.body.innerHTML = `<div hidden><a href="/x">Auto</a></div>`;
     expect(findActionTarget(document, { label: 'Auto', selector: null, urlPattern: null })).toBeNull();
+  });
+});
+
+describe('sanitizeCatalogEntryPath', () => {
+  const entry = [{ label: 'Tarificateur', selector: null, urlPattern: '/home' }];
+
+  it('garde un chemin commun valide', () => {
+    expect(sanitizeCatalogEntryPath({ origin: 'https://zeole.zephir.fr', entry })).toEqual({ origin: 'https://zeole.zephir.fr', entry });
+  });
+
+  it('refuse une origine non https, avec un chemin, ou un bouton de validation', () => {
+    expect(sanitizeCatalogEntryPath({ origin: 'http://zeole.zephir.fr', entry })).toBeNull();
+    expect(sanitizeCatalogEntryPath({ origin: 'https://zeole.zephir.fr/home', entry })).toBeNull();
+    expect(sanitizeCatalogEntryPath({ origin: 'https://zeole.zephir.fr', entry: [{ label: 'Valider', selector: null, urlPattern: null }] })).toBeNull();
   });
 });

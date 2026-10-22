@@ -128,7 +128,7 @@ export const FIELD_SYNONYMS: Record<FixedCanonicalPath, FieldSynonyms> = {
   'vehicle.parkingType': { labels: ['stationnement', 'lieu de stationnement', 'stationnement de nuit', 'lieu de stationnement la nuit', 'garage', 'lieu de garage', 'ou stationne votre vehicule'], names: ['stationnement', 'parking', 'garage'] },
   'vehicle.energyType': { labels: ['energie', 'type d energie', 'carburant', 'type de carburant', 'motorisation energie', 'source d energie'], names: ['energie', 'energy', 'carburant', 'fuel', 'fueltype'] },
   'vehicle.parkingPostalCode': { labels: ['code postal de stationnement', 'code postal du lieu de stationnement', 'code postal de garage', 'code postal du lieu de garage', 'localisation du vehicule'], names: ['cpstationnement', 'cpgarage', 'parkingpostalcode', 'garagezip'] },
-  'vehicle.parkingCity': { labels: ['ville de stationnement', 'commune de stationnement', 'ville du lieu de garage', 'commune de garage'], names: ['villestationnement', 'villegarage', 'parkingcity'] },
+  'vehicle.parkingCity': { labels: ['ville de stationnement', 'commune de stationnement', 'ville du lieu de stationnement', 'commune du lieu de stationnement','ville du lieu de garage', 'commune de garage'], names: ['villestationnement', 'villegarage', 'parkingcity'] },
   'vehicle.purchaseDate': { labels: ['date d achat', 'date d acquisition', 'achete le', 'date d achat du vehicule'], names: ['purchasedate', 'achat', 'acquisition'] },
 
   'driver.firstName': { labels: ['prenom du conducteur', 'prenom conducteur', 'prenom du conducteur principal'], names: ['driverfirstname', 'prenomconducteur'] },

@@ -86,10 +86,14 @@ import {
             @for (insurer of store.availableInsurers(); track insurer.id) {
               <li>
                 <mat-checkbox [checked]="checkedInsurers().includes(insurer.id)" (change)="toggleInsurer(insurer.id, $event.checked)">
-                  {{ insurer.name }}
-                  @if (insurer.extranetDomains[0]; as domain) {
-                    <span class="domain">{{ domain }}</span>
-                  }
+                  <span class="insurer">
+                    @if (insurer.logo) {
+                      <img class="logo" [src]="insurer.logo" alt="" loading="lazy" />
+                    } @else {
+                      <span class="logo initial" aria-hidden="true">{{ insurer.name.charAt(0) }}</span>
+                    }
+                    {{ insurer.name }}
+                  </span>
                 </mat-checkbox>
               </li>
             }
@@ -256,10 +260,27 @@ import {
         background: var(--ci-surface);
       }
 
-      .domain {
-        display: block;
-        font-size: 12px;
-        color: var(--ci-text-muted);
+      .insurer {
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .logo {
+        flex-shrink: 0;
+        width: 56px;
+        height: 28px;
+        border-radius: 4px;
+        object-fit: contain;
+        background: #fff;
+      }
+
+      .initial {
+        display: inline-grid;
+        place-items: center;
+        font-weight: 700;
+        color: var(--ci-accent-ink);
+        background: var(--ci-accent-soft);
       }
     }
 

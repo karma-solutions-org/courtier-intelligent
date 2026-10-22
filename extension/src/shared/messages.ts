@@ -75,6 +75,8 @@ export interface EntryPanelState {
   labels: string[];
   index: number;
   message: string | null;
+  /** Chemin appris dans ce navigateur, prêt à coller dans `entryPaths` du JSON de l'assureur (catalogue commun). */
+  catalogSnippet: string | null;
 }
 
 /** Réponse aux commandes d'apprentissage du side panel (ENTRY_RECORD_*). */

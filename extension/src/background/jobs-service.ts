@@ -19,7 +19,7 @@ import { httpsCallable } from 'firebase/functions';
 import { getFirebase } from '../shared/firebase';
 import { questionsOf, type ExtensionReportIssue, type ExtensionReportStep, type QuestionnaireSection } from '@shared';
 import type { CapturedOffer, ExtensionUser, JobContext, JobUpdate } from '../shared/messages';
-import { insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin, PickOptions } from './origin-match';
+import { catalogEntryPaths, insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin, PickOptions } from './origin-match';
 
 /** Les assureurs changent rarement : on les relit au plus toutes les 10 minutes. */
 const INSURERS_TTL_MS = 10 * 60 * 1000;
@@ -36,6 +36,7 @@ const toInsurerInfo = (d: DocumentSnapshot): InsurerInfo => ({
   id: d.id,
   name: String(d.get('name') ?? d.id),
   extranetDomains: (d.get('extranetDomains') as string[] | undefined) ?? [],
+  entryPaths: catalogEntryPaths(d.get('entryPaths')),
 });
 
 /**

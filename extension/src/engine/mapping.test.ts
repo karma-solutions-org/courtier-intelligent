@@ -240,3 +240,11 @@ describe('questions ajoutées depuis un extranet, reconnues sur un autre extrane
     expect(matchExtraPath(extra('Usage du véhicule'), ['extra.kilometrage_annuel'])).toBeNull();
   });
 });
+
+describe('Zephir : lieu de stationnement', () => {
+  it('« Ville du lieu de stationnement » est la ville, pas le type de stationnement', () => {
+    expect(scoreCandidate(field({ label: 'Ville du lieu de stationnement' }), 'vehicle.parkingCity')).toBeGreaterThan(
+      scoreCandidate(field({ label: 'Ville du lieu de stationnement' }), 'vehicle.parkingType'),
+    );
+  });
+});

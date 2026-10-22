@@ -1,4 +1,4 @@
-import { QuoteJobStatus } from '@shared';
+import { CatalogEntryPath, QuoteJobStatus, sanitizeCatalogEntryPath } from '@shared';
 import type { JobContext } from '../shared/messages';
 
 /** Un assureur du catalogue (`insurers/{id}`) : ce dont l'extension a besoin pour reconnaître son extranet. */
@@ -6,6 +6,19 @@ export interface InsurerInfo {
   id: string;
   name: string;
   extranetDomains: string[];
+  /** Chemins d'accès communs au formulaire de devis, par produit (catalogue). */
+  entryPaths?: Record<string, CatalogEntryPath>;
+}
+
+/** Chemins communs lus dans le catalogue : seuls les chemins valides sont gardés. */
+export function catalogEntryPaths(input: unknown): Record<string, CatalogEntryPath> {
+  if (!input || typeof input !== 'object') return {};
+  const paths: Record<string, CatalogEntryPath> = {};
+  for (const [productId, raw] of Object.entries(input as Record<string, unknown>)) {
+    const path = sanitizeCatalogEntryPath(raw);
+    if (path) paths[productId] = path;
+  }
+  return paths;
 }
 
 /** Un job tel que lu dans Firestore (chemin cabinets/{cabinetId}/dossiers/{dossierId}/quoteJobs/{insurerId}). */

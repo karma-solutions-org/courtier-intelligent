@@ -2,11 +2,12 @@
  * Chemin d'accès au formulaire de devis (profil d'extranet, brique 1), côté service worker : état de chaque onglet
  * (apprentissage ou rejeu) et profils enregistrés.
  *
- * Les profils sont gardés pour l'instant dans ce navigateur (chrome.storage.local) : leur partage entre courtiers
- * passera par une function du backend (les règles Firestore interdisent toute écriture directe de l'extension).
+ * Chemins communs : publiés dans le catalogue (`entryPaths` de l'assureur), enregistrés une fois par Courtier
+ * Intelligent pour tous les cabinets. Un chemin appris dans ce navigateur (chrome.storage.local) prime sur eux.
  */
 import { ENTRY_MAX_ACTIONS, ExtranetProfile, extranetProfileId, NavAction, sanitizeEntry } from '@shared';
 import type { EntryInstruction, EntryPanelState, JobContext, TabEntry } from '../shared/messages';
+import { loadInsurers } from './jobs-service';
 
 const TAB_PREFIX = 'entry:';
 const PROFILE_PREFIX = 'extranetProfile:';
@@ -116,8 +117,21 @@ export function entryFormReached(entry: TabEntry, previous: ExtranetProfile | nu
   return { entry: done, profile };
 }
 
-export function entryPanelState(entry: TabEntry, hasProfile: boolean): EntryPanelState {
-  return { mode: entry.mode, hasProfile, labels: entry.actions.map(action => action.label), index: entry.index, message: entry.message };
+export function entryPanelState(entry: TabEntry, hasProfile: boolean, learned: ExtranetProfile | null = null): EntryPanelState {
+  return {
+    mode: entry.mode,
+    hasProfile,
+    labels: entry.actions.map(action => action.label),
+    index: entry.index,
+    message: entry.message,
+    catalogSnippet: learned ? catalogSnippet(learned) : null,
+  };
+}
+
+/** Chemin appris, au format de `entryPaths` du catalogue : « "auto": { "origin": …, "entry": [ … ] } ». */
+export function catalogSnippet(profile: ExtranetProfile): string {
+  const path = { origin: profile.origin, entry: profile.entry };
+  return `${JSON.stringify(profile.productId)}: ${JSON.stringify(path, null, 2)}`;
 }
 
 // ── Stockage ────────────────────────────────────────────────────────────────
@@ -137,11 +151,24 @@ export async function removeTabEntry(tabId: number): Promise<void> {
   await chrome.storage.session.remove(`${TAB_PREFIX}${tabId}`).catch(() => undefined);
 }
 
+/** Chemin appris dans ce navigateur (il prime : le courtier l'a réappris), sinon le chemin commun du catalogue. */
 export async function loadProfile(insurerId: string, productId: string): Promise<ExtranetProfile | null> {
+  return (await loadLearnedProfile(insurerId, productId)) ?? catalogProfile(insurerId, productId);
+}
+
+/** Chemin appris dans ce navigateur seulement, ou null. */
+export async function loadLearnedProfile(insurerId: string, productId: string): Promise<ExtranetProfile | null> {
   const key = `${PROFILE_PREFIX}${extranetProfileId(insurerId, productId)}`;
   const stored = await chrome.storage.local.get(key).catch(() => ({}) as Record<string, unknown>);
   const profile = stored[key] as ExtranetProfile | undefined;
   return profile && sanitizeEntry(profile.entry) ? profile : null;
+}
+
+/** Chemin commun publié dans le catalogue pour cet assureur et ce produit, ou null. */
+async function catalogProfile(insurerId: string, productId: string): Promise<ExtranetProfile | null> {
+  const insurers = await loadInsurers().catch(() => []);
+  const path = insurers.find(insurer => insurer.id === insurerId)?.entryPaths?.[productId];
+  return path ? { insurerId, productId, origin: path.origin, version: 0, status: 'validated', entry: path.entry } : null;
 }
 
 export async function saveProfile(profile: ExtranetProfile): Promise<void> {

@@ -24,7 +24,7 @@ import {
   NeedAnalysis,
   NeedInput,
   Product,
-  schemaForCabinet,
+  schemaForInsurers,
   suggestNeed,
 } from '@shared';
 import {
@@ -58,7 +58,7 @@ export type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
 /** Écritures en file : exécutées l'une après l'autre, pour qu'un changement de statut voie toujours les dernières réponses. */
 type OperationInput =
-  | { kind: 'save'; event?: boolean; sectionIndex?: number; patch?: AnswerPatch }
+  | { kind: 'save'; event?: boolean; sectionIndex?: number; insurerIds?: string[]; patch?: AnswerPatch }
   | { kind: 'status'; status: DossierStatus }
   | { kind: 'assign'; uid: string }
   | { kind: 'need'; need: NeedInput }
@@ -84,8 +84,8 @@ interface DossierState {
   /** Catalogue des assureurs (onglet Tarification, historique). */
   insurers: Insurer[];
   /**
-   * Extranets choisis pour ce dossier (étape « Extranets ») : seules leurs questions sont posées. Vide : ceux du cabinet.
-   * Pas encore enregistré côté serveur : le choix est perdu au rechargement de la page.
+   * Extranets choisis pour ce dossier (étape « Extranets ») : seules leurs questions sont posées, et seuls eux sont
+   * tarifés. Vide : ceux du cabinet. Enregistré sur le dossier (`insurerIds`).
    */
   selectedInsurers: string[];
   assure: Assure | null;
@@ -144,13 +144,19 @@ export const DossierStore = signalStore(
       ),
     );
     /**
-     * Sans les questions découvertes sur l'extranet d'un assureur non retenu : ceux choisis pour le dossier,
-     * à défaut ceux du cabinet.
+     * Seulement les questions des extranets choisis pour le dossier (leur liste de questions connues et celles
+     * découvertes chez eux), à défaut de ceux du cabinet qui proposent le produit.
      */
     const schema = computed(() => {
       const selected = store.selectedInsurers();
-      const insurers = selected.length ? selected : (cabinetStatus.cabinet()?.enabledInsurers ?? []);
-      return schemaForCabinet(product()?.questionnaireSchema ?? [], insurers);
+      const insurers = selected.length
+        ? store.insurers().filter((insurer) => selected.includes(insurer.id))
+        : availableInsurers();
+      return schemaForInsurers(
+        product()?.questionnaireSchema ?? [],
+        insurers,
+        store.dossier()?.productId ?? '',
+      );
     });
     const missing = computed<CanonicalPath[]>(() => computeMissing(schema(), store.answers()));
     return {
@@ -196,7 +202,7 @@ export const DossierStore = signalStore(
     /** Envoie les réponses en attente (rien à faire s'il n'y en a pas). Une erreur les remet en attente. */
     const persist = (
       dossierId: string,
-      options: { event?: boolean; sectionIndex?: number },
+      options: { event?: boolean; sectionIndex?: number; insurerIds?: string[] },
       snapshot?: AnswerPatch,
     ): Observable<boolean> =>
       defer(() => {
@@ -205,7 +211,7 @@ export const DossierStore = signalStore(
         const current = store.selectedId() === dossierId;
         const patch = snapshot ?? (current ? store.pending() : {});
         const hasPatch = Object.keys(patch).length > 0;
-        if (!hasPatch && options.sectionIndex === undefined) {
+        if (!hasPatch && options.sectionIndex === undefined && options.insurerIds === undefined) {
           return of(true);
         }
         if (current) {
@@ -253,6 +259,7 @@ export const DossierStore = signalStore(
               ...(operation.sectionIndex !== undefined
                 ? { sectionIndex: operation.sectionIndex }
                 : {}),
+              ...(operation.insurerIds !== undefined ? { insurerIds: operation.insurerIds } : {}),
             },
             operation.patch,
           );
@@ -330,8 +337,6 @@ export const DossierStore = signalStore(
           error: null,
         }),
       setAutosave: (autosave: boolean) => patchState(store, { autosave }),
-      /** Extranets retenus pour le dossier : le questionnaire ne pose que leurs questions. */
-      selectInsurers: (selectedInsurers: string[]) => patchState(store, { selectedInsurers }),
       /** Fin du défilement de l'historique : demande la tranche suivante. */
       loadMoreEvents: () => {
         if (store.eventsHasMore() && !store.eventsLoadingMore()) {
@@ -427,6 +432,7 @@ export const DossierStore = signalStore(
                         answers: dossier.data ?? {},
                         answersFor: id,
                         sectionIndex: dossier.draft?.sectionIndex ?? 0,
+                        selectedInsurers: dossier.insurerIds ?? [],
                       });
                     } else {
                       // Écritures du serveur (OCR, collègue) : appliquées, sauf sur les champs en cours de saisie.
@@ -484,6 +490,11 @@ export const DossierStore = signalStore(
       assign: (uid: string) => enqueue({ kind: 'assign', uid }),
       saveNeed: (need: NeedInput) => enqueue({ kind: 'need', need }),
       validateNeed: () => enqueue({ kind: 'validateNeed' }),
+      /** Extranets retenus pour le dossier : le questionnaire ne pose que leurs questions, la tarification ne montre qu'eux. */
+      selectInsurers: (selectedInsurers: string[]) => {
+        patchState(store, { selectedInsurers });
+        enqueue({ kind: 'save', insurerIds: selectedInsurers });
+      },
       /** Passe à une section et mémorise où le courtier s'est arrêté. */
       goToSection: (sectionIndex: number) => {
         patchState(store, { sectionIndex });

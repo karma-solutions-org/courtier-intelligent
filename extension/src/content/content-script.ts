@@ -248,6 +248,17 @@ function stopRecording(): void {
 const ENTRY_TARGET_TIMEOUT_MS = 10_000;
 
 /**
+ * Attend que le courtier se soit connecté à l'extranet : la page de connexion disparaît (application d'une seule page).
+ * Si la connexion recharge la page, ce script s'arrête et celui de la page suivante reprend là où on en était.
+ */
+async function waitForLogin(): Promise<void> {
+  while (isAuthPage(document)) {
+    await delay(1000);
+  }
+  await waitForSettled(document);
+}
+
+/**
  * Rejoue le chemin d'accès enregistré, clic par clic, tant que la page reste la même (application d'une seule page) ;
  * une page rechargée reprend au clic suivant (l'avancement est gardé par le service worker, noté AVANT chaque clic).
  * Renvoie `recording` si le courtier apprend le chemin, `done` quand il faut remplir la page.
@@ -261,8 +272,8 @@ async function runEntry(): Promise<'recording' | 'done'> {
       // Apprentissage automatique : la page se remplit quand même, le chemin s'enregistre au formulaire de devis.
       return instruction.auto ? 'done' : 'recording';
     }
-    // Page de connexion : le courtier se connecte lui-même, le chemin reprendra sur la page suivante.
-    if (isAuthPage(document)) return 'done';
+    // Page de connexion : le courtier se connecte lui-même ; le chemin reprend dès qu'elle disparaît.
+    await waitForLogin();
     const { action, index } = instruction;
     // Le premier clic se fait sur la page où il a été appris : ailleurs (formulaire déjà ouvert), le chemin est passé.
     if (index === 0 && !matchesUrlPattern(location.href, action.urlPattern)) {
@@ -308,6 +319,8 @@ async function main(): Promise<void> {
   if (isTopFrame) {
     currentJob = job;
     if ((await runEntry()) === 'recording') return;
+    // Sans chemin à rejouer, la connexion à l'extranet est attendue aussi avant de remplir.
+    await waitForLogin();
   }
   await startRunner(job);
 }

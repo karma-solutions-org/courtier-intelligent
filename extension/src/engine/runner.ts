@@ -10,7 +10,7 @@ import { fillField, FillResult, parseRange, registrationFor } from './filler';
 import { asCanonicalPath, isCompatible, Mapping, mapExtraPaths, mapFields } from './mapping';
 import { applyMemory, MemoryPort, toDiscoveredFields, toMemoryFields, toRequiredPaths } from './memory';
 import { FillPlan, FillValue, planFill, valueOf } from './plan';
-import { detectStepHint, findNextButton, hasValidationErrors, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
+import { clickRow, detectStepHint, findNextButton, findResultRows, findSearchButton, hasValidationErrors, pickResultRow, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
 
 /** Champs d'adresse : les extranets y proposent souvent des suggestions à choisir (adresse normalisée, commune). */
 const SUGGEST_PATHS: ReadonlySet<string> = new Set(['client.address.street', 'client.address.city', 'vehicle.parkingCity']);
@@ -325,10 +325,11 @@ export class FormRunner {
       }
     }
 
-    // Champs sans équivalent dans le questionnaire : signalés dès que l'étape est remplie sans échec. Le serveur les
+    // Champs sans équivalent dans le questionnaire : signalés dès que l'étape est remplie, même si un autre champ a
+    // échoué (ce sont justement ces questions qui manquent pour avancer). Le serveur les
     // ajoute au questionnaire (obligatoires si l'extranet les exige). Indispensable sur les extranets qui rechargent la
     // page entre deux étapes : l'apprentissage « en quittant l'étape » n'y a jamais lieu pour les étapes intermédiaires.
-    if (!this.discoveredReported.has(analysis.fingerprint) && ![...results.values()].some(r => r.status === 'failed')) {
+    if (!this.discoveredReported.has(analysis.fingerprint)) {
       const discovered = toDiscoveredFields(analysis.fields, this.mappings, this.productPaths, this.job.quoteData);
       if (discovered.length) {
         this.discoveredReported.add(analysis.fingerprint);
@@ -363,13 +364,24 @@ export class FormRunner {
     if (!this.ports.autoAdvance || !this.stepReady || this.stopped || this.capturing || !this.analysis) return;
     const fingerprint = this.analysis.fingerprint;
     if (this.advancedFrom.has(fingerprint)) return;
-    const button = findNextButton(this.ports.doc);
+    // Pas de « Suivant » : une recherche (véhicule par caractéristique) à lancer, puis un résultat à choisir.
+    const search = findNextButton(this.ports.doc) ? null : findSearchButton(this.ports.doc, this.filledElements());
+    const button = search ?? findNextButton(this.ports.doc);
     if (!button) return;
     this.advancedFrom.add(fingerprint);
     const before = this.lastStep;
     button.click();
     await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
     if (this.stopped || this.capturing) return;
+    if (search) {
+      const found = findResultRows(this.ports.doc);
+      if (found) {
+        const value = valueOf(this.job.quoteData['vehicle.vehicleValue']);
+        clickRow(pickResultRow(found, typeof value === 'number' ? value : null));
+        await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
+        if (this.stopped || this.capturing) return;
+      }
+    }
     const after = { keys: analyzeForm(this.ports.doc).fields.map(f => f.key), hint: detectStepHint(this.ports.doc) };
     // Nouvelle étape : remplie tout de suite (la surveillance de la page n'est pas encore active au démarrage).
     if (isNewStep(before, after)) return this.runStep(true);
@@ -377,6 +389,13 @@ export class FormRunner {
       ? 'L’extranet a refusé cette étape : corrigez les champs signalés, puis cliquez vous-même sur « Suivant ».'
       : 'L’extranet n’est pas passé à l’étape suivante : vérifiez la page, puis cliquez vous-même sur « Suivant ».';
     if (this.lastState) this.ports.publish({ ...this.lastState, phase: 'waiting_user', message });
+  }
+
+  /** Éléments des champs remplis à l'étape affichée (pour trouver le bouton « Rechercher » de leur bloc). */
+  private filledElements(): HTMLElement[] {
+    const results = this.snapshot?.results;
+    if (!results || !this.analysis) return [];
+    return [...results].filter(([, r]) => r.status === 'filled').flatMap(([key]) => this.analysis!.elements.get(key) ?? []);
   }
 
   private aiResults = new Map<string, Mapping>();

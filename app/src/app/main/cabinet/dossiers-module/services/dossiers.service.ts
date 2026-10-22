@@ -98,7 +98,11 @@ export class DossiersService {
     return this._backend.call('dossiers-creer', { assureId, productId });
   }
 
-  save(dossierId: string, patch: AnswerPatch, options: { sectionIndex?: number; event?: boolean } = {}): Observable<SaveResult> {
+  save(
+    dossierId: string,
+    patch: AnswerPatch,
+    options: { sectionIndex?: number; event?: boolean; insurerIds?: string[] } = {},
+  ): Observable<SaveResult> {
     return this._backend.call('dossiers-sauvegarder', { dossierId, patch, ...options });
   }
 

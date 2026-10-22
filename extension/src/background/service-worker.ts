@@ -43,6 +43,7 @@ import {
   entryRecorded,
   initialEntry,
   instructionFor,
+  loadLearnedProfile,
   loadProfile,
   profileFrom,
   readTabEntry,
@@ -94,7 +95,8 @@ async function panelState(authState?: AuthState): Promise<PanelState> {
 async function entryPanelFor(tabId: number): Promise<EntryPanelState | null> {
   const entry = await readTabEntry(tabId);
   if (!entry) return null;
-  return entryPanelState(entry, (await loadProfile(entry.insurerId, entry.productId)) !== null);
+  const learned = await loadLearnedProfile(entry.insurerId, entry.productId);
+  return entryPanelState(entry, learned !== null || (await loadProfile(entry.insurerId, entry.productId)) !== null, learned);
 }
 
 async function broadcast(authState?: AuthState): Promise<void> {

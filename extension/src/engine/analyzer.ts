@@ -215,7 +215,10 @@ function isRequired(element: HTMLElement, label: string): boolean {
     (element as HTMLInputElement).required === true ||
     element.getAttribute('aria-required') === 'true' ||
     /\*\s*$/.test(label) ||
-    element.closest('label')?.textContent?.includes('*') === true
+    element.closest('label')?.textContent?.includes('*') === true ||
+    // Angular (Zephir) : sans astérisque, un champ obligatoire encore vide porte « ng-invalid » sur son contrôle.
+    element.classList.contains('ng-invalid') ||
+    element.closest('[formcontrolname], [ng-reflect-name]')?.classList.contains('ng-invalid') === true
   );
 }
 

@@ -73,7 +73,9 @@ export const PricingStore = signalStore(
     (store, dossierStore = inject(DossierStore), cabinetStatus = inject(CabinetStatusStore)) => ({
       cards: computed<PricingCard[]>(() => {
         const productId = dossierStore.dossier()?.productId ?? '';
-        const enabled = cabinetStatus.cabinet()?.enabledInsurers ?? [];
+        // Les extranets choisis pour le dossier, à défaut ceux du cabinet.
+        const chosen = dossierStore.dossier()?.insurerIds ?? [];
+        const enabled = chosen.length ? chosen : (cabinetStatus.cabinet()?.enabledInsurers ?? []);
         return insurersForProduct(dossierStore.insurers(), productId, enabled).map((insurer) => ({
           insurer,
           job: store.jobs().find((j) => j.id === insurer.id) ?? null,

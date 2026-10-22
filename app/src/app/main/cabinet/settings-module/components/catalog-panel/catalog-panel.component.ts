@@ -43,7 +43,6 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
               {{ insurer.name }}
             </span>
           </mat-checkbox>
-          <span class="muted">{{ insurer.extranetDomains[0] }}</span>
           <span class="spacer"></span>
           <a
             mat-icon-button
