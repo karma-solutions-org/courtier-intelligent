@@ -4,12 +4,12 @@ import { LANDING_PAGE_STRUCTURE } from '../landing-presentation/landing-page.str
 
 /** Aperçu (décoratif) du comparatif d'offres de la page d'accueil. */
 @Component({
-  selector: 'app-landing-offers-mock',
+  selector: 'app-landing-offers-preview',
   imports: [MatIconModule],
-  templateUrl: './landing-offers-mock.component.html',
-  styleUrl: './landing-offers-mock.component.scss',
+  templateUrl: './landing-offers-preview.component.html',
+  styleUrl: './landing-offers-preview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class LandingOffersMockComponent {
-  readonly mock = input.required<(typeof LANDING_PAGE_STRUCTURE)['mock']>();
+export class LandingOffersPreviewComponent {
+  readonly preview = input.required<(typeof LANDING_PAGE_STRUCTURE)['preview']>();
 }

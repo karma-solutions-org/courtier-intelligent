@@ -20,7 +20,7 @@ export const LANDING_PAGE_STRUCTURE = {
     secondaryCta: 'Découvrir le fonctionnement',
   },
 
-  mock: {
+  preview: {
     title: 'Comparatif — Dossier 2026-000123',
     subtitle: 'Auto · Tous risques · Budget 900 €/an',
     offers: [

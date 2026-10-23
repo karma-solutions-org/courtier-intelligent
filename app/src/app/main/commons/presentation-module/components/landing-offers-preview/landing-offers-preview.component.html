@@ -1,21 +1,21 @@
-<div class="mock" aria-hidden="true">
-  <div class="mock-header">
+<div class="preview" aria-hidden="true">
+  <div class="preview-header">
     <span class="dot"></span><span class="dot"></span><span class="dot"></span>
   </div>
-  <div class="mock-body">
-    <p class="mock-title">{{ mock().title }}</p>
-    <p class="mock-subtitle">{{ mock().subtitle }}</p>
+  <div class="preview-body">
+    <p class="preview-title">{{ preview().title }}</p>
+    <p class="preview-subtitle">{{ preview().subtitle }}</p>
     <div class="offers">
-      @for (offer of mock().offers; track offer.insurer; let first = $first) {
+      @for (offer of preview().offers; track offer.insurer; let first = $first) {
         <div class="offer" [class.chosen]="first">
           @if (first) {
-            <span class="chosen-badge">{{ mock().chosen }}</span>
+            <span class="chosen-badge">{{ preview().chosen }}</span>
           }
           <p class="offer-insurer">{{ offer.insurer }}</p>
           <p class="offer-premium">{{ offer.premium }}</p>
-          <p class="offer-meta">{{ mock().premiumLabel }}</p>
+          <p class="offer-meta">{{ preview().premiumLabel }}</p>
           <p class="offer-line">
-            <span>{{ mock().deductibleLabel }}</span><strong>{{ offer.deductible }}</strong>
+            <span>{{ preview().deductibleLabel }}</span><strong>{{ offer.deductible }}</strong>
           </p>
           <p class="gap" [class]="'gap gap-' + offer.status">
             <mat-icon>{{ offer.status === 'ok' ? 'check_circle' : offer.status === 'warn' ? 'error' : 'cancel' }}</mat-icon>

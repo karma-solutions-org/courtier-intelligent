@@ -6,7 +6,7 @@ p {
   margin: 0;
 }
 
-.mock {
+.preview {
   overflow: hidden;
   border: 1px solid var(--ci-border);
   border-radius: 12px;
@@ -14,7 +14,7 @@ p {
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
 }
 
-.mock-header {
+.preview-header {
   display: flex;
   gap: 6px;
   padding: 12px 16px;
@@ -29,15 +29,15 @@ p {
   }
 }
 
-.mock-body {
+.preview-body {
   padding: 20px;
 }
 
-.mock-title {
+.preview-title {
   font-weight: 600;
 }
 
-.mock-subtitle {
+.preview-subtitle {
   margin-top: 4px;
   font-size: 13px;
   color: var(--ci-text-muted);
