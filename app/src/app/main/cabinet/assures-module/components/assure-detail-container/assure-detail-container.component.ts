@@ -1,37 +1,24 @@
 import { DatePipe } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  input,
-  OnInit,
-  signal,
-  untracked,
-  viewChild,
-} from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, OnInit, signal, untracked, viewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
-import { TabQueryParamDirective } from '../../../../../core/directives/tab-query-param.directive';
 import { Router, RouterLink } from '@angular/router';
-import { Assure, AssureDocument, Dossier } from '@shared';
-import { combineLatest, of, switchMap } from 'rxjs';
+import { TabQueryParamDirective } from '../../../../../core/directives/tab-query-param.directive';
 import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
-import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
-import { AssuresService } from '../../services/assures.service';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
-import { StatusChipComponent } from '../../../dossiers-module/components/status-chip/status-chip.component';
+import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
+import { AssureDocumentsStore } from '../../store/assure-documents.store';
 import { AssuresStore } from '../../store/assures.store';
-import { DuplicateCandidate, displayName } from '../../util/assures.utils';
+import { dossierStats } from '../../util/assure-detail.utils';
+import { DuplicateCandidate } from '../../util/assures.utils';
+import { AssureDetailsCardComponent } from '../assure-details-card/assure-details-card.component';
+import { AssureDocumentsListComponent } from '../assure-documents-list/assure-documents-list.component';
+import { AssureDossiersTableComponent } from '../assure-dossiers-table/assure-dossiers-table.component';
 import { AssureFormComponent } from '../assure-form/assure-form.component';
+import { AssureIdentityCardComponent } from '../assure-identity-card/assure-identity-card.component';
 import { ASSURES_STRUCTURE } from '../assures.structure';
-
-/** Statuts où le dossier n'avance plus. */
-const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
 
 /**
  * Espace client : carte d'identité et actions à gauche (nouveau dossier, modifier, supprimer), onglets à droite
@@ -46,9 +33,13 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
     MatIconModule,
     MatTabsModule,
     TabQueryParamDirective,
+    AssureDetailsCardComponent,
+    AssureDocumentsListComponent,
+    AssureDossiersTableComponent,
     AssureFormComponent,
-    StatusChipComponent,
+    AssureIdentityCardComponent,
   ],
+  providers: [AssureDocumentsStore],
   template: `
     <a mat-button [routerLink]="listUrl" class="back">
       <mat-icon>arrow_back</mat-icon>
@@ -57,77 +48,19 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
 
     @if (store.selected(); as assure) {
       <div class="layout">
-        <aside class="card identity">
-          <div class="avatar" aria-hidden="true">{{ initials(assure) }}</div>
-          <h1>{{ nameOf(assure) }}</h1>
-          <p class="type">{{ typeLabels[assure.type] }}</p>
-
-          <ul class="contact">
-            @if (assure.siret) {
-              <li><mat-icon aria-hidden="true">badge</mat-icon>{{ assure.siret }}</li>
-            }
-            @if (assure.email) {
-              <li><mat-icon aria-hidden="true">mail</mat-icon>{{ assure.email }}</li>
-            }
-            @if (assure.phone) {
-              <li><mat-icon aria-hidden="true">call</mat-icon>{{ assure.phone }}</li>
-            }
-            @if (assure.address?.city) {
-              <li><mat-icon aria-hidden="true">place</mat-icon>{{ assure.address?.city }}</li>
-            }
-          </ul>
-
-          <div class="actions">
-            <a mat-flat-button [routerLink]="newDossierUrl" [queryParams]="{ assure: assure.id }">
-              <mat-icon>create_new_folder</mat-icon>
-              {{ structure.newDossier }}
-            </a>
-            <button mat-stroked-button type="button" (click)="startEdit()" [disabled]="editing()">
-              <mat-icon>edit</mat-icon>
-              {{ structure.edit }}
-            </button>
-            @if (isAdmin()) {
-              @if (confirmingDelete()) {
-                <div class="confirm" role="alert">
-                  <p>
-                    {{
-                      store.dossiers().length
-                        ? structure.deleteConfirmWithDossiers(store.dossiers().length)
-                        : structure.deleteConfirm
-                    }}
-                  </p>
-                  <div class="confirm-actions">
-                    <button mat-button type="button" (click)="confirmingDelete.set(false)">
-                      {{ structure.deleteNo }}
-                    </button>
-                    <button
-                      mat-flat-button
-                      class="danger"
-                      type="button"
-                      [disabled]="store.isPending()"
-                      (click)="store.remove(assure.id)"
-                    >
-                      {{ structure.deleteYes }}
-                    </button>
-                  </div>
-                </div>
-              } @else {
-                <button
-                  mat-stroked-button
-                  class="danger-outline"
-                  type="button"
-                  (click)="confirmingDelete.set(true)"
-                >
-                  <mat-icon>delete</mat-icon>
-                  {{ structure.delete }}
-                </button>
-              }
-            }
-            @if (store.error() && !editing()) {
-              <p class="error" role="alert">{{ store.error() }}</p>
-            }
-          </div>
-        </aside>
+        <app-assure-identity-card
+          [assure]="assure"
+          [dossierCount]="store.dossiers().length"
+          [isAdmin]="isAdmin()"
+          [editing]="editing()"
+          [confirmingDelete]="confirmingDelete()"
+          [isPending]="store.isPending()"
+          [error]="store.error()"
+          (editRequested)="startEdit()"
+          (deleteAsked)="confirmingDelete.set(true)"
+          (deleteCancelled)="confirmingDelete.set(false)"
+          (deleteConfirmed)="store.remove(assure.id)"
+        />
 
         <section class="main">
           <mat-tab-group appTabQueryParam animationDuration="0ms" mat-stretch-tabs="false">
@@ -140,11 +73,11 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
                   </div>
                   <div class="stat">
                     <span class="label">{{ structure.stats.inProgress }}</span>
-                    <span class="value">{{ inProgress() }}</span>
+                    <span class="value">{{ stats().inProgress }}</span>
                   </div>
                   <div class="stat">
                     <span class="label">{{ structure.stats.won }}</span>
-                    <span class="value">{{ won() }}</span>
+                    <span class="value">{{ stats().won }}</span>
                   </div>
                   <div class="stat">
                     <span class="label">{{ structure.stats.since }}</span>
@@ -160,79 +93,25 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
                       [assure]="assure"
                       [isPending]="store.isPending()"
                       [error]="store.error()"
-                      [duplicates]="duplicates()"
+                      [duplicates]="store.duplicates()"
                       (candidateChanged)="checkDuplicates($event)"
                       (submitted)="store.update({ id: assure.id, form: $event })"
                       (cancelled)="editing.set(false)"
                     />
                   </div>
                 } @else {
-                  <div class="card">
-                    <h2 class="section-title">{{ structure.detailsTitle }}</h2>
-                    <dl class="details">
-                      @for (field of detailsOf(assure); track field.label) {
-                        <div>
-                          <dt>{{ field.label }}</dt>
-                          <dd>{{ field.value || '—' }}</dd>
-                        </div>
-                      }
-                    </dl>
-                  </div>
+                  <app-assure-details-card [assure]="assure" />
                 }
               </div>
             </mat-tab>
 
             <mat-tab [label]="structure.dossiersTitle + ' (' + store.dossiers().length + ')'">
-              <div class="tab card">
-                @if (store.dossiers().length) {
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>{{ structure.columns.reference }}</th>
-                        <th>{{ structure.columns.product }}</th>
-                        <th>{{ structure.columns.status }}</th>
-                        <th>{{ structure.columns.createdAt }}</th>
-                        <th>{{ structure.columns.action }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (dossier of store.dossiers(); track dossier.id) {
-                        <tr class="row" [routerLink]="dossierLink(dossier)">
-                          <td>{{ dossier.reference || structure.draftReference }}</td>
-                          <td>{{ dossier.productId }}</td>
-                          <td><app-status-chip [status]="dossier.status" /></td>
-                          <td>{{ dossier.createdAt?.toMillis() | date: 'd MMM y' }}</td>
-                          <td class="action">
-                            <a mat-button [routerLink]="dossierLink(dossier)" (click)="$event.stopPropagation()">
-                              {{ dossier.status === 'brouillon' ? structure.resume : structure.open }}
-                            </a>
-                          </td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                } @else {
-                  <p class="empty">{{ structure.noDossiers }}</p>
-                }
-              </div>
+              <div class="tab card"><app-assure-dossiers-table [dossiers]="store.dossiers()" /></div>
             </mat-tab>
 
-            <mat-tab [label]="structure.documentsTitle + ' (' + documents().length + ')'">
+            <mat-tab [label]="structure.documentsTitle + ' (' + documents.documents().length + ')'">
               <div class="tab card">
-                @if (documents().length) {
-                  <ul class="pieces">
-                    @for (document of documents(); track document.id) {
-                      <li>
-                        <mat-icon aria-hidden="true">description</mat-icon>
-                        <span class="piece-name">{{ pieceText.types[document.type] }} · {{ document.fileName }}</span>
-                        <span class="piece-date">{{ document.createdAt?.toMillis() | date: 'd MMM y' }}</span>
-                        <button mat-button type="button" (click)="openDocument(document)">{{ pieceText.open }}</button>
-                      </li>
-                    }
-                  </ul>
-                } @else {
-                  <p class="empty">{{ structure.noDocuments }}</p>
-                }
+                <app-assure-documents-list [documents]="documents.documents()" (opened)="documents.open($event)" />
               </div>
             </mat-tab>
           </mat-tab-group>
@@ -271,123 +150,6 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
       border-radius: 12px;
       background: var(--ci-surface);
       box-shadow: var(--ci-shadow-sm);
-    }
-
-    .identity {
-      display: grid;
-      justify-items: center;
-      gap: 4px;
-      text-align: center;
-    }
-
-    .avatar {
-      display: grid;
-      place-items: center;
-      width: 64px;
-      height: 64px;
-      margin-bottom: 8px;
-      border: 1px solid var(--ci-border);
-      border-radius: 50%;
-      background: var(--ci-surface-2);
-      font-size: 22px;
-      font-weight: 600;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      overflow-wrap: anywhere;
-    }
-
-    .type {
-      margin: 0;
-      color: var(--ci-text-muted);
-    }
-
-    .contact {
-      display: grid;
-      gap: 10px;
-      justify-self: stretch;
-      margin: 16px 0 0;
-      padding: 16px 0;
-      border-top: 1px solid var(--ci-border);
-      border-bottom: 1px solid var(--ci-border);
-      list-style: none;
-      text-align: left;
-
-      &:empty {
-        display: none;
-      }
-
-      li {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        overflow-wrap: anywhere;
-      }
-
-      mat-icon {
-        flex: none;
-        width: 18px;
-        height: 18px;
-        font-size: 18px;
-        color: var(--ci-text-muted);
-      }
-    }
-
-    .actions {
-      display: grid;
-      gap: 10px;
-      justify-self: stretch;
-      margin-top: 16px;
-
-      > a,
-      > button {
-        width: 100%;
-      }
-    }
-
-    .danger-outline {
-      color: var(--ci-danger, #c62828);
-    }
-
-    .danger {
-      background: var(--ci-danger, #c62828);
-      color: #fff;
-    }
-
-    .confirm {
-      padding: 12px;
-      border: 1px solid var(--ci-danger, #c62828);
-      border-radius: 8px;
-      text-align: left;
-
-      p {
-        margin: 0 0 8px;
-      }
-    }
-
-    .confirm-actions {
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-    }
-
-    .hint,
-    .error {
-      margin: 0;
-      font-size: 13px;
-      text-align: left;
-    }
-
-    .hint {
-      color: var(--ci-text-muted);
-    }
-
-    .error {
-      color: var(--ci-danger, #c62828);
     }
 
     .tab {
@@ -429,136 +191,30 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
       color: var(--ci-text-muted);
     }
 
-    .details {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 20px 24px;
-      margin: 0;
-
-      dt {
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        color: var(--ci-text-muted);
-      }
-
-      dd {
-        margin: 4px 0 0;
-        font-weight: 500;
-        overflow-wrap: anywhere;
-      }
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    th,
-    td {
-      padding: 10px 8px;
-      text-align: left;
-      border-bottom: 1px solid var(--ci-border);
-    }
-
-    th {
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--ci-text-muted);
-    }
-
-    .row {
-      cursor: pointer;
-
-      &:hover {
-        background: var(--ci-surface-2);
-      }
-    }
-
-    .action {
-      text-align: right;
-    }
-
     .empty {
       margin: 0;
       color: var(--ci-text-muted);
-    }
-
-    .pieces {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-
-      li {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        padding: 6px 0;
-        border-bottom: 1px solid var(--ci-border);
-      }
-
-      .piece-name {
-        flex: 1;
-        overflow-wrap: anywhere;
-      }
-
-      .piece-date {
-        font-size: 13px;
-        color: var(--ci-text-muted);
-      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AssureDetailContainerComponent implements OnInit, HasUnsavedChanges {
-  private readonly _form = viewChild(AssureFormComponent);
-
-  /** Garde de sortie : fiche en cours de modification, pas enregistrée. */
-  hasUnsavedChanges(): boolean {
-    return this.editing() && !!this._form()?.hasUnsavedChanges();
-  }
-
   /** Lié au paramètre « :id » de la route (withComponentInputBinding). */
   readonly id = input.required<string>();
 
   protected readonly store = inject(AssuresStore);
+  protected readonly documents = inject(AssureDocumentsStore);
   private readonly _router = inject(Router);
   private readonly _snackBar = inject(MatSnackBar);
-  protected readonly structure = ASSURES_STRUCTURE.detail;
-  protected readonly typeLabels = ASSURES_STRUCTURE.typeLabels;
-  protected readonly listUrl = CabinetRouteContainerModel.CLIENTS_ROUTE.url;
-  protected readonly newDossierUrl = CabinetRouteContainerModel.DOSSIER_NEW_ROUTE.url;
-  protected readonly duplicates = this.store.duplicates;
-  protected readonly nameOf = displayName;
-  protected readonly pieceText = ASSURES_STRUCTURE.piece;
-  private readonly _service = inject(AssuresService);
   private readonly _auth = inject(AuthStore);
+  private readonly _form = viewChild(AssureFormComponent);
+  protected readonly structure = ASSURES_STRUCTURE.detail;
+  protected readonly listUrl = CabinetRouteContainerModel.CLIENTS_ROUTE.url;
   protected readonly isAdmin = computed(() => this._auth.role() === 'admin');
   /** La fiche se lit ; elle ne passe en saisie que sur « Modifier la fiche ». */
   protected readonly editing = signal(false);
   protected readonly confirmingDelete = signal(false);
-
-  /** Pièces rangées avec le client (CIN, Kbis importés à sa création). */
-  protected readonly documents = toSignal(
-    combineLatest([toObservable(this._auth.cabinetId), toObservable(this.id)]).pipe(
-      switchMap(([cabinetId, id]) => (cabinetId && id ? this._service.watchDocuments(cabinetId, id) : of([]))),
-    ),
-    { initialValue: [] as AssureDocument[] },
-  );
-
-  protected openDocument(document: AssureDocument): void {
-    this._service.downloadUrl(document.storagePath).subscribe((url) => window.open(url, '_blank', 'noopener'));
-  }
-
-  protected readonly inProgress = computed(
-    () => this.store.dossiers().filter((dossier) => !CLOSED_STATUSES.includes(dossier.status)).length,
-  );
-  protected readonly won = computed(
-    () => this.store.dossiers().filter((dossier) => dossier.status === 'souscrit').length,
-  );
+  protected readonly stats = computed(() => dossierStats(this.store.dossiers()));
 
   constructor() {
     effect(() => {
@@ -580,7 +236,7 @@ export class AssureDetailContainerComponent implements OnInit, HasUnsavedChanges
     // Client supprimé : retour à la liste.
     effect(() => {
       if (this.store.deleted()) {
-        untracked(() => this.back());
+        untracked(() => this._router.navigateByUrl(this.listUrl));
       }
     });
   }
@@ -589,10 +245,9 @@ export class AssureDetailContainerComponent implements OnInit, HasUnsavedChanges
     this.store.resetStatus();
   }
 
-  /** Un brouillon se reprend dans son questionnaire, les autres s'ouvrent sur leur fiche. */
-  protected dossierLink(dossier: Dossier): string[] {
-    const base = [CabinetRouteContainerModel.DOSSIERS_ROUTE.url, dossier.id];
-    return dossier.status === 'brouillon' ? [...base, 'brouillon'] : base;
+  /** Garde de sortie : fiche en cours de modification, pas enregistrée. */
+  hasUnsavedChanges(): boolean {
+    return this.editing() && !!this._form()?.hasUnsavedChanges();
   }
 
   protected startEdit(): void {
@@ -601,46 +256,7 @@ export class AssureDetailContainerComponent implements OnInit, HasUnsavedChanges
     this.editing.set(true);
   }
 
-  protected initials(assure: Assure): string {
-    const words = displayName(assure).trim().split(/\s+/).filter(Boolean);
-    return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || '?';
-  }
-
-  /** Détails affichés en lecture : la société d'abord pour un professionnel. */
-  protected detailsOf(assure: Assure): { label: string; value: string | null | undefined }[] {
-    const fields = this.structure.fields;
-    const company =
-      assure.type === 'pro'
-        ? [
-            { label: fields.companyName, value: assure.companyName },
-            { label: fields.siret, value: assure.siret },
-          ]
-        : [];
-    return [
-      ...company,
-      { label: fields.civilite, value: assure.civilite },
-      { label: fields.lastName, value: assure.lastName },
-      { label: fields.firstName, value: assure.firstName },
-      { label: fields.birthDate, value: formatDate(assure.birthDate) },
-      { label: fields.email, value: assure.email },
-      { label: fields.phone, value: assure.phone },
-      { label: fields.street, value: assure.address?.street },
-      { label: fields.postalCode, value: assure.address?.postalCode },
-      { label: fields.city, value: assure.address?.city },
-    ];
-  }
-
   protected checkDuplicates(candidate: DuplicateCandidate): void {
     this.store.checkDuplicates({ candidate, excludeId: this.id() });
   }
-
-  protected back(): void {
-    this._router.navigateByUrl(this.listUrl);
-  }
-}
-
-/** « 1985-04-12 » → « 12/04/1985 ». */
-function formatDate(iso: string | null | undefined): string | null {
-  const match = iso?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : (iso ?? null);
 }
