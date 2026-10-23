@@ -2,10 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, OnInit, s
 import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
-import { catchError, forkJoin, map, of } from 'rxjs';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { AssureFormModel } from '../../models/assure-form.model';
-import { AssuresService } from '../../services/assures.service';
 import { AssuresStore } from '../../store/assures.store';
 import { AssureDocumentImportComponent, ReadPiece } from '../assure-document-import/assure-document-import.component';
 import { DuplicateCandidate } from '../../util/assures.utils';
@@ -57,7 +55,6 @@ export class NewAssureContainerComponent implements OnInit, HasUnsavedChanges {
   private readonly _router = inject(Router);
   protected readonly structure = ASSURES_STRUCTURE.form;
   protected readonly duplicates = this.store.duplicates;
-  private readonly _service = inject(AssuresService);
   private readonly _snackBar = inject(MatSnackBar);
 
   /** Pièces lues (recto, verso…) : elles pré-remplissent le formulaire et seront rangées avec le client. */
@@ -89,16 +86,13 @@ export class NewAssureContainerComponent implements OnInit, HasUnsavedChanges {
       }
       this.pieces.set([]);
       // Chaque pièce est rangée avec le client ; un échec n'empêche pas les autres.
-      forkJoin(
-        pieces.map(piece =>
-          this._service.attachPiece({ assureId: createdId, ...piece }).pipe(
-            map(() => true),
-            catchError(() => of(false)),
-          ),
-        ),
-      ).subscribe(results => {
-        if (results.includes(false)) this._snackBar.open(ASSURES_STRUCTURE.piece.attachFailed, undefined, { duration: 5000 });
-        open();
+      this.store.attachPieces({
+        assureId: createdId,
+        pieces,
+        done: (allAttached) => {
+          if (!allAttached) this._snackBar.open(ASSURES_STRUCTURE.piece.attachFailed, undefined, { duration: 5000 });
+          open();
+        },
       });
     });
   }

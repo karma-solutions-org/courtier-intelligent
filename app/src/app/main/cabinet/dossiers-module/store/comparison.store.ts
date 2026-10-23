@@ -23,7 +23,7 @@ import { DossierStore } from './dossier.store';
  * Statuts où une offre peut être retenue (le serveur refait le contrôle) : passage en décision, nouveau choix, ou
  * depuis « tarification », que le serveur fait passer lui-même par « comparaison » (dossiers-decider).
  */
-export const DECISION_DOSSIER_STATUSES: DossierStatus[] = DOSSIER_STATUSES.filter(
+const DECISION_DOSSIER_STATUSES: DossierStatus[] = DOSSIER_STATUSES.filter(
   (status) =>
     status === 'decision' ||
     isTransitionAllowed(status, 'decision') ||

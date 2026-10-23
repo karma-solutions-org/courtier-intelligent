@@ -10,7 +10,7 @@ import {
 } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { Assure, Dossier } from '@shared';
-import { catchError, combineLatest, debounceTime, EMPTY, exhaustMap, map, of, pipe, switchMap, take, tap } from 'rxjs';
+import { catchError, combineLatest, debounceTime, EMPTY, exhaustMap, forkJoin, map, of, pipe, switchMap, take, tap } from 'rxjs';
 import {
   resetRequestStatus,
   setError,
@@ -26,6 +26,9 @@ import { displayName, DuplicateCandidate, DuplicateMatch, hasDuplicateCriteria, 
 
 /** Taille d'une tranche du défilement infini. */
 export const PAGE_SIZE = 20;
+
+/** Pièce lue à l'import, à ranger avec le client (function assures-rattacherPiece). */
+type AttachablePiece = Omit<Parameters<AssuresService['attachPiece']>[0], 'assureId'>;
 
 /** Filtres de la liste : type de client et ordre d'affichage. */
 export interface AssureFilters {
@@ -154,6 +157,36 @@ export const AssuresStore = signalStore(
               }),
             );
           }),
+        ),
+      ),
+      /** Ouvre une pièce du client dans un nouvel onglet (lien de téléchargement signé). */
+      openDocument: rxMethod<string>(
+        pipe(
+          switchMap((storagePath) =>
+            service.downloadUrl(storagePath).pipe(
+              tap((url) => window.open(url, '_blank', 'noopener')),
+              // Lien indisponible : rien ne s'ouvre (l'écoute continue pour la pièce suivante).
+              catchError(() => EMPTY),
+            ),
+          ),
+        ),
+      ),
+      /**
+       * Range avec le client tout juste créé les pièces lues à l'import ; un échec n'empêche pas les autres.
+       * `done` reçoit vrai si toutes ont été rangées.
+       */
+      attachPieces: rxMethod<{ assureId: string; pieces: AttachablePiece[]; done: (allAttached: boolean) => void }>(
+        pipe(
+          exhaustMap(({ assureId, pieces, done }) =>
+            forkJoin(
+              pieces.map((piece) =>
+                service.attachPiece({ assureId, ...piece }).pipe(
+                  map(() => true),
+                  catchError(() => of(false)),
+                ),
+              ),
+            ).pipe(tap((results) => done(!results.includes(false)))),
+          ),
         ),
       ),
       clearDuplicates: () => patchState(store, { duplicates: [] }),

@@ -4,6 +4,7 @@ import { CurrencyPipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { filter, map } from 'rxjs';
 import { ComparisonStore } from '../../store/comparison.store';
 import { DossierStore } from '../../store/dossier.store';
 import {
@@ -161,7 +162,7 @@ export class ComparisonTabComponent {
 
   protected choose(column: ComparisonColumn): void {
     const current = this.decision();
-    this._dialog
+    const justification$ = this._dialog
       .open<DecisionDialogComponent, DecisionDialogData, string>(DecisionDialogComponent, {
         data: {
           insurerName: column.insurerName,
@@ -169,11 +170,13 @@ export class ComparisonTabComponent {
         },
         maxWidth: '95vw',
       })
-      .afterClosed()
-      .subscribe((justification) => {
-        if (justification) {
-          this.store.decide({ insurerId: column.insurerId, justification });
-        }
-      });
+      .afterClosed();
+    // Le store reçoit le choix du dialogue (fermé sans justification : rien n'est envoyé).
+    this.store.decide(
+      justification$.pipe(
+        filter((justification): justification is string => !!justification),
+        map((justification) => ({ insurerId: column.insurerId, justification })),
+      ),
+    );
   }
 }

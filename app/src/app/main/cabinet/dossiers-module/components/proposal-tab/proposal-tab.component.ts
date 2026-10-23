@@ -18,6 +18,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { DossierOutcomeResult, PROPOSAL_MESSAGE_MAX } from '@shared';
 import { openConfirmDialog } from '../../../../../core/components/confirm-dialog/confirm-dialog.component';
 import { DossierStore } from '../../store/dossier.store';
+import { filter, map } from 'rxjs';
 import { ProposalStore } from '../../store/proposal.store';
 import {
   SubscriptionDialogComponent,
@@ -423,27 +424,27 @@ export class ProposalTabComponent {
 
   protected answer(result: Exclude<DossierOutcomeResult, 'souscrit'>): void {
     const refused = result === 'refuse';
-    openConfirmDialog(this._dialog, {
+    const confirmed$ = openConfirmDialog(this._dialog, {
       title: refused ? this.text.refusedTitle : this.text.noFollowUpTitle,
       message: refused ? this.text.confirmRefused : this.text.confirmNoFollowUp,
       confirm: this.text.confirmAnswer,
       destructive: true,
-    }).subscribe((confirmed) => {
-      if (confirmed) this.store.recordAnswer({ result });
     });
+    this.store.recordAnswer(confirmed$.pipe(filter(Boolean), map(() => ({ result }))));
   }
 
   protected subscribe(): void {
-    this._dialog
+    const result$ = this._dialog
       .open<SubscriptionDialogComponent, void, SubscriptionDialogResult>(
         SubscriptionDialogComponent,
         { maxWidth: '95vw' },
       )
-      .afterClosed()
-      .subscribe((result) => {
-        if (result) {
-          this.store.recordAnswer({ result: 'souscrit', ...result });
-        }
-      });
+      .afterClosed();
+    this.store.recordAnswer(
+      result$.pipe(
+        filter((result): result is SubscriptionDialogResult => !!result),
+        map((result) => ({ result: 'souscrit' as const, ...result })),
+      ),
+    );
   }
 }
