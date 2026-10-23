@@ -1,7 +1,7 @@
 import { computed } from '@angular/core';
 import { signalStoreFeature, withComputed, withState } from '@ngrx/signals';
 
-export type RequestStatus = 'idle' | 'pending' | 'fulfilled' | { error: string };
+type RequestStatus = 'idle' | 'pending' | 'fulfilled' | { error: string };
 
 /** Ajoute à un store un statut de requête : isPending, isFulfilled, error. */
 export function withRequestStatus() {

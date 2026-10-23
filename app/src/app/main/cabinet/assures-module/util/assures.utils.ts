@@ -3,7 +3,7 @@ import { Assure, AssureDuplicateReason, duplicateReasons, foldText, ASSURE_EMAIL
 
 /** Formats acceptés (France). Email, code postal et SIRET : partagés avec les règles Firestore (shared/assure-format). */
 export const EMAIL_PATTERN = ASSURE_EMAIL_PATTERN;
-export const PHONE_PATTERN = /^(?:(?:\+|00)33\s?|0)[1-9](?:[\s.-]?\d{2}){4}$/;
+const PHONE_PATTERN = /^(?:(?:\+|00)33\s?|0)[1-9](?:[\s.-]?\d{2}){4}$/;
 export const POSTAL_CODE_PATTERN = ASSURE_POSTAL_CODE_PATTERN;
 const SIRET_PATTERN = ASSURE_SIRET_PATTERN;
 const MIN_BIRTH_YEAR = 1900;

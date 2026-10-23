@@ -55,8 +55,6 @@ function blur(element: HTMLElement): void {
 
 // ── Valeurs ─────────────────────────────────────────────────────────────────
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
 /** Format de date attendu par un champ texte, déduit de son texte d'aide, de son motif ou de son libellé. */
 export function dateFormatOf(field: FormField): 'dd/MM/yyyy' | 'MM/yyyy' | 'yyyy-MM-dd' | 'dd-MM-yyyy' | 'ddMMyyyy' {
   const hint = `${field.placeholder ?? ''} ${field.pattern ?? ''} ${field.label}`.toLowerCase();

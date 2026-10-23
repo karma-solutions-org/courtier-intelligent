@@ -31,7 +31,7 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 type SessionStatus = 'none' | 'opening' | 'open';
 
 /** Pourquoi cet appareil a été déconnecté : chaque cas a son écran. */
-export type SessionIssue = 'device_not_authorized' | 'session_replaced';
+type SessionIssue = 'device_not_authorized' | 'session_replaced';
 
 interface AuthState {
   user: AuthUser | null;

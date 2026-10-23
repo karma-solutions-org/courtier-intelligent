@@ -9,7 +9,7 @@ export interface HasUnsavedChanges {
   hasUnsavedChanges(): boolean;
 }
 
-export const UNSAVED_CHANGES_MESSAGE =
+const UNSAVED_CHANGES_MESSAGE =
   'Des modifications ne sont pas enregistrées. Quitter quand même ?';
 
 /** Demande confirmation (dialogue Material) avant de quitter une page dont des modifications ne sont pas enregistrées. */

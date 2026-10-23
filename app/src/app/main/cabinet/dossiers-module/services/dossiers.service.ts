@@ -5,7 +5,7 @@ import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
 
 /** Réponse de `dossiers-sauvegarder` : statut (peut repasser en brouillon) et complétude recalculée par le serveur. */
-export interface SaveResult {
+interface SaveResult {
   status: DossierStatus;
   completeness: { ok: boolean; missing: CanonicalPath[] };
 }

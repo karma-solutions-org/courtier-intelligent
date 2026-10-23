@@ -24,7 +24,7 @@ const euros = new Intl.NumberFormat('fr-FR', {
 });
 
 /** Montant affiché, « — » s'il n'est pas connu. */
-export const money = (value: number | null | undefined): string => (value == null ? '—' : euros.format(value));
+const money = (value: number | null | undefined): string => (value == null ? '—' : euros.format(value));
 
 /** Tableau comparatif des offres, côte à côte (défilement horizontal sur petit écran, première colonne fixe). */
 @Component({

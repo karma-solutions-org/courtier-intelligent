@@ -3,7 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { map, Observable } from 'rxjs';
 
-export interface ConfirmDialogData {
+interface ConfirmDialogData {
   title: string;
   message: string;
   confirm: string;
@@ -36,7 +36,7 @@ export interface ConfirmDialogData {
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ConfirmDialogComponent {
+class ConfirmDialogComponent {
   protected readonly data = inject<ConfirmDialogData>(MAT_DIALOG_DATA);
 }
 

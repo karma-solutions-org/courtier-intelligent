@@ -55,7 +55,7 @@ const AUTOSAVE_DELAY_MS = 800;
 const EVENTS_PAGE_SIZE = 20;
 
 /** idle : rien à enregistrer · dirty : modifications en attente · saving · saved · error. */
-export type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
+type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
 /** Écritures en file : exécutées l'une après l'autre, pour qu'un changement de statut voie toujours les dernières réponses. */
 type OperationInput =

@@ -7,7 +7,6 @@ const setup = (html: string) => {
   document.body.innerHTML = html;
   return analyzeForm(document);
 };
-const fieldBy = (a: ReturnType<typeof analyzeForm>, pred: (f: any) => boolean) => a.fields.find(pred)!;
 
 describe('probes: analyse', () => {
   it('P1 shadow DOM inputs are found', () => {

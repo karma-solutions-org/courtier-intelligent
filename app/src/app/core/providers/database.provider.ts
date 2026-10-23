@@ -3,13 +3,13 @@ import type { WhereFilterOp } from 'firebase/firestore';
 import { catchError, combineLatest, defer, map, Observable, of } from 'rxjs';
 import { FIRESTORE } from './firebase';
 
-export interface QueryFilter {
+interface QueryFilter {
   field: string;
   operator: WhereFilterOp;
   value: unknown;
 }
 
-export interface QueryModel {
+interface QueryModel {
   filters?: QueryFilter[];
   orderBy?: { field: string; direction?: 'asc' | 'desc' }[];
   limit?: number;
