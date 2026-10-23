@@ -1,66 +1,25 @@
-import { CanonicalPath, ExtraCanonicalPath, isExtraPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, MissingField, type DiscoveredFieldInput } from '@shared';
-import type { CapturedOffer, CaptureState, JobContext, JobUpdate, RunField, RunState } from '../shared/messages';
-import { AskAi, resolveWithAi } from './ai-fallback';
+import { CanonicalPath, ExtraCanonicalPath, isExtraPath, ExtensionReportIssue, ExtensionReportStep, MissingField, type DiscoveredFieldInput } from '@shared';
+import type { CapturedOffer, CaptureState, JobContext, RunField, RunState } from '../shared/messages';
+import { resolveWithAi } from './ai-fallback';
 import { analyzeForm, FormAnalysis, isAuthPage } from './analyzer';
 import { applyLayout, FormLayout, readLayoutWithAi } from './layout-ai';
 import { detectResultPage, extractFromDom, hasPremium, hasResultHeading, parseAmounts, visibleText } from './capture';
-import { captureWithAi, mergeOffers } from './capture-ai';
-import { expectsDate } from './field-synonyms';
-import { fillField, FillResult, parseRange, registrationFor } from './filler';
+import type { FillResult } from './filler';
 import { asCanonicalPath, ExtraQuestion, isCompatible, Mapping, mapExtraPaths, mapFields } from './mapping';
-import { applyMemory, MemoryPort, toDiscoveredFields, toMemoryFields, toRequiredPaths } from './memory';
-import { FillPlan, FillValue, planFill, valueOf } from './plan';
+import { toDiscoveredFields, toRequiredPaths } from './memory';
+import { FillPlan, planFill, valueOf } from './plan';
 import { adapterFor, type ExtranetAdapter } from './extranets';
 import { advanceButton, AdvanceGuard, leftTextPage, refusalMessage, stepKey } from './flow/advance';
+import { completeWithAi, fillableCount, needsAiCompletion } from './flow/capture-page';
 import { ClaimRows } from './flow/claim-rows';
+import { applyOverrides, fillPlan } from './flow/fill-step';
+import { MemorySession, StepSnapshot } from './flow/memory-session';
+import { panelFields, progressSignature, progressUpdate } from './flow/run-report';
+import { JobUpdateError, RunnerPorts } from './runner-ports';
 import { clickRow, detectStepHint, findResultRows, pickResultRow, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
-
-/** Champs d'adresse : les extranets y proposent souvent des suggestions à choisir (adresse normalisée, commune). */
-const SUGGEST_PATHS: ReadonlySet<string> = new Set(['client.address.street', 'client.address.city', 'vehicle.parkingCity']);
-
-/** Échec d'écriture de l'avancement, avec la cause exacte (`cancelled` : le job a été annulé). */
-export class JobUpdateError extends Error {
-  constructor(message: string, readonly cancelled = false) {
-    super(message);
-  }
-}
-
-export interface RunnerPorts {
-  doc: Document;
-  /** Écrit l'avancement du job (statut, étape, champs manquants) : le service worker le transmet à Firestore. */
-  report(update: JobUpdate): Promise<void>;
-  /** Publie l'avancement détaillé pour le side panel. */
-  publish(state: RunState): void;
-  askAi: AskAi;
-  /** Signale un échec du remplissage ou de la capture du tarif (E10-4) : un code, jamais de donnée client. */
-  reportIssue?(step: ExtensionReportStep, issue: ExtensionReportIssue): Promise<void>;
-  /** Mémoire partagée des formulaires (E8) : sans elle, tout se fait par synonymes puis IA. */
-  memory?: MemoryPort;
-  /**
-   * Champs sans équivalent d'un formulaire validé : le serveur les ajoute au questionnaire (ou les rattache à une
-   * question existante) et renvoie, par champ, le chemin de cette question.
-   */
-  reportDiscovered?(fingerprint: string, fields: DiscoveredFieldInput[], requiredPaths?: string[]): Promise<Record<string, string> | void>;
-  /** Lecture de la mise en page déjà faite par l'IA pour un formulaire (cache local du navigateur). */
-  layoutCache?: { load(fingerprint: string): Promise<FormLayout | null>; save(fingerprint: string, layout: FormLayout): Promise<void> };
-  /** Origine de l'extranet, clé de la mémoire (par défaut : celle de la page). */
-  origin?: string;
-  /** Une étape remplie sans manque ni échec : l'extension clique elle-même sur « Suivant » (jamais sur le bouton final). */
-  autoAdvance?: boolean;
-  /**
-   * Formulaire de devis reconnu (au moins FORM_MIN_MAPPED champs reliés au dossier), une fois par remplissage : fin de
-   * l'apprentissage automatique du chemin d'accès.
-   */
-  formReached?(): void;
-  quietMs?: number;
-  settleTimeoutMs?: number;
-}
 
 /** Relances maximales dans une étape quand le remplissage révèle de nouveaux champs. */
 const MAX_FOLLOW_UPS = 3;
-/** Part de champs mappés par la mémoire dont le remplissage échoue à partir de laquelle la mémoire est invalidée. */
-const MEMORY_FAILURE_RATIO = 0.3;
-const MEMORY_MAX_FIELDS = 300;
 /** Champs reliés au dossier à partir desquels la page est un formulaire de devis (pas une recherche ou une connexion). */
 const FORM_MIN_MAPPED = 3;
 
@@ -90,16 +49,9 @@ export class FormRunner {
   private readonly aiTried = new Set<string>();
   private aiUsed = false;
   // ── Mémoire partagée (E8) ──
-  /** Mémoire chargée par empreinte (null : formulaire inconnu). */
-  private readonly loadedMemory = new Map<string, { key: string; fields: FormMemoryField[] } | null>();
-  /** Empreintes dont la mémoire a échoué : on revient aux synonymes et à l'IA, puis on réapprend. */
-  private readonly memoryDisabled = new Set<string>();
-  private readonly memoryTouched = new Set<string>();
-  private readonly learned = new Set<string>();
-  private memoryStatus: RunState['memory'] = null;
-  private fromMemory = new Set<string>();
+  private readonly memory: MemorySession;
   /** L'étape qui vient d'être remplie : apprise quand le courtier la quitte ou la valide. */
-  private snapshot: { fingerprint: string; fields: FormAnalysis['fields']; mappings: Mapping[]; results: Map<string, FillResult>; usedMemory: boolean } | null = null;
+  private snapshot: StepSnapshot | null = null;
   private lastReported = '';
   /** Empreintes dont les champs obligatoires ont déjà été signalés. */
   private readonly requirementsReported = new Set<string>();
@@ -134,6 +86,7 @@ export class FormRunner {
   ) {
     this.adapter = adapterFor({ insurerId: job.insurerId, origin: ports.origin ?? ports.doc.location?.origin });
     this.claimRows = new ClaimRows(this.adapter);
+    this.memory = new MemorySession(ports.memory, () => this.origin);
   }
 
   /** Analyse de la page affichée, avec les règles de l'extranet. */
@@ -269,7 +222,7 @@ export class FormRunner {
     // Mêmes montants, même nombre de champs : même réponse, sans réanalyser la page (appelé à chaque changement du DOM).
     const key = `${JSON.stringify(amounts)}#${doc.querySelectorAll('input, select, textarea').length}`;
     if (key !== this.tariffCheck.key) {
-      const fillable = mapFields(this.analyze().fields).filter(m => m.status === 'mapped' && m.canonicalPath !== null).length;
+      const fillable = fillableCount(this.analyze().fields);
       this.tariffCheck = { key, found: detectResultPage(extractFromDom(doc), fillable) !== 'none' };
     }
     return this.tariffCheck.found;
@@ -372,14 +325,9 @@ export class FormRunner {
 
     // 1. Synonymes et scoring ; la mémoire partagée tranche ce qu'ils n'ont pas tranché, puis l'IA, pour le reste.
     let mappings = mapExtraPaths(analysis.fields, mapFields(analysis.fields), this.extraQuestions);
-    this.fromMemory = new Set();
-    const memory = await this.memoryFor(analysis.fingerprint);
-    if (memory) {
-      const applied = applyMemory(analysis.fields, mappings, memory.fields, this.allowedPaths);
-      mappings = applied.mappings;
-      this.fromMemory = applied.fromMemory;
-      if (applied.fromMemory.size > 0) this.memoryStatus = 'used';
-    }
+    const remembered = await this.memory.map(analysis, mappings, this.allowedPaths);
+    const memory = remembered.memory;
+    mappings = remembered.mappings;
     if (!this.aiTried.has(analysis.fingerprint)) {
       this.aiTried.add(analysis.fingerprint);
       const resolved = await resolveWithAi(analysis.fields, this.applyManual(mappings), this.allowedPaths, this.askAi);
@@ -401,16 +349,18 @@ export class FormRunner {
     const plan = planFill(analysis.fields, this.mappings, this.job.quoteData);
 
     // 3. Remplissage (sans jamais cliquer sur un bouton).
-    const results = await this.fill(plan, analysis);
+    const results = await fillPlan(plan, analysis, this.written, this.job.quoteData);
 
     // La mémoire a-t-elle bien servi ? Sinon elle est invalidée et on réapprend (E8-4).
-    if (memory && (await this.checkMemoryHealth(analysis.fingerprint, memory.key, results))) {
+    if (memory && (await this.memory.checkHealth(analysis.fingerprint, memory.key, this.mappings, results))) {
+      this.aiTried.delete(analysis.fingerprint);
+      this.written.clear();
       await this.reportIssue('mapping', 'memory_invalidated');
       await this.runStep(false, depth);
       return;
     }
     if ([...results.values()].some(r => r.status === 'failed')) await this.reportIssue('fill', 'fill_failed');
-    this.snapshot = { fingerprint: analysis.fingerprint, fields: analysis.fields, mappings: this.mappings, results, usedMemory: !!memory && this.fromMemory.size > 0 };
+    this.snapshot = { fingerprint: analysis.fingerprint, fields: analysis.fields, mappings: this.mappings, results, usedMemory: !!memory && this.memory.fromMemory.size > 0 };
     // Exigences de l'extranet (champs obligatoires) : signalées dès l'analyse, même si la page bloque ensuite sur un manque.
     if (!this.requirementsReported.has(analysis.fingerprint)) {
       const requiredPaths = toRequiredPaths(analysis.fields, this.mappings);
@@ -536,7 +486,7 @@ export class FormRunner {
     // Ni montant en euros ni titre de résultat : ce n'est pas une page de résultat, inutile d'analyser toute la page.
     if (!force && parseAmounts(this.ports.doc.body.textContent ?? '').length === 0 && !hasResultHeading(this.ports.doc)) return false;
     const extraction = extractFromDom(this.ports.doc);
-    const fillable = mapFields(analysis.fields).filter(m => m.status === 'mapped' && m.canonicalPath !== null).length;
+    const fillable = fillableCount(analysis.fields);
     if (!force && detectResultPage(extraction, fillable) === 'none') return false;
 
     this.capturing = true;
@@ -548,14 +498,11 @@ export class FormRunner {
     let offer: CapturedOffer = extraction.offer;
     let source: CaptureState['source'] = 'dom';
     let aiFailure: ExtensionReportIssue | null = null;
-    if (!hasPremium(offer) || offer.guarantees.length === 0) {
+    if (needsAiCompletion(offer)) {
       this.aiUsed = true;
-      const ai = await captureWithAi(visibleText(this.ports.doc.body), this.job.quoteData, this.askAi);
-      if (ai.offer) {
-        const merged = mergeOffers(offer, ai.offer);
-        if (JSON.stringify(merged) !== JSON.stringify(offer)) source = 'ai';
-        offer = merged;
-      }
+      const ai = await completeWithAi(offer, visibleText(this.ports.doc.body), this.job.quoteData, this.askAi);
+      offer = ai.offer;
+      source = ai.source;
       aiFailure = ai.failure;
     }
     if (this.stopped) return true;
@@ -592,7 +539,7 @@ export class FormRunner {
       fields: [],
       missing: [],
       aiUsed: this.aiUsed,
-      memory: this.memoryStatus,
+      memory: this.memory.status,
       assignablePaths: [],
       message,
       capture,
@@ -603,59 +550,9 @@ export class FormRunner {
     return this.ports.origin ?? new URL(this.ports.doc.URL).origin;
   }
 
-  /** Mémoire valide du formulaire (une lecture par empreinte), sauf si elle a déjà échoué ici. Une panne n'empêche rien. */
-  private async memoryFor(fingerprint: string): Promise<{ key: string; fields: FormMemoryField[] } | null> {
-    if (!this.ports.memory || this.memoryDisabled.has(fingerprint)) return null;
-    if (!this.loadedMemory.has(fingerprint)) {
-      this.loadedMemory.set(fingerprint, await this.ports.memory.load(this.origin, fingerprint).catch(() => null));
-    }
-    return this.loadedMemory.get(fingerprint) ?? null;
-  }
-
-  /**
-   * Après remplissage : la mémoire a-t-elle servi sans problème ? Si trop de champs qu'elle a mappés échouent, elle est
-   * signalée comme invalide (`memoires-invalider`), mise de côté pour ce formulaire, et le mapping est refait sans elle.
-   * Renvoie vrai quand il faut recommencer l'étape sans la mémoire.
-   */
-  private async checkMemoryHealth(fingerprint: string, key: string, results: Map<string, FillResult>): Promise<boolean> {
-    const used = this.mappings.filter(m => this.fromMemory.has(m.fieldKey) && m.canonicalPath !== null);
-    if (used.length === 0) return false;
-    const failed = used.filter(m => results.get(m.fieldKey)?.status === 'failed').length;
-    if (failed > 0 && failed / used.length >= MEMORY_FAILURE_RATIO) {
-      this.memoryDisabled.add(fingerprint);
-      this.aiTried.delete(fingerprint);
-      this.written.clear();
-      this.memoryStatus = 'invalidated';
-      await this.ports.memory?.invalidate(key).catch(() => undefined);
-      return true;
-    }
-    if (failed === 0 && !this.memoryTouched.has(fingerprint)) {
-      this.memoryTouched.add(fingerprint);
-      await this.ports.memory?.touch(key).catch(() => undefined);
-    }
-    return false;
-  }
-
-  /**
-   * Apprend la structure d'une étape (E8-3) : seulement après un remplissage RÉUSSI (aucun champ en échec) et VALIDÉ
-   * (le courtier est passé à l'étape suivante, ou la dernière étape est remplie), et seulement si la mémoire ne la
-   * connaissait pas déjà. Jamais de valeur : champs, types, libellés et chemins canoniques.
-   */
-  private async maybeLearn(snapshot: FormRunner['snapshot']): Promise<void> {
-    if (!snapshot || !this.ports.memory || this.learned.has(snapshot.fingerprint) || snapshot.usedMemory) return;
-    const results = [...snapshot.results.values()];
-    if (results.length === 0 || results.some(r => r.status === 'failed')) return;
-    const fields = toMemoryFields(snapshot.fields, snapshot.mappings);
-    if (fields.length === 0 || fields.length > MEMORY_MAX_FIELDS || !fields.some(f => f.canonicalPath !== null)) return;
-    this.learned.add(snapshot.fingerprint);
-    try {
-      const outcome = await this.ports.memory.save(this.origin, snapshot.fingerprint, fields);
-      // `ignored` : le serveur n'a rien retenu. `pending` : retenu pour le cabinet (mémoire commune en attente).
-      if (outcome !== 'ignored') this.memoryStatus = 'learned';
-    } catch {
-      this.learned.delete(snapshot.fingerprint); // une panne réseau : on réessaiera
-      return;
-    }
+  /** Apprend la structure de l'étape (voir MemorySession.learn), puis signale ses champs restés sans équivalent. */
+  private async maybeLearn(snapshot: StepSnapshot | null): Promise<void> {
+    if (!snapshot || !(await this.memory.learn(snapshot))) return;
     // Après la mémoire (le serveur y rattache les nouvelles questions) : les champs restés sans équivalent.
     if (this.discoveredReported.has(snapshot.fingerprint)) return;
     const discovered = toDiscoveredFields(snapshot.fields, snapshot.mappings, this.productPaths, this.job.quoteData);
@@ -684,91 +581,19 @@ export class FormRunner {
 
   /** Corrections du courtier, puis rattachements du serveur, par-dessus le mapping calculé. */
   private applyManual(mappings: Mapping[]): Mapping[] {
-    return mappings.map(mapping => {
-      const server = this.manual.has(mapping.fieldKey) ? undefined : this.serverMapped.get(mapping.fieldKey);
-      return server ? { ...mapping, canonicalPath: server, confidence: 1, status: 'mapped' as const } : mapping;
-    }).map(mapping =>
-      this.manual.has(mapping.fieldKey)
-        ? {
-            ...mapping,
-            canonicalPath: this.manual.get(mapping.fieldKey)!,
-            confidence: this.manual.get(mapping.fieldKey) ? 1 : 0,
-            status: this.manual.get(mapping.fieldKey) ? ('mapped' as const) : ('unmapped' as const),
-            source: 'manual' as const,
-          }
-        : mapping,
-    );
-  }
-
-  private async fill(plan: FillPlan, analysis: FormAnalysis): Promise<Map<string, FillResult>> {
-    const results = new Map<string, FillResult>();
-    for (const { field, value: planned, path } of plan.instructions) {
-      const elements = analysis.elements.get(field.key) ?? [];
-      const value = path === 'vehicle.registration' ? registrationFor(field, elements[0], planned) : this.withSeniority(path, field, planned);
-      const signature = `${String(value)}`;
-      if (this.written.get(field.key) === signature) {
-        results.set(field.key, { fieldKey: field.key, status: 'filled' });
-        continue;
-      }
-      const result = await fillField(field, elements, value, {
-        date: expectsDate(path, value),
-        version: path === 'vehicle.version',
-        suggest: SUGGEST_PATHS.has(path),
-      });
-      results.set(field.key, result);
-      if (result.status === 'filled') this.written.set(field.key, signature);
-    }
-    return results;
-  }
-
-  /**
-   * « Avez-vous été assuré ? » proposé en durées (« moins de 9 mois », « 24 mois et plus ») : un simple « oui » ne
-   * choisit pas, l'ancienneté du dossier (en mois) le fait.
-   */
-  private withSeniority(path: CanonicalPath, field: FormAnalysis['fields'][number], planned: FillValue): FillValue {
-    if (path !== 'insuranceHistory.currentlyInsured' || planned !== true) return planned;
-    if (!field.options.some(option => parseRange(option.label) !== null)) return planned;
-    const months = valueOf(this.job.quoteData['insuranceHistory.seniority']);
-    return typeof months === 'number' ? months : planned;
+    return applyOverrides(mappings, this.manual, this.serverMapped);
   }
 
   private async reportProgress(plan: FillPlan, hint: StepHint): Promise<void> {
-    const current = hint.current ?? this.stepCounter;
-    let update: JobUpdate;
-    if (plan.missing.length > 0) {
-      update = { status: 'needs_info', currentStep: current, totalSteps: hint.total, missingFields: plan.missing };
-    } else if (isFinalStep(this.ports.doc, hint)) {
-      update = { status: 'awaiting_submit', currentStep: current, totalSteps: hint.total ?? current, missingFields: [] };
-    } else {
-      update = { status: 'filling', currentStep: current, totalSteps: hint.total, missingFields: [] };
-    }
-    const signature = JSON.stringify([update.status, update.currentStep, update.totalSteps, (update.missingFields ?? []).map(m => m.canonicalPath)]);
+    const update = progressUpdate(plan, hint, this.stepCounter, isFinalStep(this.ports.doc, hint));
+    const signature = progressSignature(update);
     if (signature === this.lastReported) return;
     this.lastReported = signature;
     await this.ports.report(update).catch(error => this.jobUpdateFailed('fill', error));
   }
 
   private publishFromPlan(plan: FillPlan, results: Map<string, FillResult>, hint: StepHint): void {
-    const missingPaths = new Set(plan.missing.map(m => m.canonicalPath));
-    const fields: RunField[] = (this.analysis?.fields ?? []).map(field => {
-      const mapping = this.mappings.find(m => m.fieldKey === field.key);
-      const result = results.get(field.key);
-      let status: RunField['status'] = 'unmapped';
-      if (result) status = result.status;
-      else if (mapping?.canonicalPath && missingPaths.has(mapping.canonicalPath)) status = 'missing';
-      else if (mapping?.status === 'uncertain') status = 'uncertain';
-      return {
-        key: field.key,
-        label: field.label,
-        required: field.required,
-        section: field.section,
-        canonicalPath: mapping?.canonicalPath ?? null,
-        confidence: mapping?.confidence ?? 0,
-        source: mapping?.source ?? 'heuristic',
-        status,
-        reason: result?.reason ?? null,
-      };
-    });
+    const fields = panelFields(this.analysis?.fields ?? [], this.mappings, plan, results);
     const phase = plan.missing.length > 0 ? 'waiting_user' : isFinalStep(this.ports.doc, hint) ? 'awaiting_submit' : 'filling';
     this.publishState(phase, fields, plan.missing, this.notice, hint);
   }
@@ -795,7 +620,7 @@ export class FormRunner {
       fields,
       missing,
       aiUsed: this.aiUsed,
-      memory: this.memoryStatus,
+      memory: this.memory.status,
       assignablePaths: this.allowedPaths,
       message,
     };

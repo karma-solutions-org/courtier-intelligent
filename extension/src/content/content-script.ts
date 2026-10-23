@@ -1,7 +1,7 @@
 import { matchesUrlPattern } from '@shared';
 import { isAuthPage } from '../engine/analyzer';
 import { describeClick, findActionTarget } from '../engine/entry-path';
-import { JobUpdateError } from '../engine/runner';
+import { JobUpdateError } from '../engine/runner-ports';
 import type { FormLayout } from '../engine/layout-ai';
 import { LoadedMemory, MemoryPort, type MemorySaveOutcome } from '../engine/memory';
 import { FormRunner } from '../engine/runner';
