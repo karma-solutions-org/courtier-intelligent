@@ -1,60 +1,31 @@
 import { DatePipe } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  HostListener,
-  inject,
-  input,
-  OnInit,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, OnInit, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSelectModule } from '@angular/material/select';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Router, RouterLink } from '@angular/router';
-import { DossierStatus, PROPOSAL_DOSSIER_STATUSES, TERMINAL_DOSSIER_STATUSES } from '@shared';
-import { toBackendErrorMessage } from '../../../../../core/utils/backend-error.utils';
+import { RouterLink } from '@angular/router';
+import { Dossier } from '@shared';
+import { firstValueFrom } from 'rxjs';
 import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
-import { DossiersService } from '../../services/dossiers.service';
 import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { displayName } from '../../../assures-module/util/assures.utils';
+import { DossierActionsStore } from '../../store/dossier-actions.store';
 import { DossierStore } from '../../store/dossier.store';
+import { currentStageOf, isHaltedStatus, pipelineOf, Stage } from '../../util/dossier-stages.utils';
 import { ComparisonTabComponent } from '../comparison-tab/comparison-tab.component';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
 import { DocumentImportContainerComponent } from '../document-import/document-import-container.component';
+import { DossierPipelineComponent } from '../dossier-pipeline/dossier-pipeline.component';
 import { DossierTimelineComponent } from '../dossier-timeline/dossier-timeline.component';
+import { DossierToolbarComponent } from '../dossier-toolbar/dossier-toolbar.component';
 import { NeedFormComponent } from '../need-form/need-form.component';
 import { PricingTabComponent } from '../pricing-tab/pricing-tab.component';
 import { ProposalTabComponent } from '../proposal-tab/proposal-tab.component';
-import {
-  AnswerChange,
-  QuestionnaireFormComponent,
-} from '../questionnaire-form/questionnaire-form.component';
+import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/questionnaire-form.component';
 import { SansSuiteDialogComponent, SansSuiteDialogData } from '../sans-suite-dialog/sans-suite-dialog.component';
 import { StatusChipComponent } from '../status-chip/status-chip.component';
-
-type Stage = 'infos' | 'need' | 'pricing' | 'comparison' | 'proposal';
-
-/** Étape de travail correspondant à chaque statut : c'est elle qui s'ouvre à l'arrivée sur le dossier. */
-const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
-  brouillon: 'infos',
-  complet: 'need',
-  besoin_valide: 'pricing',
-  tarification: 'pricing',
-  comparaison: 'comparison',
-  decision: 'proposal',
-  proposition_envoyee: 'proposal',
-  souscrit: 'proposal',
-  refuse: 'proposal',
-  // Sans suite : l'étape réellement atteinte se déduit du dossier (voir currentStage).
-  sans_suite: 'infos',
-};
 
 /** Détail d'un dossier : en-tête (statut, courtier en charge, actions) et une seule navigation par étapes. */
 @Component({
@@ -63,18 +34,20 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
     DatePipe,
     RouterLink,
     MatButtonModule,
-    MatFormFieldModule,
     MatIconModule,
-    MatSelectModule,
     ComparisonTabComponent,
     DocumentImportContainerComponent,
+    DossierPipelineComponent,
     DossierTimelineComponent,
+    DossierToolbarComponent,
     NeedFormComponent,
     PricingTabComponent,
     ProposalTabComponent,
     QuestionnaireFormComponent,
     StatusChipComponent,
   ],
+  providers: [DossierActionsStore],
+  host: { '(window:beforeunload)': 'onBeforeUnload($event)' },
   template: `
     <a mat-button [routerLink]="backUrl()" class="back"
       ><mat-icon>arrow_back</mat-icon>{{ structure.back }}</a
@@ -105,85 +78,29 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
           {{ dossier.createdAt?.toMillis() | date: 'd MMM y' }}
         </p>
 
-        <ol class="pipeline" [class.halted]="isHalted(dossier.status)" aria-label="Étapes du dossier">
-          @for (stage of stages; track stage.key; let i = $index) {
-            <li
-              class="step"
-              [class.done]="stageState(stage.key) === 'done'"
-              [class.current]="stageState(stage.key) === 'current'"
-              [class.selected]="selected() === stage.key"
-            >
-              <button
-                type="button"
-                class="step-button"
-                [disabled]="!stageEnabled(stage.key)"
-                [attr.aria-current]="selected() === stage.key ? 'step' : null"
-                (click)="selected.set(stage.key)"
-              >
-                <span class="dot" aria-hidden="true">
-                  @if (stageState(stage.key) === 'done') {
-                    <mat-icon>check</mat-icon>
-                  } @else {
-                    {{ i + 1 }}
-                  }
-                </span>
-                <span class="step-label">{{ stage.label }}</span>
-              </button>
-            </li>
-          }
-        </ol>
+        <app-dossier-pipeline
+          [steps]="pipeline()"
+          [selected]="selected()"
+          [halted]="isHalted(dossier.status)"
+          (stageSelected)="selected.set($event)"
+        />
 
-        <div class="toolbar">
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="assignee">
-            <mat-label>{{ structure.assignedTo }}</mat-label>
-            <mat-select [value]="dossier.assignedTo" (selectionChange)="store.assign($event.value)">
-              @for (member of store.activeMembers(); track member.id) {
-                <mat-option [value]="member.id">{{
-                  member.displayName || member.email
-                }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <span class="spacer"></span>
-
-          <button
-            mat-button
-            type="button"
-            [class.active]="selected() === 'history'"
-            (click)="selected.set(selected() === 'history' ? currentStage() : 'history')"
-          >
-            <mat-icon>history</mat-icon>{{ structure.tabs.history }}
-          </button>
-
-          @if (dossier.status === 'brouillon') {
-            <a mat-stroked-button [routerLink]="[listUrl, dossier.id, 'brouillon']">{{
-              structure.resume
-            }}</a>
-          }
-
-          @if (canClose(dossier.status) && !dossier.deletedAt) {
-            <button mat-stroked-button type="button" [disabled]="closing()" (click)="classerSansSuite(dossier.id, dossier.reference)">
-              <mat-icon>block</mat-icon>Classer sans suite
-            </button>
-          }
-
-          @if (isAdmin() && !dossier.deletedAt) {
-            @if (confirmingDelete()) {
-              <span class="confirm" role="alert">
-                Mettre ce dossier dans la corbeille ?
-                <button mat-button type="button" (click)="confirmingDelete.set(false)">Annuler</button>
-                <button mat-flat-button class="danger" type="button" [disabled]="deleting()" (click)="remove(dossier.id)">
-                  Supprimer
-                </button>
-              </span>
-            } @else {
-              <button mat-button type="button" class="danger-text" (click)="confirmingDelete.set(true)">
-                <mat-icon>delete</mat-icon>Supprimer le dossier
-              </button>
-            }
-          }
-        </div>
+        <app-dossier-toolbar
+          [dossier]="dossier"
+          [members]="store.activeMembers()"
+          [listUrl]="listUrl"
+          [isAdmin]="isAdmin()"
+          [historyOpen]="selected() === 'history'"
+          [closing]="actions.closing()"
+          [deleting]="actions.deleting()"
+          [confirmingDelete]="actions.confirmingDelete()"
+          (assigned)="store.assign($event)"
+          (historyToggled)="toggleHistory()"
+          (closeRequested)="classerSansSuite(dossier)"
+          (deleteAsked)="actions.askDelete()"
+          (deleteCancelled)="actions.cancelDelete()"
+          (deleteConfirmed)="actions.remove({ dossierId: dossier.id, backUrl: backUrl() })"
+        />
         @if (dossier.status === 'brouillon' && !store.isComplete() && store.schema().length) {
           <p class="hint">{{ structure.incompleteHint }}</p>
         }
@@ -337,52 +254,6 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
       font-weight: 500;
     }
 
-    .pipeline {
-      display: flex;
-      gap: 0;
-      margin: 0 0 18px;
-      padding: 4px 0 6px;
-      list-style: none;
-      overflow-x: auto;
-      scrollbar-width: thin;
-    }
-
-    .step-button {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      width: 100%;
-      padding: 0 4px 8px;
-      border: 0;
-      border-bottom: 2px solid transparent;
-      font: inherit;
-      background: none;
-      cursor: pointer;
-
-      &:disabled {
-        cursor: not-allowed;
-        opacity: 0.55;
-      }
-
-      &:not(:disabled):hover .step-label {
-        color: var(--ci-navy-900);
-      }
-    }
-
-    .step.selected .step-button {
-      border-bottom-color: var(--ci-navy-900);
-    }
-
-    .step.selected .step-label {
-      font-weight: 600;
-      color: var(--ci-navy-900);
-    }
-
-    .active {
-      background: var(--ci-navy-50);
-    }
-
     .history {
       position: relative;
 
@@ -394,102 +265,6 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
       }
     }
 
-    .step {
-      position: relative;
-      display: flex;
-      flex: 1 0 88px;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      text-align: center;
-
-      &:not(:first-child)::before {
-        content: '';
-        position: absolute;
-        top: 13px;
-        right: 50%;
-        width: 100%;
-        height: 2px;
-        background: var(--ci-border);
-        z-index: 0;
-      }
-
-      &.done:not(:first-child)::before,
-      &.current:not(:first-child)::before {
-        background: var(--ci-navy-900);
-      }
-    }
-
-    .dot {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      place-items: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--ci-text-muted);
-      background: var(--ci-surface);
-      border: 2px solid var(--ci-border);
-
-      mat-icon {
-        width: 16px;
-        height: 16px;
-        font-size: 16px;
-      }
-    }
-
-    .step.done .dot {
-      color: #fff;
-      border-color: var(--ci-navy-900);
-      background: var(--ci-navy-900);
-    }
-
-    .step.current .dot {
-      color: var(--ci-navy-900);
-      border-color: var(--ci-navy-900);
-      background: var(--ci-navy-50);
-    }
-
-    .step-label {
-      font-size: 13px;
-      font-weight: 500;
-      line-height: 1.25;
-      color: var(--ci-text-muted);
-    }
-
-    .step.current .step-label {
-      font-weight: 600;
-    }
-
-    .pipeline.halted {
-      opacity: 0.6;
-      filter: grayscale(1);
-    }
-
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .assignee {
-      width: 240px;
-      max-width: 100%;
-    }
-
-    .spacer {
-      flex: 1;
-    }
-
-    .secondary {
-      --mat-button-filled-container-color: var(--ci-navy-100);
-      --mat-button-filled-label-text-color: var(--ci-navy-900);
-    }
-
     .trashed {
       display: flex;
       gap: 8px;
@@ -499,22 +274,6 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
       border: 1px solid var(--ci-danger, #c62828);
       border-radius: 8px;
       color: var(--ci-danger, #c62828);
-    }
-
-    .danger-text {
-      color: var(--ci-danger, #c62828);
-    }
-
-    .danger {
-      background: var(--ci-danger, #c62828);
-      color: #fff;
-    }
-
-    .confirm {
-      display: inline-flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
     }
 
     .hint {
@@ -571,10 +330,6 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
       .panel {
         padding: 4px 8px 12px;
       }
-
-      h1 {
-        font-size: 22px;
-      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -584,142 +339,21 @@ export class DossierDetailContainerComponent implements OnInit, HasUnsavedChange
   readonly id = input.required<string>();
 
   protected readonly store = inject(DossierStore);
+  protected readonly actions = inject(DossierActionsStore);
   private readonly _snackBar = inject(MatSnackBar);
+  private readonly _dialog = inject(MatDialog);
+  private readonly _auth = inject(AuthStore);
   protected readonly structure = DOSSIERS_STRUCTURE.detail;
   protected readonly listUrl = CabinetRouteContainerModel.DOSSIERS_ROUTE.url;
-  private readonly _router = inject(Router);
-  private readonly _dossiers = inject(DossiersService);
-  private readonly _auth = inject(AuthStore);
   protected readonly isAdmin = computed(() => this._auth.role() === 'admin');
-  protected readonly confirmingDelete = signal(false);
-  protected readonly deleting = signal(false);
-  protected readonly closing = signal(false);
-  private readonly _dialog = inject(MatDialog);
-
-  /** Un dossier se classe sans suite à toute étape, tant qu'il n'est pas clos. */
-  protected canClose(status: DossierStatus): boolean {
-    return !TERMINAL_DOSSIER_STATUSES.includes(status);
-  }
-
-  /** Demande le motif, puis classe le dossier sans suite (les tarifications en cours sont annulées par le serveur). */
-  protected classerSansSuite(dossierId: string, reference: string | null): void {
-    this._dialog
-      .open<SansSuiteDialogComponent, SansSuiteDialogData, string>(SansSuiteDialogComponent, { data: { reference } })
-      .afterClosed()
-      .subscribe((motif) => {
-        if (!motif) return;
-        this.closing.set(true);
-        this._dossiers.classerSansSuite(dossierId, motif).subscribe({
-          next: ({ cancelledJobs }) => {
-            this.closing.set(false);
-            const jobs = cancelledJobs ? ` ${cancelledJobs} tarification(s) annulée(s).` : '';
-            this._snackBar.open(`Dossier classé sans suite.${jobs}`, undefined, { duration: 4000 });
-          },
-          error: (error) => {
-            this.closing.set(false);
-            this._snackBar.open(toBackendErrorMessage(error), undefined, { duration: 5000 });
-          },
-        });
-      });
-  }
-
-  /** Met le dossier dans la corbeille, puis revient à l'espace du client. */
-  protected remove(dossierId: string): void {
-    const back = this.backUrl();
-    this.deleting.set(true);
-    this._dossiers.remove(dossierId).subscribe({
-      next: () => {
-        this._snackBar.open('Dossier placé dans la corbeille.', undefined, { duration: 3000 });
-        this._router.navigateByUrl(back);
-      },
-      error: (error) => {
-        this.deleting.set(false);
-        this.confirmingDelete.set(false);
-        this._snackBar.open(toBackendErrorMessage(error), undefined, { duration: 5000 });
-      },
-    });
-  }
-
-  /** Le dossier se gère depuis l'espace de son client. */
-  protected backUrl(): string {
-    const assureId = this.store.dossier()?.assureId;
-    return assureId ? CabinetRouteContainerModel.clientUrl(assureId) : CabinetRouteContainerModel.CLIENTS_ROUTE.url;
-  }
   protected readonly nameOf = displayName;
-  /** Les étapes du dossier : chacune ouvre son espace de travail (une seule navigation). */
-  protected readonly stages: { key: Stage; label: string }[] = [
-    { key: 'infos', label: 'Informations' },
-    { key: 'need', label: 'Couverture' },
-    { key: 'pricing', label: 'Tarification' },
-    { key: 'comparison', label: 'Comparatif' },
-    { key: 'proposal', label: 'Proposition' },
-  ];
+  protected readonly isHalted = isHaltedStatus;
 
   /** Étape où se trouve le dossier, d'après son statut (sans suite : la dernière étape atteinte). */
-  protected readonly currentStage = computed<Stage>(() => {
-    const status = this.store.dossier()?.status;
-    if (!status) return 'infos';
-    if (status === 'sans_suite') {
-      const dossier = this.store.dossier()!;
-      if (dossier.decision || dossier.proposal) return 'proposal';
-      if (dossier.needAnalysis?.validatedAt) return 'pricing';
-      return dossier.completeness?.ok ? 'need' : 'infos';
-    }
-    return STAGE_OF_STATUS[status];
-  });
-
+  protected readonly currentStage = computed<Stage>(() => currentStageOf(this.store.dossier()));
+  protected readonly pipeline = computed(() => pipelineOf(this.store.dossier()));
   /** Étape affichée (ou l'historique) : suit l'avancement du dossier, le courtier peut revenir sur une étape passée. */
   protected readonly selected = signal<Stage | 'history'>('infos');
-
-  protected stageEnabled(stage: Stage): boolean {
-    const status = this.store.dossier()?.status;
-    switch (stage) {
-      case 'infos':
-        return true;
-      case 'need':
-        return !!status && status !== 'brouillon';
-      case 'pricing':
-        return !!status && status !== 'brouillon' && status !== 'complet';
-      case 'comparison':
-        return this.comparisonEnabled();
-      case 'proposal':
-        return this.proposalEnabled();
-    }
-  }
-
-  protected stageState(stage: Stage): 'done' | 'current' | 'todo' {
-    if (this.store.dossier()?.status === 'souscrit') return 'done';
-    const order = this.stages.findIndex((s) => s.key === stage);
-    const current = this.stages.findIndex((s) => s.key === this.currentStage());
-    return order < current ? 'done' : order === current ? 'current' : 'todo';
-  }
-
-  protected isHalted(status: DossierStatus): boolean {
-    return status === 'refuse' || status === 'sans_suite';
-  }
-
-  /** Le comparatif s'ouvre dès la tarification (les offres arrivent au fil de l'eau). */
-  protected readonly comparisonEnabled = computed(() =>
-    [
-      'tarification',
-      'comparaison',
-      'decision',
-      'proposition_envoyee',
-      'souscrit',
-      'refuse',
-    ].includes(this.store.dossier()?.status ?? '') ||
-      (this.store.dossier()?.status === 'sans_suite' && !!this.store.dossier()?.needAnalysis?.validatedAt),
-  );
-
-  /** La proposition s'ouvre dès qu'une offre est retenue (sans suite : seulement si une décision existe). */
-  protected readonly proposalEnabled = computed(() => {
-    const dossier = this.store.dossier();
-    return (
-      !!dossier &&
-      (PROPOSAL_DOSSIER_STATUSES.includes(dossier.status) || dossier.status === 'sans_suite') &&
-      !!dossier.decision
-    );
-  });
 
   protected readonly missingLabels = computed(() =>
     this.store
@@ -746,13 +380,31 @@ export class DossierDetailContainerComponent implements OnInit, HasUnsavedChange
     this.store.clearMessages();
   }
 
+  /** Le dossier se gère depuis l'espace de son client. */
+  protected backUrl(): string {
+    const assureId = this.store.dossier()?.assureId;
+    return assureId ? CabinetRouteContainerModel.clientUrl(assureId) : CabinetRouteContainerModel.CLIENTS_ROUTE.url;
+  }
+
+  protected toggleHistory(): void {
+    this.selected.set(this.selected() === 'history' ? this.currentStage() : 'history');
+  }
+
+  /** Demande le motif, puis classe le dossier sans suite. */
+  protected async classerSansSuite(dossier: Dossier): Promise<void> {
+    const dialog = this._dialog.open<SansSuiteDialogComponent, SansSuiteDialogData, string>(SansSuiteDialogComponent, {
+      data: { reference: dossier.reference },
+    });
+    const motif = await firstValueFrom(dialog.afterClosed());
+    if (motif) this.actions.classerSansSuite({ dossierId: dossier.id, motif });
+  }
+
   /** Garde de sortie de route : des modifications ne sont pas enregistrées. */
   hasUnsavedChanges(): boolean {
     return this.store.hasPendingEdits();
   }
 
   /** Fermeture ou rechargement de l'onglet pendant une saisie ou un enregistrement. */
-  @HostListener('window:beforeunload', ['$event'])
   protected onBeforeUnload(event: BeforeUnloadEvent): void {
     if (this.store.hasPendingEdits() || this.store.saveStatus() === 'saving') {
       event.preventDefault();
@@ -762,5 +414,4 @@ export class DossierDetailContainerComponent implements OnInit, HasUnsavedChange
   protected onAnswer({ path, value }: AnswerChange): void {
     this.store.edit(path, value);
   }
-
 }
