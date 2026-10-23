@@ -1,5 +1,5 @@
 import { AbstractControl, ValidationErrors } from '@angular/forms';
-import { Assure, AssureDuplicateReason, duplicateReasons, ASSURE_EMAIL_PATTERN, ASSURE_POSTAL_CODE_PATTERN, ASSURE_SIRET_PATTERN } from '@shared';
+import { Assure, AssureDuplicateReason, duplicateReasons, foldText, ASSURE_EMAIL_PATTERN, ASSURE_POSTAL_CODE_PATTERN, ASSURE_SIRET_PATTERN } from '@shared';
 
 /** Formats acceptés (France). Email, code postal et SIRET : partagés avec les règles Firestore (shared/assure-format). */
 export const EMAIL_PATTERN = ASSURE_EMAIL_PATTERN;
@@ -33,10 +33,7 @@ export const birthDateValidator = (control: AbstractControl): ValidationErrors |
 
 /** Minuscules, sans accents ni espaces superflus : base des comparaisons (recherche, doublons). */
 export function normalize(text: string | null | undefined): string {
-  return (text ?? '')
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
+  return foldText(text)
     .replace(/\s+/g, ' ')
     .trim();
 }

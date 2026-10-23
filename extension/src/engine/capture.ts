@@ -1,3 +1,4 @@
+import { foldText } from '@shared';
 import type { CapturedGuarantee, CapturedOffer } from '../shared/messages';
 import { isVisible } from './analyzer';
 import { hasPremium } from './offer';
@@ -74,11 +75,7 @@ export function visibleText(root: Element): string {
 
 /** Comme `normalize`, mais garde la ponctuation utile aux montants et aux numéros (« , », « . », « € », « / », « - »). */
 const fold = (text: string) =>
-  text
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
+  foldText(text).replace(/\s+/g, ' ');
 
 const HEADINGS = 'h1, h2, h3, h4, h5, h6, [role="heading"], caption, legend, dt, th, strong, b';
 

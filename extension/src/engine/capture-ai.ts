@@ -1,4 +1,4 @@
-import { AI_MASK as MASK, CAPTURE_SYSTEM_PROMPT, type CanonicalData } from '@shared';
+import { AI_MASK as MASK, CAPTURE_SYSTEM_PROMPT, foldText, type CanonicalData } from '@shared';
 import type { CapturedOffer } from '../shared/messages';
 import type { AiRequest, AskAi } from './ai-fallback';
 import { parseAmounts } from './capture';
@@ -32,7 +32,7 @@ const ACCENTS: Record<string, string> = {
 
 /** Motif d'une valeur du dossier : sans casse ni accents, séparateurs libres (« AB-123-CD » ↔ « ab 123 cd » ↔ « AB123CD »). */
 function looseValuePattern(value: string): string | null {
-  const runs = value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().match(/[a-z]+|\d+/g);
+  const runs = foldText(value).match(/[a-z]+|\d+/g);
   if (!runs) return null;
   const letters = (run: string) => [...run].map(char => (ACCENTS[char] ? `[${ACCENTS[char]}]` : char)).join('');
   return runs.map(letters).join("[\\s\\-'’.,/]*");

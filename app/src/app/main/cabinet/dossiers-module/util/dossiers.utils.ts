@@ -1,4 +1,4 @@
-import { CanonicalPath, Dossier, DOSSIER_TRANSITIONS, DossierStatus, QuestionnaireSection } from '@shared';
+import { CanonicalPath, Dossier, DOSSIER_TRANSITIONS, DossierStatus, foldText, QuestionnaireSection } from '@shared';
 
 export interface DossierFilter {
   status: DossierStatus | '';
@@ -40,7 +40,7 @@ export function filterDossiers(
 }
 
 function normalize(text: string): string {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
+  return foldText(text).trim().replace(/\s+/g, ' ');
 }
 
 /** Faut-il interroger Elasticsearch (texte ou filtre) plutôt que lire simplement la tranche Firestore ? */

@@ -1,3 +1,5 @@
+import { foldText } from './text';
+
 // Formats d'un assuré, partagés par l'app (validateurs du formulaire) et les règles Firestore
 // (firestore.rules, bloc « assures » du repo back) : modifier les deux ensemble.
 
@@ -35,10 +37,7 @@ export type AssureDuplicateReason = 'siret' | 'email' | 'nom_naissance' | 'raiso
 
 /** Texte comparable : minuscules, sans accents ni espaces superflus. */
 export function normalizeIdentityText(value: string | null | undefined): string {
-  return (value ?? '')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
+  return foldText(value)
     .replace(/\s+/g, ' ')
     .trim();
 }

@@ -1,10 +1,9 @@
+import { foldText } from '@shared';
+
 /** Outils de comparaison de textes (libellés de champs, options) : sans accents, sans casse, sans ponctuation. */
 
 export function normalize(text: string | null | undefined): string {
-  return (text ?? '')
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
+  return foldText(text)
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
