@@ -1,7 +1,7 @@
-import { CanonicalData, CanonicalPath, isExtraPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, type DiscoveredFieldInput, isRelevantField } from '@shared';
+import { CanonicalData, CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, DISCOVERED_LABEL_MAX, type DiscoveredFieldInput, isRelevantField } from '@shared';
 import { normalize } from './text';
 import type { FormField } from './analyzer';
-import { ACCEPT_THRESHOLD, isCompatible, Mapping, matchExtraPath } from './mapping';
+import { isCompatible, Mapping } from './mapping';
 
 /** Mémoire partagée des formulaires, vue par l'extension (lecture directe, écriture par les functions `memoires-*`). */
 /**
@@ -90,9 +90,9 @@ export function applyMemory(
 const MAX_LABEL = 120;
 
 /** Un libellé est un texte de formulaire : s'il ressemble à une donnée saisie (e-mail, numéro), il n'est pas conservé. */
-export function safeLabel(label: string): string | null {
+export function safeLabel(label: string, max = MAX_LABEL): string | null {
   const text = label.trim();
-  if (!text || text.length > MAX_LABEL) return null;
+  if (!text || text.length > max) return null;
   if (/[^\s@]+@[^\s@]+\.[^\s@]+/.test(text) || /\d{6,}/.test(text.replace(/[\s.\-/]/g, ''))) return null;
   return text;
 }
@@ -112,6 +112,19 @@ const PHONE = /(\+33|0033|\b0)\s?[1-9]([\s.-]?\d{2}){4}\b/;
 const DATE = /\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b/;
 
 const normalizeValue = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const sameText = (a: string, b: string) => normalizeValue(a) === normalizeValue(b);
+
+/**
+ * Nom technique plutôt que question : un seul mot en code (« AUTO01 », « ZSEC_B1 », « AssureDepuis »), ou une réponse
+ * prise pour la question (« Non »). Un mot ordinaire (« Garage », même si le champ s'appelle `garage`) ou un sigle
+ * (« SIRET », « CRM ») reste une vraie question.
+ */
+export function isTechnicalLabel(label: string): boolean {
+  const text = label.trim();
+  if (/^(oui|non|yes|no)$/i.test(text)) return true;
+  return !/\s/.test(text) && (/[_\d]/.test(text) || /[a-z][A-Z]/.test(text));
+}
 
 /** Valeurs du dossier (texte de 3 caractères et plus) : une option qui les reprend est une donnée client. */
 export function clientValues(quoteData: CanonicalData | undefined): Set<string> {
@@ -163,17 +176,17 @@ export function toDiscoveredFields(
       .map(m => m.fieldKey),
   );
   const values = clientValues(quoteData);
-  // La même question déjà ajoutée depuis un autre extranet (autres mots, autre ordre) n'est pas nouvelle.
-  const productExtras = (productPaths ?? []).filter(isExtraPath);
-  const alreadyAsked = (field: FormField) => (matchExtraPath(field, productExtras)?.score ?? 0) >= ACCEPT_THRESHOLD;
+  // Pas de filtre « déjà posée par un autre assureur » : le champ est signalé, et le serveur le rattache à la question
+  // existante (même règle, shared/question-matching.ts) en y ajoutant cet assureur. Sans ce signalement, un dossier
+  // qui ne vise que cet assureur ne verrait jamais la question (elle n'est montrée que pour les assureurs qui la posent).
   return fields
     // Seuls les champs OBLIGATOIRES de l'extranet deviennent des questions (un champ facultatif ne bloque pas le devis),
     // jamais un fil d'Ariane ou une barre de navigation (« > Conducteur 1 > Véhicule »).
-    .filter(field => !known.has(field.key) && field.required && isRelevantField(field) && !isNavigationLabel(field.label) && !alreadyAsked(field))
+    .filter(field => !known.has(field.key) && field.required && isRelevantField(field) && !isNavigationLabel(field.label))
     .slice(0, DISCOVERED_MAX_FIELDS_PER_REPORT)
     .map(field => ({
       fieldKey: field.key.slice(0, MAX_FIELD_KEY),
-      label: safeLabel(field.label) ?? '',
+      label: safeLabel(field.label, DISCOVERED_LABEL_MAX) ?? '',
       kind: field.kind,
       inputType: field.inputType,
       name: safeText(field.name, MAX_NAME, values),
@@ -186,6 +199,9 @@ export function toDiscoveredFields(
     }))
     // Libellé illisible ou qui ressemble à une donnée client : le champ n'est pas signalé du tout.
     .filter(field => field.label !== '')
+    // Libellé introuvable sur la page : l'analyse retombe sur le nom technique (« AUTO01 », « ZSEC_B1 », « AssureDepuis »)
+    // ou sur une des réponses (« Non ») ; ce n'est pas une question qu'on peut poser au client.
+    .filter(field => !isTechnicalLabel(field.label) && !field.options.some(o => sameText(o.label, field.label)))
     // Lecture ratée de l'extranet (options identiques, ou qui ne sont que le nom technique du champ) : jamais une question.
     .filter(field => !misreadOptions(field.options, field.name));
 }

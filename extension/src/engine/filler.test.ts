@@ -524,3 +524,14 @@ describe('Réponses en tranches (ancienneté d’assurance)', () => {
   });
 });
 
+
+describe('Garage Oui / Non déduit du lieu de stationnement', () => {
+  const yesNo = [{ value: 'oui', label: 'Oui' }, { value: 'non', label: 'Non' }];
+  it('garage privé → Oui, voie publique → Non', () => {
+    expect(matchOption(yesNo, 'garage_prive')?.label).toBe('Oui');
+    expect(matchOption(yesNo, 'voie_publique')?.label).toBe('Non');
+  });
+  it('une vraie liste de stationnement garde son option', () => {
+    expect(matchOption([{ value: 'g', label: 'Garage privé' }, { value: 'v', label: 'Voie publique' }], 'garage_prive')?.label).toBe('Garage privé');
+  });
+});

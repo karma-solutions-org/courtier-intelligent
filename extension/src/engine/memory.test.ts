@@ -206,3 +206,29 @@ describe('Questions découvertes : navigation jamais signalée', () => {
     expect(isNavigationLabel('Pays de naissance')).toBe(false);
   });
 });
+
+describe('toDiscoveredFields : libellé introuvable (Zephir)', () => {
+  const yesNo = [{ value: 'true', label: 'Oui' }, { value: 'false', label: 'Non' }];
+  it.each(['AUTO01', 'ZSEC_B1', 'AssureDepuis'])('nom technique « %s » : pas de question', label => {
+    expect(toDiscoveredFields([field('k', { label, name: label, required: true, kind: 'radio', options: yesNo })], [])).toEqual([]);
+  });
+
+  it('libellé qui n’est qu’une réponse (« Non ») : pas de question', () => {
+    const options = [{ value: 'non', label: 'Non' }, { value: 'm2', label: 'Moins de 2 mois' }];
+    expect(toDiscoveredFields([field('k', { label: 'Non', required: true, kind: 'radio', options })], [])).toEqual([]);
+  });
+
+  it('libellé « Non » dont la liste ne garde plus que les autres réponses : pas de question', () => {
+    const options = [{ value: 'm2', label: 'Moins de 2 mois' }, { value: 'p9', label: 'Plus de 9 mois' }];
+    expect(toDiscoveredFields([field('k', { label: 'Non', required: true, kind: 'radio', options })], [])).toEqual([]);
+  });
+
+  it.each([['Garage', 'garage'], ['SIRET', 'siret'], ['CRM', null]])('mot ordinaire ou sigle « %s » : une vraie question', (label, name) => {
+    expect(toDiscoveredFields([field('k', { label, name, required: true })], []).map(f => f.label)).toEqual([label]);
+  });
+
+  it('une vraie question reste signalée', () => {
+    const label = 'La suspension faisait-elle suite à une perte de points ?';
+    expect(toDiscoveredFields([field('k', { label, required: true, kind: 'radio', options: yesNo })], []).map(f => f.label)).toEqual([label]);
+  });
+});

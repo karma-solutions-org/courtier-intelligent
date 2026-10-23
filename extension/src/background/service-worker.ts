@@ -25,6 +25,7 @@ import {
   TabMessage,
   type JobUpdate,
   type UpdateJobResponse,
+  type FieldsDiscoveredResponse,
 } from '../shared/messages';
 import { createAuthController, MESSAGES, toAiMessage, toUserMessage, UserFacingError } from './auth-controller';
 import { APP_DEVICE_KEY, firebaseAuthPort, firebaseBackendPort, firestoreSessionPort } from './firebase-adapters';
@@ -366,6 +367,11 @@ async function report(insurerId: string, origin: string, step: ExtensionReportSt
   await addExtensionReport({ insurerId: insurerId.slice(0, 100), origin: originOnly(origin), step, issue }).catch(() => undefined);
 }
 
+/** Onglets (et job) dont un tarif est déjà enregistré : une nouvelle sauvegarde ne réécrit que l'offre. */
+const savedCaptures = new Set<string>();
+const captureKey = (tabId: number, run: RunState) => `${tabId}|${run.dossierId}|${run.insurerId}`;
+const CAPTURE_PHASES: RunState['phase'][] = ['capturing', 'capture_review', 'captured', 'capture_failed'];
+
 /** Termine la capture de l'onglet : nouvel état pour le side panel, et la page arrête de surveiller. */
 function finishCapture(tabId: number, run: RunState, update: Partial<RunState>): void {
   runByTab.set(tabId, { ...run, ...update });
@@ -412,6 +418,7 @@ function autoSubmitCapture(tabId: number, run: RunState): void {
       const current = runByTab.get(tabId);
       if (current) runByTab.set(tabId, { ...current, message: response.message });
       void broadcast();
+      chrome.tabs.sendMessage(tabId, { type: 'CAPTURE_SAVE_FAILED' } satisfies TabMessage).catch(() => undefined);
     }
   });
 }
@@ -430,7 +437,8 @@ async function submitCapture(tabId: number, edits: Partial<CaptureEdits>): Promi
     return { ok: false, message: 'Indiquez au moins la prime annuelle ou la prime mensuelle.' };
   }
   try {
-    await writeCapturedOffer(user, run.dossierId, run.insurerId, offer);
+    await writeCapturedOffer(user, run.dossierId, run.insurerId, offer, savedCaptures.has(captureKey(tabId, run)));
+    savedCaptures.add(captureKey(tabId, run));
   } catch (error) {
     // Le tarif reste affiché dans le side panel : le courtier peut le renvoyer de là.
     runByTab.set(tabId, run);
@@ -775,6 +783,8 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
       else if (jobMatches(jobByTab.get(tab!.tabId), message.state.dossierId, message.state.insurerId)) {
         // Un envoi du tarif est déjà en cours : l'état republié par la page ne le relance pas.
         if (message.state.phase === 'capture_review' && runByTab.get(tab!.tabId)?.phase === 'capturing' && runByTab.get(tab!.tabId)?.capture?.offer) return false;
+        // La page remplit de nouveau (job relancé) : le prochain tarif repasse le job à « captured ».
+        if (!CAPTURE_PHASES.includes(message.state.phase)) savedCaptures.delete(captureKey(tab!.tabId, message.state));
         runByTab.set(tab!.tabId, message.state);
         autoSubmitCapture(tab!.tabId, message.state);
       } else return false;
@@ -821,13 +831,13 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     case 'FIELDS_DISCOVERED': {
       const insurerId = tabJob(tab!.tabId)?.insurerId;
       if (!insurerId || !Array.isArray(message.fields)) {
-        sendResponse(false);
+        sendResponse({ ok: false, mapping: {} } satisfies FieldsDiscoveredResponse);
         return false;
       }
       signedInUser()
-        .then(user => (user ? reportDiscoveredFields(insurerId, tab!.origin, String(message.fingerprint), message.fields, Array.isArray(message.requiredPaths) ? message.requiredPaths : []) : undefined))
-        .then(() => sendResponse(true))
-        .catch(() => sendResponse(false));
+        .then(user => (user ? reportDiscoveredFields(insurerId, tab!.origin, String(message.fingerprint), message.fields, Array.isArray(message.requiredPaths) ? message.requiredPaths : []) : {}))
+        .then(mapping => sendResponse({ ok: true, mapping } satisfies FieldsDiscoveredResponse))
+        .catch(() => sendResponse({ ok: false, mapping: {} } satisfies FieldsDiscoveredResponse));
       return true;
     }
 

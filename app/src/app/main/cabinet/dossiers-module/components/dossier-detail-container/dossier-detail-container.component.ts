@@ -196,24 +196,26 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
         @switch (selected()) {
           @case ('infos') {
             <div class="tab">
-              @if (store.missing().length && store.editable()) {
+              @if (store.missing().length && store.answersEditable()) {
                 <p class="warning" role="status">
                   {{ structure.missingBanner }}
                   {{ missingLabels() }}
                 </p>
               }
-              @if (!store.editable()) {
+              @if (!store.answersEditable()) {
                 <p class="hint">{{ structure.readonlyNote }}</p>
+              } @else if (store.editingDuringPricing()) {
+                <p class="hint" role="status">{{ structure.pricingEditNote }}</p>
               }
-              <app-document-import-container class="documents" [editable]="store.editable()" />
+              <app-document-import-container class="documents" [editable]="store.answersEditable()" />
               <app-questionnaire-form
                 [sections]="store.schema()"
                 [data]="store.answers()"
-                [readonly]="!store.editable()"
+                [readonly]="!store.answersEditable()"
                 [showMissing]="true"
                 (answerChanged)="onAnswer($event)"
               />
-              @if (store.editable()) {
+              @if (store.answersEditable()) {
                 <div class="actions">
                   <button
                     mat-flat-button

@@ -131,3 +131,16 @@ describe('questionTypeOf', () => {
     expect(questionTypeOf(field('a'))).toBe('text');
   });
 });
+
+describe('Réponses de repli', () => {
+  const field = (key: string, required: boolean) => ({ key, kind: 'text', inputType: 'text', label: key, placeholder: null, name: null, id: null, autocomplete: null, required, section: null, order: 0, options: [], pattern: null, maxLength: null, segments: null }) as FormField;
+  const mapping = (fieldKey: string, canonicalPath: string) => ({ fieldKey, canonicalPath, status: 'mapped' }) as unknown as Mapping;
+  const data = { 'client.address.postalCode': '13010' } as CanonicalData;
+
+  it('code postal de stationnement absent : celui du souscripteur, si l’extranet l’exige', () => {
+    expect(planFill([field('cp', true)], [mapping('cp', 'vehicle.parkingPostalCode')], data).instructions[0]?.value).toBe('13010');
+  });
+  it('même sans marque d’obligation (Zephir ne la montre qu’après « Suivant »)', () => {
+    expect(planFill([field('cp', false)], [mapping('cp', 'vehicle.parkingPostalCode')], data).instructions[0]?.value).toBe('13010');
+  });
+});

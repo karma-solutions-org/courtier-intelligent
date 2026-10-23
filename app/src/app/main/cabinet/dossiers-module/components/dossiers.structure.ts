@@ -93,6 +93,8 @@ export const DOSSIERS_STRUCTURE = {
     resume: 'Reprendre le brouillon',
     save: 'Enregistrer les modifications',
     readonlyNote: "Ce dossier n'est plus modifiable à ce stade.",
+    pricingEditNote:
+      'Tarification en cours : vos modifications sont transmises aux tarifications en cours, et les tarifs déjà obtenus devront être refaits.',
     missingBanner: 'Informations obligatoires manquantes :',
     closeHistory: "Fermer l'historique",
     statusActions: {

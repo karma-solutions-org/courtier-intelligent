@@ -2,6 +2,7 @@ import { FORBIDDEN_NAV_LABEL } from '@shared';
 import { analyzeForm, customValueOf, isLabelStyledChoice, type FieldOption, type FormField } from './analyzer';
 import type { FillValue } from './plan';
 import { containsPhrase, normalize, words } from './text';
+import { yesNoFromChoice } from './yes-no';
 
 export type FillStatus = 'filled' | 'failed';
 
@@ -132,7 +133,7 @@ const CHOICE_SYNONYMS: Record<string, string[]> = {
   ethanol: ['ethanol', 'e85', 'superethanol', 'fe'],
 };
 
-const YES = ['oui', 'yes', 'true', 'vrai', '1', 'o', 'y'];
+const YES = ['oui','yes', 'true', 'vrai', '1', 'o', 'y'];
 const NO = ['non', 'no', 'false', 'faux', '0', 'n'];
 
 /** Intervalle numérique lu dans le libellé d'une option (« moins de 9 mois », « de 9 à 23 mois », « 24 mois et plus »). */
@@ -185,6 +186,11 @@ export function matchOption(options: FieldOption[], value: FillValue): FieldOpti
     const phrased = value ? /^(oui|yes)\b/ : /^(non|aucun|aucune|jamais)\b/;
     const starting = candidates.filter(o => phrased.test(normalize(o.label)));
     return starting.length === 1 ? starting[0] : null;
+  }
+  // Question Oui / Non déduite d'un choix du dossier (« Garage » ← lieu de stationnement « garage privé »).
+  const impliedYesNo = typeof value === 'string' ? yesNoFromChoice(value) : undefined;
+  if (impliedYesNo !== undefined && candidates.some(o => YES.includes(normalize(o.label)))) {
+    return matchOption(candidates, impliedYesNo);
   }
   const wanted = String(value);
   const wantedNorm = normalize(wanted);
@@ -547,8 +553,10 @@ function fillAriaRadio(field: FormField, radios: HTMLElement[], value: FillValue
   if (!option) return fail(field, `Aucune option ne correspond à « ${String(value)} ».`);
   const radio = radios.find(el => customValueOf(el) === option.value);
   if (!radio) return fail(field, 'Le bouton radio est introuvable.');
-  if (radio.getAttribute('aria-checked') !== 'true') realClick(radio);
-  return radio.getAttribute('aria-checked') === 'true' ? ok(field) : fail(field, "Le choix n'a pas pu être coché.");
+  // Bouton radio ARIA (aria-checked) ou bouton bascule (aria-pressed).
+  const checked = () => radio.getAttribute('aria-checked') === 'true' || radio.getAttribute('aria-pressed') === 'true';
+  if (!checked()) realClick(radio);
+  return checked() ? ok(field) : fail(field, "Le choix n'a pas pu être coché.");
 }
 
 /** Interrupteur ou case dessinés (role="switch" / "checkbox") : état lu dans aria-checked. */

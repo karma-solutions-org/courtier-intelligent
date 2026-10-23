@@ -1,4 +1,4 @@
-import { CanonicalPath, isExtraPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, MissingField, type DiscoveredFieldInput } from '@shared';
+import { CanonicalPath, ExtraCanonicalPath, isExtraPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, MissingField, type DiscoveredFieldInput } from '@shared';
 import type { CapturedOffer, CaptureState, JobContext, JobUpdate, RunField, RunState } from '../shared/messages';
 import { AskAi, resolveWithAi } from './ai-fallback';
 import { analyzeForm, FormAnalysis, isAuthPage } from './analyzer';
@@ -7,10 +7,13 @@ import { detectResultPage, extractFromDom, hasPremium, hasResultHeading, parseAm
 import { captureWithAi, mergeOffers } from './capture-ai';
 import { expectsDate } from './field-synonyms';
 import { fillField, FillResult, parseRange, registrationFor } from './filler';
-import { asCanonicalPath, isCompatible, Mapping, mapExtraPaths, mapFields } from './mapping';
+import { asCanonicalPath, ExtraQuestion, isCompatible, Mapping, mapExtraPaths, mapFields } from './mapping';
 import { applyMemory, MemoryPort, toDiscoveredFields, toMemoryFields, toRequiredPaths } from './memory';
 import { FillPlan, FillValue, planFill, valueOf } from './plan';
-import { clickRow, detectStepHint, findNextButton, findResultRows, findSearchButton, hasValidationErrors, pickResultRow, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
+import { adapterFor, type ExtranetAdapter } from './extranets';
+import { advanceButton, AdvanceGuard, leftTextPage, refusalMessage, stepKey } from './flow/advance';
+import { ClaimRows } from './flow/claim-rows';
+import { clickRow, detectStepHint, findResultRows, pickResultRow, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
 
 /** Champs d'adresse : les extranets y proposent souvent des suggestions à choisir (adresse normalisée, commune). */
 const SUGGEST_PATHS: ReadonlySet<string> = new Set(['client.address.street', 'client.address.city', 'vehicle.parkingCity']);
@@ -33,8 +36,11 @@ export interface RunnerPorts {
   reportIssue?(step: ExtensionReportStep, issue: ExtensionReportIssue): Promise<void>;
   /** Mémoire partagée des formulaires (E8) : sans elle, tout se fait par synonymes puis IA. */
   memory?: MemoryPort;
-  /** Champs sans équivalent d'un formulaire validé : le serveur les ajoute au questionnaire. */
-  reportDiscovered?(fingerprint: string, fields: DiscoveredFieldInput[], requiredPaths?: string[]): Promise<void>;
+  /**
+   * Champs sans équivalent d'un formulaire validé : le serveur les ajoute au questionnaire (ou les rattache à une
+   * question existante) et renvoie, par champ, le chemin de cette question.
+   */
+  reportDiscovered?(fingerprint: string, fields: DiscoveredFieldInput[], requiredPaths?: string[]): Promise<Record<string, string> | void>;
   /** Lecture de la mise en page déjà faite par l'IA pour un formulaire (cache local du navigateur). */
   layoutCache?: { load(fingerprint: string): Promise<FormLayout | null>; save(fingerprint: string, layout: FormLayout): Promise<void> };
   /** Origine de l'extranet, clé de la mémoire (par défaut : celle de la page). */
@@ -71,6 +77,12 @@ export class FormRunner {
   private mappings: Mapping[] = [];
   private lastStep: { keys: string[]; hint: StepHint } = { keys: [], hint: { current: null, total: null } };
   private stepCounter = 0;
+  /**
+   * Champs signalés que le serveur a rattachés à une question (créée ou existante) : le champ vise désormais ce
+   * chemin ; sans réponse au dossier, il devient un champ manquant que le courtier renseigne dans la carte de l'assureur
+   * (le dossier, en tarification, n'est plus modifiable ailleurs).
+   */
+  private readonly serverMapped = new Map<string, CanonicalPath>();
   /** Corrections manuelles du courtier : clé du champ → chemin (ou null pour « ne pas remplir »). */
   private readonly manual = new Map<string, CanonicalPath | null>();
   /** Valeurs déjà écrites, pour ne pas réécrire un champ que le courtier a pu corriger. */
@@ -98,6 +110,8 @@ export class FormRunner {
   private running: Promise<void> = Promise.resolve();
   private stopped = false;
   private cancelled = false;
+  /** Mis en pause par le courtier (barre flottante) : plus aucun remplissage ni clic tant qu'il ne reprend pas. */
+  private paused = false;
   // ── Capture du tarif (E10) ──
   /** La page de résultat est en cours de lecture ou lue : le remplissage s'arrête. */
   private capturing = false;
@@ -107,15 +121,25 @@ export class FormRunner {
   // ── Passage automatique à l'étape suivante ──
   /** L'étape affichée est remplie sans manque ni échec, et ce n'est pas la dernière. */
   private stepReady = false;
-  /** Étapes (empreintes) où « Suivant » a déjà été cliqué : un seul essai, l'extranet peut la refuser. */
-  private readonly advancedFrom = new Set<string>();
+  private readonly advanceGuard = new AdvanceGuard();
+  // ── Règles propres à l'extranet (extranets/) ──
+  private readonly adapter: ExtranetAdapter;
+  private readonly claimRows: ClaimRows;
   private lastState: RunState | null = null;
   private formReachedSent = false;
 
   constructor(
     private job: JobContext,
     private readonly ports: RunnerPorts,
-  ) {}
+  ) {
+    this.adapter = adapterFor({ insurerId: job.insurerId, origin: ports.origin ?? ports.doc.location?.origin });
+    this.claimRows = new ClaimRows(this.adapter);
+  }
+
+  /** Analyse de la page affichée, avec les règles de l'extranet. */
+  private analyze(): FormAnalysis {
+    return analyzeForm(this.ports.doc, this.adapter);
+  }
 
   /**
    * Questions du produit (toutes, conditions comprises) : un champ reconnu sur l'une d'elles n'est pas nouveau.
@@ -143,6 +167,18 @@ export class FormRunner {
   };
   /** `notice` vient d'un échec de l'IA (effacé quand elle répond de nouveau). */
   private aiNotice = false;
+
+  /**
+   * Questions ajoutées depuis les extranets que le dossier pose, avec leur libellé et leur forme de réponse quand le
+   * produit est lisible (sinon leur code) : un champ posé autrement par cet extranet y est rattaché.
+   */
+  private get extraQuestions(): (ExtraCanonicalPath | ExtraQuestion)[] {
+    const known = new Map((this.job.productQuestions ?? []).map(question => [question.path, question]));
+    return this.allowedPaths.filter(isExtraPath).map(path => {
+      const question = known.get(path);
+      return question ? { path, label: question.label, shape: { type: question.type, choices: question.choices } } : path;
+    });
+  }
 
   /** Chemins du dossier : seuls ceux-ci peuvent être visés (par l'IA ou à la main). */
   private get allowedPaths(): CanonicalPath[] {
@@ -188,7 +224,12 @@ export class FormRunner {
   /** Le dossier a changé (le courtier a répondu aux champs manquants) : on reprend le remplissage. */
   async updateJob(job: JobContext): Promise<void> {
     if (job.status === 'cancelled') return this.cancel();
-    this.job = job.productPaths?.length ? job : { ...job, productPaths: this.job.productPaths };
+    // Le questionnaire du produit n'est pas relu à chaque mise à jour du dossier : on garde celui déjà connu.
+    this.job = {
+      ...job,
+      productPaths: job.productPaths?.length ? job.productPaths : this.job.productPaths,
+      productQuestions: job.productQuestions ?? this.job.productQuestions,
+    };
     await this.enqueue(() => this.runStep(false));
   }
 
@@ -206,9 +247,52 @@ export class FormRunner {
     await this.enqueue(() => this.runStep(false));
   }
 
-  /** Lire le tarif de la page affichée, à la demande du courtier (détection manquée, ou nouvel essai après un échec). */
+  /**
+   * Lire le tarif de la page affichée, à la demande du courtier (détection manquée, nouvel essai après un échec, ou
+   * nouvelle formule affichée : annuel ↔ mensuel). Possible aussi après un premier tarif enregistré.
+   */
   async captureNow(): Promise<void> {
+    if (this.cancelled) return;
+    this.stopped = false;
+    this.capturing = false;
     await this.enqueue(async () => void (await this.tryCapture(true)));
+  }
+
+  /**
+   * La page affiche-t-elle un tarif ? Même règle que la détection automatique de la page de résultat (montant en
+   * euros, puis résultat reconnu) : le bouton « Sauvegarder le tarif » de la barre flottante n'apparaît qu'alors.
+   */
+  hasTariffOnPage(): boolean {
+    const doc = this.ports.doc;
+    const amounts = parseAmounts(doc.body?.textContent ?? '');
+    if (amounts.length === 0 && !hasResultHeading(doc)) return false;
+    // Mêmes montants, même nombre de champs : même réponse, sans réanalyser la page (appelé à chaque changement du DOM).
+    const key = `${JSON.stringify(amounts)}#${doc.querySelectorAll('input, select, textarea').length}`;
+    if (key !== this.tariffCheck.key) {
+      const fillable = mapFields(this.analyze().fields).filter(m => m.status === 'mapped' && m.canonicalPath !== null).length;
+      this.tariffCheck = { key, found: detectResultPage(extractFromDom(doc), fillable) !== 'none' };
+    }
+    return this.tariffCheck.found;
+  }
+  private tariffCheck = { key: '', found: false };
+
+  get isPaused(): boolean {
+    return this.paused;
+  }
+
+  /** Pause : la page n'est plus remplie ni avancée (le courtier navigue lui-même, change de formule…). */
+  pause(): void {
+    if (this.paused) return;
+    this.paused = true;
+    if (this.pending) clearTimeout(this.pending);
+    if (this.lastState) this.ports.publish({ ...this.lastState, phase: 'waiting_user', message: 'Extension en pause : reprenez depuis la barre flottante.' });
+  }
+
+  /** Reprise : la page affichée est relue et remplie. */
+  async resume(): Promise<void> {
+    if (!this.paused) return;
+    this.paused = false;
+    if (!this.stopped) await this.enqueue(() => this.runStep(false));
   }
 
   /** Remplit à nouveau tous les champs reconnus (le courtier a vidé ou corrigé le formulaire). */
@@ -225,12 +309,13 @@ export class FormRunner {
   /** Après un changement de la page : attend qu'elle soit chargée, puis regarde si c'est une nouvelle étape. */
   private scheduleCheck(): void {
     if (this.pending) clearTimeout(this.pending);
+    if (this.paused) return;
     this.pending = setTimeout(() => {
       this.pending = null;
       void this.enqueue(async () => {
         if (this.stopped || this.capturing) return;
         await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
-        const analysis = analyzeForm(this.ports.doc);
+        const analysis = this.analyze();
         const next = { keys: analysis.fields.map(f => f.key), hint: detectStepHint(this.ports.doc) };
         const changed = analysis.fingerprint !== this.analysis?.fingerprint;
         if (changed || next.hint.current !== this.lastStep.hint.current) {
@@ -243,8 +328,8 @@ export class FormRunner {
   /** `depth` borne les relances quand le remplissage fait apparaître d'autres champs (réponse « Oui » → champ en plus). */
   private async runStep(newStep: boolean, depth = 0): Promise<void> {
     this.stepReady = false;
-    if (this.stopped || this.capturing) return;
-    let analysis = analyzeForm(this.ports.doc);
+    if (this.stopped || this.capturing || this.paused) return;
+    let analysis = this.analyze();
     // Le courtier a soumis le formulaire et l'extranet affiche le tarif sans recharger la page.
     if (await this.tryCapture(false, analysis)) return;
     // Page de connexion de l'extranet : l'extension ne touche jamais aux identifiants du courtier.
@@ -259,6 +344,8 @@ export class FormRunner {
       this.stepCounter += 1;
       this.written.clear();
       this.aiTried.clear();
+      this.claimRows.reset();
+      this.advanceGuard.reset();
     } else if (this.stepCounter === 0) {
       this.stepCounter = 1;
     }
@@ -272,11 +359,19 @@ export class FormRunner {
       // Seule la première page compte : en cours de parcours, une page sans champ (chargement, récapitulatif) est normale.
       if (!newStep && this.stepCounter <= 1) await this.reportIssue('analyze', 'no_fields');
       this.publishState('analyzing', [], [], 'Aucun champ à remplir sur cette page.');
+      // Tableau des sinistres vide alors que le dossier en déclare : on ajoute une ligne, puis on la remplit.
+      if (await this.maybeAddClaimRow(analysis)) return this.runStep(false, depth);
+      // En cours de parcours, une page sans champ (récapitulatif, tableau des sinistres vide) se valide par « Suivant »,
+      // sauf un tableau de sinistres alors que le dossier en déclare (ajout impossible) : le courtier les ajoute.
+      if (this.formReachedSent && !this.claimRows.awaitsClaims(this.ports.doc, this.job.quoteData)) {
+        this.stepReady = true;
+        if (depth === 0) await this.maybeAdvance();
+      }
       return;
     }
 
     // 1. Synonymes et scoring ; la mémoire partagée tranche ce qu'ils n'ont pas tranché, puis l'IA, pour le reste.
-    let mappings = mapExtraPaths(analysis.fields, mapFields(analysis.fields), this.allowedPaths.filter(isExtraPath));
+    let mappings = mapExtraPaths(analysis.fields, mapFields(analysis.fields), this.extraQuestions);
     this.fromMemory = new Set();
     const memory = await this.memoryFor(analysis.fingerprint);
     if (memory) {
@@ -333,7 +428,7 @@ export class FormRunner {
       const discovered = toDiscoveredFields(analysis.fields, this.mappings, this.productPaths, this.job.quoteData);
       if (discovered.length) {
         this.discoveredReported.add(analysis.fingerprint);
-        void this.ports.reportDiscovered?.(analysis.fingerprint, discovered).catch(() => this.discoveredReported.delete(analysis.fingerprint));
+        this.reportNewFields(analysis.fingerprint, discovered, () => this.discoveredReported.delete(analysis.fingerprint));
       }
     }
 
@@ -343,17 +438,33 @@ export class FormRunner {
     const finalStep = isFinalStep(this.ports.doc, hint);
     if (plan.missing.length === 0 && finalStep) await this.maybeLearn(this.snapshot);
     this.publishFromPlan(plan, results, hint);
-    this.stepReady = plan.missing.length === 0 && !finalStep && ![...results.values()].some(r => r.status === 'failed');
+    // Un champ facultatif pour l'extranet (Préfecture sur Zephir) qui n'a pas pu être rempli ne bloque pas l'étape.
+    const required = new Set(analysis.fields.filter(f => f.required).map(f => f.key));
+    this.stepReady =
+      plan.missing.length === 0 && !finalStep && ![...results.values()].some(r => r.status === 'failed' && required.has(r.fieldKey));
 
     // Une réponse a pu faire apparaître d'autres champs dans la même étape : on les remplit aussi.
-    if (depth < MAX_FOLLOW_UPS && analyzeForm(this.ports.doc).fingerprint !== analysis.fingerprint) {
+    if (depth < MAX_FOLLOW_UPS && this.analyze().fingerprint !== analysis.fingerprint) {
       await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
-      const next = analyzeForm(this.ports.doc);
+      const next = this.analyze();
       const kept = this.lastStep.keys.filter(key => next.fields.some(f => f.key === key)).length;
       if (this.lastStep.keys.length > 0 && kept / this.lastStep.keys.length >= 0.5) await this.runStep(false, depth + 1);
     }
+    // Sinistre suivant du dossier : une ligne de plus dans le tableau, remplie à son tour.
+    if (this.stepReady && (await this.maybeAddClaimRow(analysis))) return this.runStep(false, depth);
     // Toute l'étape est remplie (relances comprises) : on passe à la suivante.
     if (depth === 0) await this.maybeAdvance();
+  }
+
+  /** Ajoute la ligne de sinistre suivante (voir ClaimRows). Renvoie `true` si une ligne a été demandée. */
+  private async maybeAddClaimRow(analysis: FormAnalysis): Promise<boolean> {
+    if (!this.ports.autoAdvance || this.stopped || this.capturing || this.paused) return false;
+    const button = this.claimRows.nextAddButton(this.ports.doc, analysis.fields, this.job.quoteData);
+    if (!button) return false;
+    // `dispatchEvent` plutôt que `click()` : l'icône ⊕ peut être un `<svg>`, qui n'a pas de `click()`.
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
+    return !this.stopped && !this.capturing;
   }
 
   /**
@@ -361,34 +472,32 @@ export class FormRunner {
    * d'étape, et remplit la nouvelle. Sinon (erreur de saisie, page bloquée), le courtier corrige et avance lui-même.
    */
   private async maybeAdvance(): Promise<void> {
-    if (!this.ports.autoAdvance || !this.stepReady || this.stopped || this.capturing || !this.analysis) return;
-    const fingerprint = this.analysis.fingerprint;
-    if (this.advancedFrom.has(fingerprint)) return;
-    // Pas de « Suivant » : une recherche (véhicule par caractéristique) à lancer, puis un résultat à choisir.
-    const search = findNextButton(this.ports.doc) ? null : findSearchButton(this.ports.doc, this.filledElements());
-    const button = search ?? findNextButton(this.ports.doc);
-    if (!button) return;
-    this.advancedFrom.add(fingerprint);
+    if (!this.ports.autoAdvance || !this.stepReady || this.stopped || this.capturing || this.paused || !this.analysis) return;
+    const key = stepKey(this.analysis, this.ports.doc);
+    const found = advanceButton(this.ports.doc, this.filledElements());
+    if (!found || !this.advanceGuard.firstTry(key)) return;
     const before = this.lastStep;
-    button.click();
+    found.button.click();
     await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
     if (this.stopped || this.capturing) return;
-    if (search) {
-      const found = findResultRows(this.ports.doc);
-      if (found) {
+    if (found.search) {
+      const results = findResultRows(this.ports.doc);
+      if (results) {
         const value = valueOf(this.job.quoteData['vehicle.vehicleValue']);
-        clickRow(pickResultRow(found, typeof value === 'number' ? value : null));
+        clickRow(pickResultRow(results, typeof value === 'number' ? value : null));
         await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
         if (this.stopped || this.capturing) return;
       }
     }
-    const after = { keys: analyzeForm(this.ports.doc).fields.map(f => f.key), hint: detectStepHint(this.ports.doc) };
+    const refused = this.analyze();
+    const after = { keys: refused.fields.map(f => f.key), hint: detectStepHint(this.ports.doc) };
     // Nouvelle étape : remplie tout de suite (la surveillance de la page n'est pas encore active au démarrage).
-    if (isNewStep(before, after)) return this.runStep(true);
-    const message = hasValidationErrors(this.ports.doc)
-      ? 'L’extranet a refusé cette étape : corrigez les champs signalés, puis cliquez vous-même sur « Suivant ».'
-      : 'L’extranet n’est pas passé à l’étape suivante : vérifiez la page, puis cliquez vous-même sur « Suivant ».';
-    if (this.lastState) this.ports.publish({ ...this.lastState, phase: 'waiting_user', message });
+    if (isNewStep(before, after) || (before.keys.length === 0 && leftTextPage(key, this.ports.doc))) return this.runStep(true);
+    // Refus : l'extranet marque maintenant ses champs obligatoires (Zephir ne le fait qu'après « Suivant »). Ceux qui
+    // n'ont pas d'équivalent sont signalés : ils deviennent des questions du dossier, et le prochain passage les remplira.
+    const discovered = toDiscoveredFields(refused.fields, mapFields(refused.fields), this.productPaths, this.job.quoteData);
+    if (discovered.length) this.reportNewFields(refused.fingerprint, discovered);
+    if (this.lastState) this.ports.publish({ ...this.lastState, phase: 'waiting_user', message: refusalMessage(this.ports.doc) });
   }
 
   /** Éléments des champs remplis à l'étape affichée (pour trouver le bouton « Rechercher » de leur bloc). */
@@ -422,7 +531,7 @@ export class FormRunner {
    * le DOM, puis demande à l'IA ce qui manque (prime introuvable, garanties absentes). Le service worker enregistre
    * l'offre « à vérifier » : le courtier la valide ou la corrige dans l'app. Renvoie vrai quand la page est traitée comme un résultat.
    */
-  private async tryCapture(force: boolean, analysis: FormAnalysis = analyzeForm(this.ports.doc)): Promise<boolean> {
+  private async tryCapture(force: boolean, analysis: FormAnalysis = this.analyze()): Promise<boolean> {
     if (this.stopped) return true;
     // Ni montant en euros ni titre de résultat : ce n'est pas une page de résultat, inutile d'analyser toute la page.
     if (!force && parseAmounts(this.ports.doc.body.textContent ?? '').length === 0 && !hasResultHeading(this.ports.doc)) return false;
@@ -553,8 +662,32 @@ export class FormRunner {
     if (discovered.length) await this.ports.reportDiscovered?.(snapshot.fingerprint, discovered).catch(() => undefined);
   }
 
+  /** Signale des champs sans équivalent, puis vise les questions que le serveur leur a données. */
+  private reportNewFields(fingerprint: string, fields: DiscoveredFieldInput[], onFailure?: () => void): void {
+    void this.ports
+      .reportDiscovered?.(fingerprint, fields)
+      .then(mapping => this.adoptServerMapping(mapping ?? {}))
+      .catch(() => onFailure?.());
+  }
+
+  /** Champs rattachés par le serveur : la page est relue pour les remplir ou les demander au courtier. */
+  private adoptServerMapping(mapping: Record<string, string>): void {
+    let changed = false;
+    for (const [fieldKey, raw] of Object.entries(mapping)) {
+      const path = asCanonicalPath(raw);
+      if (!path || !isExtraPath(path) || this.manual.has(fieldKey) || this.serverMapped.get(fieldKey) === path) continue;
+      this.serverMapped.set(fieldKey, path);
+      changed = true;
+    }
+    if (changed && !this.stopped) void this.enqueue(() => this.runStep(false));
+  }
+
+  /** Corrections du courtier, puis rattachements du serveur, par-dessus le mapping calculé. */
   private applyManual(mappings: Mapping[]): Mapping[] {
-    return mappings.map(mapping =>
+    return mappings.map(mapping => {
+      const server = this.manual.has(mapping.fieldKey) ? undefined : this.serverMapped.get(mapping.fieldKey);
+      return server ? { ...mapping, canonicalPath: server, confidence: 1, status: 'mapped' as const } : mapping;
+    }).map(mapping =>
       this.manual.has(mapping.fieldKey)
         ? {
             ...mapping,

@@ -6,7 +6,8 @@ import type { FormLayout } from '../engine/layout-ai';
 import { LoadedMemory, MemoryPort, type MemorySaveOutcome } from '../engine/memory';
 import { FormRunner } from '../engine/runner';
 import { waitForSettled } from '../engine/steps';
-import { AskAiResponse, EntryInstruction, ExtensionMessage, JobContext, JobUpdate, RUNNER_PORT, type UpdateJobResponse, RunState, TabMessage } from '../shared/messages';
+import { createFloatingBar, type FloatingBar } from './floating-bar';
+import { AskAiResponse, EntryInstruction, ExtensionMessage, JobContext, JobUpdate, RUNNER_PORT, type UpdateJobResponse, type FieldsDiscoveredResponse, RunState, TabMessage } from '../shared/messages';
 
 /** Compte les champs de formulaire visibles (affiché dans le side panel). */
 function countVisibleFields(): number {
@@ -16,6 +17,22 @@ function countVisibleFields(): number {
 }
 
 let runner: FormRunner | null = null;
+/** Barre flottante (pause, sauvegarde du tarif) de la page principale pendant un remplissage. */
+let bar: FloatingBar | null = null;
+
+/** Message de la barre selon l'état publié par le remplissage (capture du tarif surtout). */
+function barStatusFor(state: RunState): string | null {
+  switch (state.phase) {
+    case 'capturing':
+      return 'Lecture du tarif affiché…';
+    case 'capture_review':
+      return 'Enregistrement…';
+    case 'capture_failed':
+      return 'Aucun tarif lisible';
+    default:
+      return null;
+  }
+}
 /** Arrête le remplissage de la page (apprentissage du chemin d'accès), ou null sans remplissage. */
 let stopRunner: (() => void) | null = null;
 /** Job de la page (page principale) : le remplissage reprend avec lui après l'apprentissage. */
@@ -108,10 +125,14 @@ async function startRunner(job: JobContext): Promise<void> {
       const saved = await send<UpdateJobResponse>({ type: 'UPDATE_JOB', dossierId: job.dossierId, insurerId: job.insurerId, update });
       if (!saved?.ok) throw new JobUpdateError(saved?.message ?? 'Avancement non enregistré dans l’application.', saved?.cancelled === true);
     },
-    publish: (state: RunState) => void send({ type: 'RUN_STATE', state }).catch(() => undefined),
+    publish: (state: RunState) => {
+      const text = barStatusFor(state);
+      if (text) bar?.setStatus(text);
+      void send({ type: 'RUN_STATE', state }).catch(() => undefined);
+    },
     memory: memoryPort,
     reportDiscovered: async (fingerprint, fields, requiredPaths) =>
-      void (await send({ type: 'FIELDS_DISCOVERED', fingerprint, fields, requiredPaths })),
+      (await send<FieldsDiscoveredResponse>({ type: 'FIELDS_DISCOVERED', fingerprint, fields, requiredPaths }))?.mapping ?? {},
     origin: location.origin,
     autoAdvance: true,
     // Formulaire de devis atteint : l'apprentissage automatique du chemin d'accès s'arrête et l'enregistre.
@@ -147,6 +168,8 @@ async function startRunner(job: JobContext): Promise<void> {
       // Port déjà invalide (contexte perdu).
     }
     runner?.stop();
+    bar?.destroy();
+    bar = null;
   };
   teardowns.push(stop);
   stopRunner = () => {
@@ -159,6 +182,28 @@ async function startRunner(job: JobContext): Promise<void> {
     stop();
     void send({ type: 'RUN_STATE', state: null }).catch(() => undefined);
   });
+  // Page principale seulement : une barre par onglet, jamais dans une iframe de l'extranet.
+  if (window === window.top) {
+    const current = runner;
+    bar = createFloatingBar(document, {
+      pause: () => current.pause(),
+      resume: () => void current.resume(),
+      save: () => current.captureNow().then(() => true, () => false),
+    });
+    // « Sauvegarder le tarif » seulement quand un tarif est affiché : vérifié quand la page cesse de bouger.
+    let tariffCheck: ReturnType<typeof setTimeout> | undefined;
+    const checkTariff = () => bar?.setSaveVisible(current.hasTariffOnPage());
+    const watcher = new MutationObserver(() => {
+      clearTimeout(tariffCheck);
+      tariffCheck = setTimeout(checkTariff, 700);
+    });
+    watcher.observe(document.body, { childList: true, subtree: true, characterData: true });
+    teardowns.push(() => {
+      watcher.disconnect();
+      clearTimeout(tariffCheck);
+    });
+    checkTariff();
+  }
   await runner.start();
 }
 
@@ -195,8 +240,13 @@ chrome.runtime.onMessage.addListener((message: TabMessage, sender, sendResponse)
       return respond(runner.updateJob(message.job), sendResponse);
     case 'CAPTURE_NOW':
       return respond(runner.captureNow(), sendResponse);
+    case 'CAPTURE_SAVE_FAILED':
+      bar?.setStatus('Tarif non enregistré : voir le panneau');
+      sendResponse(true);
+      return false;
     case 'CAPTURE_DONE':
       runner.stop();
+      bar?.setStatus('Tarif enregistré ✓');
       sendResponse(true);
       return false;
   }

@@ -1,3 +1,4 @@
+import { genericAdapter, type ExtranetAdapter } from './extranets';
 import { cleanLabel, hash, normalize } from './text';
 
 export type FieldKind = 'text' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'textarea' | 'autocomplete';
@@ -162,7 +163,9 @@ function labelOf(element: HTMLElement): string {
   // Libellé à côté du bloc qui contient le champ (ex. « Date de naissance » à gauche des cases jour / mois / année).
   const container = element.parentElement;
   const beside = container && container.querySelectorAll('input, select, textarea').length <= 3 ? container.previousElementSibling : null;
-  if (beside && !beside.querySelector('input, select, textarea')) {
+  // Jamais le bloc d'un autre champ, boutons bascule compris (Zephir : « Remorque / Caravane » et ses boutons
+  // « - de 750kg / + de 750kg » juste avant la liste « Classe socio-professionnelle »).
+  if (beside && !beside.querySelector(CONTROL_SELECTOR) && !beside.matches(CONTROL_SELECTOR)) {
     const text = textOf(beside);
     if (text && text.length < 80) return text;
   }
@@ -198,6 +201,15 @@ function groupLabelOf(first: HTMLElement): string {
     const aria = labelledBy(group) ?? group.getAttribute('aria-label');
     if (aria) return cleanLabel(aria);
   }
+  // Boutons bascule sans libellé ARIA : la question est le texte juste avant le groupe (« Garage », « Second conducteur ? »).
+  // Le texte peut précéder le bloc qui contient le groupe (Zephir : `<label><span>Question</span></label>` puis
+  // `<div><mat-button-toggle-group>`) : on remonte de deux niveaux au plus, sans jamais prendre un autre champ.
+  const toggleGroup = first.hasAttribute('aria-pressed') ? first.closest(TOGGLE_GROUP_SELECTOR) : null;
+  for (let node: Element | null | undefined = toggleGroup, level = 0; node && level < 3; node = node.parentElement, level++) {
+    const before = node.previousElementSibling;
+    if (before && !before.querySelector(CONTROL_SELECTOR) && textOf(before)) return textOf(before);
+    if (before) break;
+  }
   const column = tableColumnOf(first);
   if (column) return column.header;
   // Tableau de saisie : la question est dans la cellule qui précède (le libellé « Oui » du bouton n'est qu'une réponse).
@@ -210,7 +222,7 @@ function groupLabelOf(first: HTMLElement): string {
   return textOf(heading) || labelOf(first);
 }
 
-function isRequired(element: HTMLElement, label: string): boolean {
+function isRequired(element: HTMLElement, label: string, adapter: ExtranetAdapter): boolean {
   return (
     (element as HTMLInputElement).required === true ||
     element.getAttribute('aria-required') === 'true' ||
@@ -218,7 +230,9 @@ function isRequired(element: HTMLElement, label: string): boolean {
     element.closest('label')?.textContent?.includes('*') === true ||
     // Angular (Zephir) : sans astérisque, un champ obligatoire encore vide porte « ng-invalid » sur son contrôle.
     element.classList.contains('ng-invalid') ||
-    element.closest('[formcontrolname], [ng-reflect-name]')?.classList.contains('ng-invalid') === true
+    element.closest('[formcontrolname], [ng-reflect-name]')?.classList.contains('ng-invalid') === true ||
+    // Marque propre à l'extranet (Zephir : groupe Material « ng-invalid »), voir extranets/.
+    adapter.isRequired(element)
   );
 }
 
@@ -239,7 +253,10 @@ function sectionOf(element: HTMLElement, headings: Element[]): string | null {
  * interrupteurs dessinés (rôles ARIA). Une liste maison qui contient un vrai <input> est analysée par cet input.
  */
 const CUSTOM_CONTROL_SELECTOR =
-  '[role="combobox"]:not(input), button[aria-haspopup="listbox"], [role="radio"]:not(input), [role="switch"]:not(input), [role="checkbox"]:not(input)';
+  '[role="combobox"]:not(input), button[aria-haspopup="listbox"], [role="radio"]:not(input), [role="switch"]:not(input), [role="checkbox"]:not(input), button[aria-pressed]';
+
+/** Groupe d'un bouton radio dessiné ou d'un bouton bascule (« Oui » / « Non » de Zephir, mat-button-toggle). */
+const TOGGLE_GROUP_SELECTOR = '[role="radiogroup"], mat-button-toggle-group, [role="group"], .btn-group';
 const CONTROL_SELECTOR = `input, select, textarea, ${CUSTOM_CONTROL_SELECTOR}`;
 
 const isCustomControl = (element: HTMLElement) =>
@@ -253,7 +270,7 @@ export function customValueOf(element: HTMLElement): string {
 function kindOf(element: HTMLElement): { kind: FieldKind; inputType: string } {
   if (isCustomControl(element)) {
     const role = element.getAttribute('role');
-    if (role === 'radio') return { kind: 'radio', inputType: 'aria-radio' };
+    if (role === 'radio' || element.hasAttribute('aria-pressed')) return { kind: 'radio', inputType: 'aria-radio' };
     if (role === 'switch' || role === 'checkbox') return { kind: 'checkbox', inputType: 'aria-checkbox' };
     return { kind: 'select', inputType: 'custom-select' };
   }
@@ -277,7 +294,7 @@ function optionsOf(element: HTMLElement, group: HTMLElement[]): FieldOption[] {
       .map(option => ({ value: option.value, label: cleanLabel(option.textContent ?? '') }))
       .filter(option => !/^(choisir|selectionner|sélectionner|-+|\.\.\.)/i.test(option.label) || option.value !== '');
   }
-  if (element.getAttribute('role') === 'radio' && isCustomControl(element)) {
+  if ((element.getAttribute('role') === 'radio' || element.hasAttribute('aria-pressed')) && isCustomControl(element)) {
     return group.map(radio => ({ value: customValueOf(radio), label: customValueOf(radio) }));
   }
   if ((element as HTMLInputElement).type === 'radio') {
@@ -360,7 +377,10 @@ function radioGroupId(group: HTMLElement): string {
   return id;
 }
 
-export function analyzeForm(root: Document | HTMLElement = document): FormAnalysis {
+/**
+ * Analyse du formulaire affiché. `adapter` : règles propres à l'extranet (champ obligatoire…), générique par défaut.
+ */
+export function analyzeForm(root: Document | HTMLElement = document, adapter: ExtranetAdapter = genericAdapter): FormAnalysis {
   const doc = root instanceof Document ? root : root.ownerDocument;
   const scope = root instanceof Document ? root.body : root;
   const headings = [...scope.querySelectorAll(HEADING_SELECTOR)];
@@ -414,7 +434,7 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
 
     if (kind === 'radio') {
       const name = isCustomControl(element)
-        ? radioGroupId(element.closest<HTMLElement>('[role="radiogroup"]') ?? element.parentElement ?? element)
+        ? radioGroupId(element.closest<HTMLElement>(TOGGLE_GROUP_SELECTOR) ?? element.parentElement ?? element)
         : (element as HTMLInputElement).name || element.id || `radio-${fields.length}`;
       const groupKey = `${name}@${formOf(element)}`;
       const existing = radioGroups.get(groupKey);
@@ -442,7 +462,7 @@ export function analyzeForm(root: Document | HTMLElement = document): FormAnalys
       name,
       id: element.id || null,
       autocomplete: element.getAttribute('autocomplete')?.trim().toLowerCase() || null,
-      required: isRequired(element, label),
+      required: isRequired(element, label, adapter),
       section: sectionOf(element, headings),
       order: fields.length,
       options: [],

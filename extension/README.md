@@ -32,6 +32,9 @@ Pour que l'app détecte l'extension, renseigner son identifiant (visible dans `c
 | `engine/steps.ts` + `runner.ts` | Parcours en plusieurs étapes : détection de l'étape, attente du chargement, `currentStep`, nouveaux champs sous une réponse |
 | `engine/capture.ts` + `offer.ts` | Capture du tarif (E10) : détection de la page de résultat, lecture dans le DOM des primes, franchises, garanties (tableau ou liste), plafonds, exclusions et numéro de devis |
 | `engine/capture-ai.ts` | Repli sur `ia-proxy` quand le DOM ne suffit pas : texte de la page **expurgé** des données du dossier et des coordonnées ; un montant absent de la page est écarté |
+| `engine/extranets/` | Ce que chaque extranet fait à sa façon : un dossier par extranet (adaptateur, pages réelles, test de parcours), registre, simulateur commun ; `adapterFor` choisit par assureur du job |
+| `engine/flow/` | Parcours : lignes de sinistres (`claim-rows.ts`), clic sur « Suivant » (`advance.ts`) |
+| `content/floating-bar.ts` | Barre flottante sur l'extranet : pause / reprise, sauvegarde du tarif affiché |
 | `sidepanel/` | Connexion, dossier et job en cours, progression, champs non trouvés, correction manuelle, confirmation du tarif lu |
 
 ## Règles
@@ -42,6 +45,12 @@ Pour que l'app détecte l'extension, renseigner son identifiant (visible dans `c
 - Les libellés des pages tierces sont affichés dans le side panel avec `textContent` (jamais comme HTML).
 - **Capture du tarif** : rien n'est enregistré sans la confirmation du courtier dans le side panel (il peut corriger primes et numéro de devis). L'offre (`source: auto`) et le passage du job à `captured` sont écrits ensemble. S'il refuse le tarif, le job passe en `failed` (relance ou saisie manuelle dans l'app).
 - **Rapports d'échec** (`extensionReports`) : assureur, origine de l'extranet, étape et un **code** parmi une liste fermée (`EXTENSION_REPORT_ISSUES`) ; jamais de texte libre ni d'URL complète.
+
+## Ajouter un extranet sans casser ceux qui marchent
+
+Voir **`src/engine/extranets/README.md`** : un dossier par extranet (adaptateur, HTML réel de ses pages, test de
+parcours complet), créé par `npm run extranet:new -- <insurerId> <domaine>`. Toute modification doit garder verts
+les tests de parcours de tous les extranets configurés (Zephir : `src/engine/extranets/zephir/journey.test.ts`).
 
 ## Limites connues
 

@@ -8,6 +8,7 @@ export * from './limits';
 export * from './questionnaire';
 export * from './need';
 export * from './pricing';
+export * from './question-matching';
 export * from './comparison';
 export * from './documents';
 export * from './proposal';

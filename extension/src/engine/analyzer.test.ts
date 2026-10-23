@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { analyzeForm, isAuthPage } from './analyzer';
 import { mountAssureurA } from './__fixtures__/assureur-a';
+import { zephirAdapter } from './extranets/zephir/adapter';
 
 describe('analyzeForm : extranet de l’assureur A, étape 1', () => {
   beforeEach(() => {
@@ -184,5 +185,49 @@ describe('Champ obligatoire sans astérisque (Angular, Zephir)', () => {
     const { fields } = analyzeForm(document);
     expect(fields.find(f => f.label === 'Usage')?.required).toBe(true);
     expect(fields.find(f => f.label === 'Commentaire')?.required).toBe(false);
+  });
+});
+
+describe('Boutons bascule Oui / Non (Zephir, mat-button-toggle)', () => {
+  it('un groupe de boutons aria-pressed est une question à choix, titrée par le texte qui le précède', () => {
+    document.body.innerHTML = `<div><span>Garage</span><mat-button-toggle-group formcontrolname="garage" class="ng-invalid" role="group">
+      <mat-button-toggle><button type="button" aria-pressed="false">Oui</button></mat-button-toggle>
+      <mat-button-toggle><button type="button" aria-pressed="false">Non</button></mat-button-toggle></mat-button-toggle-group></div>`;
+    const { fields } = analyzeForm(document);
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ label: 'Garage', kind: 'radio', required: true });
+    expect(fields[0].options.map(o => o.label)).toEqual(['Oui', 'Non']);
+  });
+
+  it('Zephir, formulaire ngModel sans formcontrolname : le groupe « ng-invalid » rend la question obligatoire', () => {
+    document.body.innerHTML = `<div><p>Le véhicule est-il utilisé pour le transport de matières dangereuses ?</p>
+      <mat-button-toggle-group name="matDang" class="ng-untouched ng-pristine ng-invalid" role="group">
+      <mat-button-toggle><button type="button" aria-pressed="false">Oui</button></mat-button-toggle>
+      <mat-button-toggle><button type="button" aria-pressed="false">Non</button></mat-button-toggle></mat-button-toggle-group></div>`;
+    expect(analyzeForm(document, zephirAdapter).fields[0]).toMatchObject({ kind: 'radio', required: true });
+    // Règle propre à Zephir : sans son adaptateur, le groupe n'est pas lu comme obligatoire.
+    expect(analyzeForm(document).fields[0].required).toBe(false);
+  });
+});
+
+describe('Zephir : libellé d’un groupe Oui / Non rangé dans son propre bloc', () => {
+  it('lit la question dans le <label> qui précède le bloc du groupe (pas le nom technique AUTO03)', () => {
+    document.body.innerHTML = `<div class="form-input"><label><span>Le véhicule est-il utilisé pour le transport de matières dangereuses ?</span></label>
+      <div class="form-input"><mat-button-toggle-group role="group" required="" class="ng-invalid">
+        <mat-button-toggle value="true"><button type="button" aria-pressed="false" name="AUTO03"><span><span>Oui</span></span></button></mat-button-toggle>
+        <mat-button-toggle value="false"><button type="button" aria-pressed="false" name="AUTO03"><span><span>Non</span></span></button></mat-button-toggle>
+      </mat-button-toggle-group><app-control-error></app-control-error></div></div>`;
+    const [field] = analyzeForm(document, zephirAdapter).fields;
+    expect(field).toMatchObject({ label: 'Le véhicule est-il utilisé pour le transport de matières dangereuses ?', required: true });
+  });
+});
+
+describe('Zephir : libellé d’une liste à côté d’un bloc de boutons bascule', () => {
+  it('ne prend pas « Remorque / Caravane » et ses boutons comme libellé de la liste voisine', () => {
+    document.body.innerHTML = `<div><div><span>Remorque / Caravane :</span>
+      <mat-button-toggle-group role="group"><button type="button" aria-pressed="true">- de 750kg</button><button type="button" aria-pressed="false">+ de 750kg</button></mat-button-toggle-group></div>
+      <div><select name="csp"><option>Salarié non sédentaire</option><option>Artisan sédentaire</option></select></div></div>`;
+    const select = analyzeForm(document).fields.find(f => f.kind === 'select');
+    expect(select?.label ?? '').not.toContain('Remorque');
   });
 });

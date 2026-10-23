@@ -230,13 +230,23 @@ export const PricingStore = signalStore(
       };
     },
   ),
-  withMethods((store) => ({
+  withMethods((store, dossierStore = inject(DossierStore)) => ({
     /**
      * « Tarifer » ou « Relancer » : écrit le job puis ouvre l'extranet dans `target`, un onglet ouvert au clic
-     * (ouvert après la réponse du serveur, il serait bloqué par le navigateur).
+     * (ouvert après la réponse du serveur, il serait bloqué par le navigateur). Refusé tant qu'une question obligatoire
+     * est sans réponse (dossier commencé avant qu'elle le devienne) : l'extension resterait bloquée sur l'extranet.
      */
-    launch: (insurerId: string, target: Window | null) =>
-      store._act({ kind: 'launch', insurerId, target }),
+    launch: (insurerId: string, target: Window | null) => {
+      const missing = dossierStore.missing();
+      if (missing.length) {
+        target?.close();
+        const labels = dossierStore.labels();
+        const names = missing.map((path) => labels.get(path) ?? path).join(', ');
+        patchState(store, { error: `Complétez d'abord le dossier (onglet Informations) : ${names}.` });
+        return;
+      }
+      store._act({ kind: 'launch', insurerId, target });
+    },
     cancel: (insurerId: string) => store._act({ kind: 'cancel', insurerId }),
     complete: (insurerId: string, answers: CanonicalData) =>
       store._act({ kind: 'complete', insurerId, answers }),

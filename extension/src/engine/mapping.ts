@@ -1,7 +1,8 @@
-import { CANONICAL_PATHS, CanonicalPath, ExtraCanonicalPath, isCanonicalPath, isExtraPath, isFixedCanonicalPath, labelSignature, parseClaimPath } from '@shared';
+import { CANONICAL_PATHS, CanonicalPath, ExtraCanonicalPath, isCanonicalPath, isExtraPath, isFixedCanonicalPath, parseClaimPath, findMatchingQuestion, isRelatedLabel, sameAnswerShape, type AnswerShape } from '@shared';
 import type { FormField } from './analyzer';
 import { COMPATIBLE_KINDS, FIELD_SYNONYMS, INHERITED_LABELS, PATH_EXPECTED, PREFIX_KEYWORDS } from './field-synonyms';
 import { containsPhrase, normalize, words } from './text';
+import { translatesToYesNo } from './yes-no';
 
 /** Confiance à partir de laquelle un mapping est retenu sans l'IA. */
 export const ACCEPT_THRESHOLD = 0.75;
@@ -44,10 +45,19 @@ const SELECTABLE_TEXT_PATHS: ReadonlySet<CanonicalPath> = new Set<CanonicalPath>
 ]);
 
 /** Compatibilité entre le type HTML du champ et ce que le chemin canonique attend. */
+const isYesNoField =(field: FormField): boolean =>
+  (field.kind === 'radio' || field.kind === 'select') &&
+  field.options.length === 2 &&
+  field.options.every(option => /^(oui|non|yes|no)$/i.test(option.label.trim()));
+
 export function isCompatible(field: FormField, path: CanonicalPath): boolean {
   // Question ajoutée depuis un extranet : elle a été créée à partir de ce champ même (mémoire), son type lui correspond.
   if (isExtraPath(path)) return true;
   if (!COMPATIBLE_KINDS[PATH_EXPECTED[path]].includes(field.kind)) return false;
+  // Une question Oui / Non ne reçoit qu'un oui / non du dossier : « Le véhicule est-il utilisé pour… taxis, location ? »
+  // (Zephir) n'est pas l'usage du véhicule (« Privé »), qu'on ne saurait y cocher. Sauf un choix que le remplissage
+  // sait traduire en oui / non (« Garage » ← lieu de stationnement « garage privé », voir yes-no.ts).
+  if (isYesNoField(field) && PATH_EXPECTED[path] !== 'boolean' && !translatesToYesNo(path)) return false;
   // Un champ e-mail ou téléphone ne reçoit que l'e-mail ou le téléphone, et inversement.
   // Une liste déroulante ne porte un texte que pour les valeurs qu'un extranet propose en liste.
   if (field.kind === 'select' && PATH_EXPECTED[path] === 'text' && !SELECTABLE_TEXT_PATHS.has(path)) return false;
@@ -190,30 +200,42 @@ export function mapFields(fields: FormField[]): Mapping[] {
   return mappings;
 }
 
-/** Pluriel retiré (« sinistres » = « sinistre », « travaux » = « travau ») : la comparaison ne dépend pas de l'accord. */
-const stem = (word: string): string => (word.length > 3 ? word.replace(/[sx]$/, '') : word);
+/** Score d'une piste (question plus large ou plus précise) : au-dessus du doute, sous l'acceptation. */
+const RELATED_SCORE = 0.6;
 
-/** Mots significatifs d'un libellé, ou du code d'une question ajoutée depuis un extranet (`extra.kilometrage_annuel`). */
-const labelTokens = (label: string): Set<string> => new Set(labelSignature(label).split(' ').filter(Boolean).map(stem));
-const extraTokens = (path: ExtraCanonicalPath): Set<string> => labelTokens(path.slice('extra.'.length).replace(/_/g, ' '));
+/** Question ajoutée depuis un extranet, telle que le dossier la connaît : libellé et forme de réponse si connus. */
+export interface ExtraQuestion {
+  path: ExtraCanonicalPath;
+  label: string;
+  shape?: AnswerShape;
+}
+
+/** Code seul (`extra.kilometrage_annuel`, produit illisible) : ses mots tiennent lieu de libellé. */
+const asExtraQuestion = (extra: ExtraCanonicalPath | ExtraQuestion): ExtraQuestion =>
+  typeof extra === 'string' ? { path: extra, label: extra.slice('extra.'.length).replace(/_/g, ' ') } : extra;
+
+/** Forme de réponse d'un champ de l'extranet (Oui / Non, liste, date…), pour la comparer à celle d'une question. */
+export function fieldShape(field: FormField): AnswerShape {
+  const labels = field.options.map(option => option.label.trim()).filter(Boolean);
+  if (field.kind === 'checkbox' || isYesNoField(field)) return { type: 'boolean' };
+  if ((field.kind === 'radio' || field.kind === 'select') && labels.length >= 2) return { type: 'choice', choices: labels };
+  if (field.kind === 'date') return { type: 'date' };
+  if (field.kind === 'number') return { type: 'number' };
+  return { type: 'text' };
+}
 
 /**
- * Question ajoutée depuis un extranet la plus proche du libellé du champ (mêmes mots, quel que soit leur ordre ou leur
- * accord) : la même question posée par un autre assureur, sous une autre forme, est ainsi reconnue sans l'IA.
- * Score : 0,9 pour les mêmes mots, moins quand des mots diffèrent ; null si trop peu de mots en commun.
+ * Question ajoutée depuis un extranet qui est la même que le champ, même posée autrement par un autre assureur
+ * (règle commune avec le serveur : shared/question-matching.ts). Score entre 0,84 et 0,9, ou null.
  */
-export function matchExtraPath(field: FormField, extraPaths: readonly ExtraCanonicalPath[]): Candidate | null {
-  const fieldTokens = labelTokens(field.label);
-  if (fieldTokens.size === 0) return null;
-  let best: Candidate | null = null;
-  for (const path of extraPaths) {
-    const tokens = extraTokens(path);
-    const common = [...tokens].filter(token => fieldTokens.has(token)).length;
-    const similarity = common / new Set([...tokens, ...fieldTokens]).size;
-    const score = 0.5 + 0.4 * similarity;
-    if (similarity > 0 && score >= UNCERTAIN_THRESHOLD + 0.2 && (!best || score > best.score)) best = { path, score };
-  }
-  return best;
+export function matchExtraPath(field: FormField, extras: readonly (ExtraCanonicalPath | ExtraQuestion)[]): Candidate | null {
+  const questions = extras.map(asExtraQuestion);
+  const shape = fieldShape(field);
+  const match = findMatchingQuestion(questions, { label: field.label, shape });
+  if (match) return { path: match.question.path, score: 0.5 + 0.4 * match.score };
+  // Question plus large ou plus précise : une piste à proposer à l'IA (`uncertain`), jamais remplie d'office.
+  const related = questions.find(q => (!q.shape || sameAnswerShape(q.shape, shape)) && isRelatedLabel(q.label, field.label));
+  return related ? { path: related.path, score: RELATED_SCORE } : null;
 }
 
 /**
@@ -221,14 +243,15 @@ export function matchExtraPath(field: FormField, extraPaths: readonly ExtraCanon
  * dans le dossier : assez proche, le champ est associé (`mapped`) ; sinon le candidat est proposé à l'IA (`uncertain`).
  * Un chemin déjà visé par un autre champ n'est pas repris.
  */
-export function mapExtraPaths(fields: FormField[], mappings: Mapping[], extraPaths: readonly ExtraCanonicalPath[]): Mapping[] {
-  if (extraPaths.length === 0) return mappings;
+export function mapExtraPaths(fields: FormField[], mappings: Mapping[], extras: readonly (ExtraCanonicalPath | ExtraQuestion)[]): Mapping[] {
+  if (extras.length === 0) return mappings;
+  const questions = extras.map(asExtraQuestion);
   const used = new Set(mappings.filter(m => m.canonicalPath).map(m => m.canonicalPath!));
   const fieldByKey = new Map(fields.map(field => [field.key, field]));
   return mappings.map(mapping => {
     const field = fieldByKey.get(mapping.fieldKey);
     if (!field || mapping.status === 'mapped' || mapping.source !== 'heuristic') return mapping;
-    const match = matchExtraPath(field, extraPaths.filter(path => !used.has(path)));
+    const match = matchExtraPath(field, questions.filter(question => !used.has(question.path)));
     if (!match || match.score <= mapping.confidence) return mapping;
     const candidates = [match, ...mapping.candidates].slice(0, 3);
     if (match.score < ACCEPT_THRESHOLD) return { ...mapping, status: 'uncertain', confidence: match.score, candidates };

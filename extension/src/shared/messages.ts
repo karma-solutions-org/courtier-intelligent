@@ -1,4 +1,4 @@
-import type { CanonicalData, CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, DiscoveredFieldInput, MissingField, NavAction, QuoteJobStatus } from '@shared';
+import type { CanonicalData, CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, DiscoveredFieldInput, MissingField, NavAction, QuoteJobStatus, QuestionType } from '@shared';
 
 /** Utilisateur connecté dans l'extension (affiché dans le side panel). */
 export interface ExtensionUser {
@@ -27,6 +27,20 @@ export interface CurrentJob {
 }
 
 /** Job de tarification à exécuter sur une page : ce que le content script reçoit pour remplir l'extranet. */
+/** Question du produit telle que l'extension la compare : chemin, libellé, forme de réponse. */
+export interface ProductQuestion {
+  path: string;
+  label: string;
+  type: QuestionType;
+  choices?: string[];
+}
+
+/** Réponse à FIELDS_DISCOVERED : champ de l'extranet → chemin de la question du dossier (créée ou retrouvée). */
+export interface FieldsDiscoveredResponse {
+  ok: boolean;
+  mapping: Record<string, string>;
+}
+
 export interface JobContext {
   dossierId: string;
   insurerId: string;
@@ -40,6 +54,11 @@ export interface JobContext {
    * un champ reconnu sur l'une d'elles n'est pas « nouveau ». Absent : produit illisible, on se rabat sur quoteData.
    */
   productPaths?: string[];
+  /**
+   * Questions ajoutées depuis les extranets (`extra.*`) du produit, avec leur libellé : une question posée par un autre
+   * assureur avec d'autres mots est reconnue (shared/question-matching.ts) au lieu d'être signalée en double.
+   */
+  productQuestions?: ProductQuestion[];
   /** Produit du dossier : choisit le profil d'extranet (chemin d'accès propre à chaque produit). */
   productId?: string | null;
 }
@@ -242,6 +261,8 @@ export type TabMessage =
   | { type: 'CAPTURE_NOW' }
   /** La capture est terminée (offre enregistrée ou échec signalé) : la page n'a plus rien à faire. */
   | { type: 'CAPTURE_DONE' }
+  /** Le tarif lu n'a pas pu être enregistré (règles, réseau) : la barre flottante l'affiche. */
+  | { type: 'CAPTURE_SAVE_FAILED' }
   /** Apprentissage du chemin d'accès : la page enregistre les clics de navigation (et ne remplit plus), puis reprend. */
   | { type: 'ENTRY_RECORD_START' }
   | { type: 'ENTRY_RECORD_STOP' };

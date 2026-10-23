@@ -17,6 +17,7 @@ import {
   Dossier,
   DossierEvent,
   DossierStatus,
+  ANSWERS_EDITABLE_DOSSIER_STATUSES,
   EDITABLE_DOSSIER_STATUSES,
   Insurer,
   insurersForProduct,
@@ -185,6 +186,12 @@ export const DossierStore = signalStore(
       editable: computed(() =>
         EDITABLE_DOSSIER_STATUSES.includes(store.dossier()?.status ?? 'souscrit'),
       ),
+      /** Réponses du questionnaire modifiables : avant la tarification, et pendant (voir ANSWERS_EDITABLE_DOSSIER_STATUSES). */
+      answersEditable: computed(() =>
+        ANSWERS_EDITABLE_DOSSIER_STATUSES.includes(store.dossier()?.status ?? 'souscrit'),
+      ),
+      /** Modification pendant la tarification : les tarifs déjà obtenus deviendront périmés. */
+      editingDuringPricing: computed(() => store.dossier()?.status === 'tarification'),
       transitions: computed(() => {
         const status = store.dossier()?.status;
         return status ? manualTransitionsFrom(status) : [];

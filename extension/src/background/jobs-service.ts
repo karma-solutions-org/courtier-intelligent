@@ -17,8 +17,8 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getFirebase } from '../shared/firebase';
-import { questionsOf, type ExtensionReportIssue, type ExtensionReportStep, type QuestionnaireSection } from '@shared';
-import type { CapturedOffer, ExtensionUser, JobContext, JobUpdate } from '../shared/messages';
+import { isExtraPath, questionsOf, type ExtensionReportIssue, type ExtensionReportStep, type QuestionnaireSection } from '@shared';
+import type { CapturedOffer, ExtensionUser, JobContext, JobUpdate, ProductQuestion } from '../shared/messages';
 import { catalogEntryPaths, insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin, PickOptions } from './origin-match';
 
 /** Les assureurs changent rarement : on les relit au plus toutes les 10 minutes. */
@@ -114,10 +114,17 @@ export async function findJobForOrigin(user: ExtensionUser, origin: string, pick
   if (!job) return null;
   // Produit du dossier : il choisit le profil d'extranet (chemin d'accès au formulaire).
   const productId = await loadProductId(user, job.dossierId);
-  // Chemins du produit copiés dans le job par `tarification-lancer` ; à défaut (ancien job), lecture du produit.
-  if (job.productPaths?.length || !productId) return { ...job, productId };
-  const productPaths = await loadProductPaths(productId);
-  return productPaths ? { ...job, productId, productPaths } : { ...job, productId };
+  if (!productId) return { ...job, productId };
+  // Questions du produit (lues une fois, en cache) : chemins (si `tarification-lancer` ne les a pas copiés dans le job)
+  // et libellés des questions ajoutées depuis les extranets.
+  const product = await loadProductQuestions(productId);
+  if (!product) return { ...job, productId };
+  return {
+    ...job,
+    productId,
+    productPaths: job.productPaths?.length ? job.productPaths : product.paths,
+    productQuestions: product.extras,
+  };
 }
 
 /** Produit de chaque dossier : il ne change pas une fois le dossier créé. */
@@ -140,23 +147,33 @@ async function loadProductId(user: ExtensionUser, dossierId: string): Promise<st
 }
 
 /** Questions de chaque produit : un produit change rarement pendant un remplissage. */
-const productPathsCache = new Map<string, string[]>();
+const productCache = new Map<string, { paths: string[]; extras: ProductQuestion[] }>();
 
 /**
- * Chemins de toutes les questions du produit (questionnaire complet, conditions comprises), ou null si le produit est
- * illisible (règles, réseau) : l'appelant se rabat alors sur les clés de quoteData.
+ * Questions du produit : chemins de TOUTES ses questions (conditions comprises) et questions ajoutées depuis les
+ * extranets avec leur libellé, ou null si le produit est illisible (règles, réseau) : l'appelant se rabat alors sur
+ * les clés de quoteData.
  */
-async function loadProductPaths(productId: string): Promise<string[] | null> {
-  const cached = productPathsCache.get(productId);
+async function loadProductQuestions(productId: string): Promise<{ paths: string[]; extras: ProductQuestion[] } | null> {
+  const cached = productCache.get(productId);
   if (cached) return cached;
   try {
     const { firestore } = getFirebase();
     const product = await getDoc(doc(firestore, `ci_products/${productId}`));
     const schema = product.get('questionnaireSchema') as QuestionnaireSection[] | undefined;
     if (!Array.isArray(schema)) return null;
-    const paths = [...new Set(questionsOf(schema).map(question => question.canonicalPath as string))];
-    productPathsCache.set(productId, paths);
-    return paths;
+    const questions = questionsOf(schema);
+    const extras = questions
+      .filter(question => isExtraPath(question.canonicalPath))
+      .map(question => ({
+        path: question.canonicalPath as string,
+        label: question.label,
+        type: question.type,
+        ...(question.choices ? { choices: question.choices.map(choice => choice.label) } : {}),
+      }));
+    const loaded = { paths: [...new Set(questions.map(question => question.canonicalPath as string))], extras };
+    productCache.set(productId, loaded);
+    return loaded;
   } catch {
     return null;
   }
@@ -242,7 +259,11 @@ export function watchJob(user: ExtensionUser, dossierId: string, insurerId: stri
  * (référentiel du produit) est posé ensuite côté serveur : l'extension écrit le libellé lu sur la page.
  * L'offre arrive « à vérifier » (`review: pending`) : le courtier la valide ou la corrige dans l'onglet Tarification.
  */
-export async function writeCapturedOffer(user: ExtensionUser, dossierId: string, insurerId: string, offer: CapturedOffer): Promise<void> {
+/**
+ * Écrit le tarif lu. `again` : un tarif de cet onglet est déjà enregistré (le courtier sauvegarde une autre formule,
+ * annuel ↔ mensuel) ; seule l'offre est réécrite, le job est déjà `captured` (règles : ciExtOfferRewrite).
+ */
+export async function writeCapturedOffer(user: ExtensionUser, dossierId: string, insurerId: string, offer: CapturedOffer, again = false): Promise<void> {
   const { firestore } = getFirebase();
   const base = `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}`;
   const batch = writeBatch(firestore);
@@ -257,7 +278,7 @@ export async function writeCapturedOffer(user: ExtensionUser, dossierId: string,
     capturedAt: serverTimestamp(),
     review: 'pending',
   });
-  batch.update(doc(firestore, `${base}/ci_quoteJobs/${insurerId}`), {
+  if (!again) batch.update(doc(firestore, `${base}/ci_quoteJobs/${insurerId}`), {
     status: 'captured',
     missingFields: [],
     error: null,

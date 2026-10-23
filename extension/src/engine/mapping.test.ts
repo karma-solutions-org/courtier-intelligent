@@ -248,3 +248,17 @@ describe('Zephir : lieu de stationnement', () => {
     );
   });
 });
+
+describe('isCompatible : question Oui / Non', () => {
+  it('ne vise jamais une donnée qui n’est pas un oui / non (usage du véhicule)', () => {
+    document.body.innerHTML = `<div><p>Le véhicule est-il utilisé pour taxis ou location ?</p><div role="radiogroup">
+      <label><input type="radio" name="u" value="true">Oui</label><label><input type="radio" name="u" value="false">Non</label></div></div>`;
+    const [field] = analyzeForm(document).fields;
+    expect(isCompatible(field, 'vehicle.usage')).toBe(false);
+    expect(isCompatible(field, 'insuranceHistory.wasTerminated')).toBe(true);
+    // « Garage » Oui / Non ← lieu de stationnement « garage privé » : traduit par le remplissage (yes-no.ts).
+    expect(isCompatible(field, 'vehicle.parkingType')).toBe(true);
+    // « Garage » Oui / Non ← lieu de stationnement « garage privé » : traduit par le remplissage.
+    expect(isCompatible(field, 'vehicle.parkingType')).toBe(true);
+  });
+});
