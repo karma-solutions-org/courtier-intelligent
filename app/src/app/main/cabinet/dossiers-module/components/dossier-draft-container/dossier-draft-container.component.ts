@@ -1,38 +1,19 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  HostListener,
-  inject,
-  input,
-  linkedSignal,
-  OnDestroy,
-  OnInit,
-  signal,
-  untracked,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, linkedSignal, OnDestroy, OnInit, signal, untracked } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
-import { CanonicalPath, isAnalyzableDocumentType, OcrField } from '@shared';
-import { catchError, concatMap, EMPTY, finalize, from, map, of, switchMap, take, tap } from 'rxjs';
 import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
 import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
-import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
-import { DocumentsService } from '../../services/documents.service';
+import { ClientPiecesStore } from '../../store/client-pieces.store';
 import { DossierStore } from '../../store/dossier.store';
-import { mergeOcrFields, needsConfirmation } from '../../util/documents.utils';
+import { boundedSectionIndex, missingInSection } from '../../util/draft.utils';
 import { sectionIndexOf } from '../../util/dossiers.utils';
 import { DocumentImportContainerComponent } from '../document-import/document-import-container.component';
 import { DossierStepperHeaderComponent } from '../dossier-stepper-header/dossier-stepper-header.component';
 import { DOSSIERS_STRUCTURE } from '../dossiers.structure';
-import {
-  AnswerChange,
-  QuestionnaireFormComponent,
-} from '../questionnaire-form/questionnaire-form.component';
+import { AnswerChange, QuestionnaireFormComponent } from '../questionnaire-form/questionnaire-form.component';
+import { ExtranetPickerComponent } from './extranet-picker.component';
+import { ReadingOverlayComponent } from './reading-overlay.component';
 
 /**
  * « Nouveau dossier », étapes 3 à 5 : extranets à utiliser, documents, puis questionnaire section par section
@@ -44,24 +25,19 @@ import {
   selector: 'app-dossier-draft-container',
   imports: [
     MatButtonModule,
-    MatCheckboxModule,
     MatIconModule,
     DocumentImportContainerComponent,
     DossierStepperHeaderComponent,
+    ExtranetPickerComponent,
     QuestionnaireFormComponent,
+    ReadingOverlayComponent,
   ],
+  providers: [ClientPiecesStore],
+  host: { '(window:beforeunload)': 'onBeforeUnload($event)' },
   template: `
-    @if (readingPieces()) {
+    @if (pieces.reading()) {
       <!-- Lecture des pièces du client : écran bloqué jusqu'au remplissage des champs. -->
-      <div class="reading-overlay" role="alertdialog" aria-modal="true" aria-live="assertive">
-        <div class="reading-card">
-          <div class="scan" aria-hidden="true">
-            <mat-icon class="scan-doc">description</mat-icon>
-            <span class="scan-line"></span>
-          </div>
-          <p>{{ structure.clientPiecesReading }}</p>
-        </div>
-      </div>
+      <app-reading-overlay [message]="structure.clientPiecesReading" />
     }
     @if (store.dossier(); as dossier) {
       <header>
@@ -81,26 +57,11 @@ import {
           <h2>{{ structure.extranetsTitle }}</h2>
           <p>{{ structure.extranetsHint }}</p>
         </section>
-        @if (store.availableInsurers().length) {
-          <ul class="extranets">
-            @for (insurer of store.availableInsurers(); track insurer.id) {
-              <li>
-                <mat-checkbox [checked]="checkedInsurers().includes(insurer.id)" (change)="toggleInsurer(insurer.id, $event.checked)">
-                  <span class="insurer">
-                    @if (insurer.logo) {
-                      <img class="logo" [src]="insurer.logo" alt="" loading="lazy" />
-                    } @else {
-                      <span class="logo initial" aria-hidden="true">{{ insurer.name.charAt(0) }}</span>
-                    }
-                    {{ insurer.name }}
-                  </span>
-                </mat-checkbox>
-              </li>
-            }
-          </ul>
-        } @else {
-          <p class="progress">{{ structure.noExtranet }}</p>
-        }
+        <app-extranet-picker
+          [insurers]="store.availableInsurers()"
+          [checked]="checkedInsurers()"
+          (toggled)="toggleInsurer($event.insurerId, $event.checked)"
+        />
         @if (showMissing() && !checkedInsurers().length) {
           <p class="blocked" role="alert">{{ structure.extranetsRequired }}</p>
         }
@@ -245,114 +206,6 @@ import {
       margin-bottom: 16px;
     }
 
-    .extranets {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 8px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-
-      li {
-        padding: 6px 8px;
-        border: 1px solid var(--ci-border);
-        border-radius: 8px;
-        background: var(--ci-surface);
-      }
-
-      .insurer {
-        display: inline-flex;
-        gap: 10px;
-        align-items: center;
-      }
-
-      .logo {
-        flex-shrink: 0;
-        width: 56px;
-        height: 28px;
-        border-radius: 4px;
-        object-fit: contain;
-        background: #fff;
-      }
-
-      .initial {
-        display: inline-grid;
-        place-items: center;
-        font-weight: 700;
-        color: var(--ci-accent-ink);
-        background: var(--ci-accent-soft);
-      }
-    }
-
-    .reading-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-      background: rgb(15 23 42 / 55%);
-    }
-
-    .reading-card {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      align-items: center;
-      max-width: 360px;
-      padding: 32px 40px;
-      border-radius: 12px;
-      background: var(--ci-surface);
-      box-shadow: var(--ci-shadow-sm);
-      text-align: center;
-
-      p {
-        margin: 0;
-        font-weight: 500;
-      }
-    }
-
-    /* Document lu : une ligne de scan passe de haut en bas sur l'icône. */
-    .scan {
-      position: relative;
-      width: 72px;
-      height: 72px;
-      overflow: hidden;
-    }
-
-    .scan-doc {
-      width: 72px;
-      height: 72px;
-      font-size: 72px;
-      color: var(--mat-sys-primary, #0b5cff);
-    }
-
-    .scan-line {
-      position: absolute;
-      left: 8px;
-      right: 8px;
-      top: 6px;
-      height: 3px;
-      border-radius: 2px;
-      background: var(--mat-sys-primary, #0b5cff);
-      box-shadow: 0 0 10px 2px var(--mat-sys-primary, #0b5cff);
-      animation: scan 1.4s ease-in-out infinite alternate;
-    }
-
-    @keyframes scan {
-      to {
-        top: 62px;
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .scan-line {
-        animation: none;
-        top: 34px;
-      }
-    }
-
     .actions {
       display: flex;
       align-items: center;
@@ -384,10 +237,8 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
   readonly id = input.required<string>();
 
   protected readonly store = inject(DossierStore);
+  protected readonly pieces = inject(ClientPiecesStore);
   private readonly _router = inject(Router);
-  private readonly _documents = inject(DocumentsService);
-  private readonly _authStore = inject(AuthStore);
-  private readonly _snackBar = inject(MatSnackBar);
   /** Dossier dont les pièces du client ont déjà été reprises pendant cette visite. */
   private _clientPiecesTakenFor: string | null = null;
   protected readonly structure = DOSSIERS_STRUCTURE.draft;
@@ -399,13 +250,9 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
   protected readonly checkedInsurers = linkedSignal(() => this.store.selectedInsurers());
   protected readonly showMissing = signal(false);
   protected readonly validating = signal(false);
-  /** Pièces du client en cours de lecture : un spinner couvre le formulaire jusqu'au remplissage. */
-  protected readonly readingPieces = signal(false);
 
   /** Section affichée, bornée au questionnaire (la reprise peut venir d'un ancien enregistrement). */
-  protected readonly sectionIndex = computed(() =>
-    Math.min(this.store.sectionIndex(), Math.max(0, this.store.schema().length - 1)),
-  );
+  protected readonly sectionIndex = computed(() => boundedSectionIndex(this.store.sectionIndex(), this.store.schema().length));
   protected readonly currentSection = computed(() =>
     this.store.schema().slice(this.sectionIndex(), this.sectionIndex() + 1),
   );
@@ -413,11 +260,7 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
     () => this.sectionIndex() >= this.store.schema().length - 1,
   );
   /** Champs obligatoires encore vides de la section affichée : « Suivant » reste bloqué tant qu'il y en a. */
-  protected readonly sectionMissing = computed(() => {
-    const paths = new Set(this.currentSection().flatMap(section => section.questions).map(q => q.canonicalPath));
-    return this.store.missing().filter(path => paths.has(path));
-  });
-
+  protected readonly sectionMissing = computed(() => missingInSection(this.currentSection(), this.store.missing()));
   protected readonly saveLabel = computed(() => {
     switch (this.store.saveStatus()) {
       case 'saving':
@@ -470,7 +313,7 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
       if (!dossier || !this.store.editable() || !this.store.product() || this._clientPiecesTakenFor === dossier.id) return;
       if (this.view() !== 'questionnaire') return;
       this._clientPiecesTakenFor = dossier.id;
-      untracked(() => this.takeClientPieces(dossier.id));
+      untracked(() => this.pieces.take(dossier.id));
     });
     effect(() => {
       // Une erreur de validation rend la main au courtier.
@@ -489,7 +332,6 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
   }
 
   /** Fermeture ou rechargement de l'onglet pendant une saisie ou un enregistrement. */
-  @HostListener('window:beforeunload', ['$event'])
   protected onBeforeUnload(event: BeforeUnloadEvent): void {
     if (this.store.hasPendingEdits() || this.store.saveStatus() === 'saving') {
       event.preventDefault();
@@ -502,54 +344,6 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
     if (this.store.saveStatus() === 'dirty') {
       this.store.saveNow({ sectionIndex: this.sectionIndex() });
     }
-  }
-
-  /**
-   * Reprend les pièces du client (une seule fois chacune, côté serveur), lit celles qui ne l'ont pas encore été, puis
-   * écrit les valeurs sûres (confiance suffisante) dans les champs encore VIDES : rien de ce que le courtier a saisi
-   * n'est écrasé. Une lecture coupée (page rechargée) reprend à l'ouverture suivante : les pièces non lues sont lues
-   * et toutes les valeurs du client sont appliquées. Rien à lire : rien n'est réappliqué (un champ vidé reste vide).
-   */
-  private takeClientPieces(dossierId: string): void {
-    const cabinetId = this._authStore.cabinetId();
-    if (!cabinetId) return;
-    const fields: OcrField[] = [];
-    // Écran de lecture affiché tout de suite, sans attendre la reprise des pièces côté serveur.
-    this.readingPieces.set(true);
-    this._documents
-      .takeClientPieces(dossierId)
-      .pipe(
-        switchMap(() => this._documents.watchDocuments(cabinetId, dossierId).pipe(take(1))),
-        map(documents => documents.filter(document => !!document.sourceAssureDocumentId && isAnalyzableDocumentType(document.type))),
-        switchMap(documents => {
-          const toRead = documents.filter(document => document.status === 'uploaded');
-          if (!toRead.length) return EMPTY;
-          for (const document of documents) if (document.status === 'analyzed') fields.push(...document.ocrFields);
-          return from(toRead).pipe(
-            concatMap(document =>
-              this._documents.analyze(dossierId, document.id).pipe(
-                tap(({ status, ocrFields }) => {
-                  if (status === 'analyzed') fields.push(...ocrFields);
-                }),
-                catchError(() => of(null)),
-              ),
-            ),
-          );
-        }),
-        catchError(() => EMPTY),
-        finalize(() => {
-          this.readingPieces.set(false);
-          if (this.store.selectedId() !== dossierId || !fields.length) return;
-          const answers = this.store.answers();
-          const isEmpty = (path: CanonicalPath) => answers[path] === undefined || answers[path] === null || answers[path] === '';
-          const toFill = mergeOcrFields(fields).filter(field => !needsConfirmation(field) && isEmpty(field.canonicalPath));
-          if (!toFill.length) return;
-          for (const field of toFill) this.store.edit(field.canonicalPath, field.value);
-          this.store.saveNow({ event: true, sectionIndex: this.sectionIndex() });
-          this._snackBar.open(`${toFill.length} ${this.structure.clientPiecesApplied}`, undefined, { duration: 6000 });
-        }),
-      )
-      .subscribe();
   }
 
   protected toggleInsurer(insurerId: string, checked: boolean): void {
