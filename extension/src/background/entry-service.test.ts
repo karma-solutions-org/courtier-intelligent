@@ -90,3 +90,26 @@ describe('sameSite : chemin rejoué sur un autre sous-domaine du même extranet'
     expect(sameSite(a, b)).toBe(expected);
   });
 });
+
+describe('chemin passé ou interrompu : la page est observée jusqu’au formulaire', () => {
+  const replaying = initialEntry(job, ORIGIN, profile);
+
+  it('chemin passé (page différente au premier clic) : aucun remplissage avant le formulaire reconnu', () => {
+    const skipped = entryFailed(replaying, 0, 'skipped');
+    expect(instructionFor(skipped)).toEqual({ mode: 'none', waitForForm: true });
+    const reached = entryFormReached(skipped, profile).entry;
+    expect(reached.reached).toBe(true);
+    expect(instructionFor(reached)).toEqual({ mode: 'none' });
+  });
+
+  it('bouton introuvable : idem', () => {
+    expect(instructionFor(entryFailed(replaying, 0, 'not_found'))).toEqual({ mode: 'none', waitForForm: true });
+  });
+
+  it('chemin rejoué jusqu’au bout : le formulaire est atteint, la page se remplit', () => {
+    let entry = replaying;
+    for (let index = 0; index < profile.entry.length; index++) entry = entryClicked(entry, index);
+    expect(entry).toMatchObject({ mode: 'done', reached: true });
+    expect(instructionFor(entry)).toEqual({ mode: 'none' });
+  });
+});

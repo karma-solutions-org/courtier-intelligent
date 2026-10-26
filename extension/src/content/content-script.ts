@@ -322,11 +322,12 @@ async function waitForLogin(): Promise<void> {
 /** Étapes du chemin d'accès dans la console de la page (jamais de donnée : libellés des boutons et adresses des cadres). */
 const trace = (...parts: unknown[]) => console.info('[Courtier Intelligent] chemin :', ...parts);
 
-async function runEntry(): Promise<'recording' | 'learning' | 'done'> {
+async function runEntry(): Promise<'recording' | 'learning' | 'watch' | 'done'> {
   for (;;) {
     const instruction = await send<EntryInstruction | false>({ type: 'ENTRY_GET' }).catch(() => false as const);
     trace('instruction', instruction ? instruction.mode : 'injoignable');
-    if (!instruction || instruction.mode === 'none') return 'done';
+    if (!instruction) return 'done';
+    if (instruction.mode === 'none') return instruction.waitForForm ? 'watch' : 'done';
     if (instruction.mode === 'record') {
       startRecording();
       // Apprentissage automatique : la page est observée, et remplie dès que le formulaire de devis est reconnu (le
@@ -338,11 +339,15 @@ async function runEntry(): Promise<'recording' | 'learning' | 'done'> {
     const { action, index } = instruction;
     trace(`clic ${index + 1} : « ${action.label} »`, 'page attendue', action.urlPattern, 'pages vues', documentsOf(document).map(d => d.location.pathname));
     // Le premier clic se fait sur la page où il a été appris : ailleurs (formulaire déjà ouvert), le chemin est passé.
-    // Clic appris dans un cadre (Oyat) : c'est l'adresse du cadre qui compte.
-    if (index === 0 && !documentsOf(document).some(d => matchesUrlPattern(d.location.href, action.urlPattern))) {
+    // Clic appris dans un cadre (Oyat) : c'est l'adresse du cadre qui compte, et les cadres se chargent après la page
+    // principale : on attend qu'ils soient là (ou que le bouton apparaisse) avant de conclure que la page est autre.
+    const onLearnedPage = () =>
+      documentsOf(document).some(d => matchesUrlPattern(d.location.href, action.urlPattern)) || !!findActionTarget(document, action);
+    for (let waited = 0; index === 0 && !onLearnedPage() && waited < ENTRY_TARGET_TIMEOUT_MS; waited += 500) await delay(500);
+    if (index === 0 && !onLearnedPage()) {
       trace('page différente : chemin passé');
       await send({ type: 'ENTRY_FAILED', index, reason: 'skipped' }).catch(() => undefined);
-      return 'done';
+      return 'watch';
     }
     let target = findActionTarget(document, action);
     for (let waited = 0; !target && waited < ENTRY_TARGET_TIMEOUT_MS; waited += 500) {
@@ -352,7 +357,7 @@ async function runEntry(): Promise<'recording' | 'learning' | 'done'> {
     if (!target) {
       trace('bouton introuvable');
       await send({ type: 'ENTRY_FAILED', index, reason: 'not_found' }).catch(() => undefined);
-      return 'done';
+      return 'watch';
     }
     // Avancement non noté (service worker injoignable) : on ne clique pas, la page se remplit telle quelle.
     if (!(await send<boolean>({ type: 'ENTRY_CLICKED', index }).catch(() => false))) {
@@ -396,7 +401,7 @@ async function main(): Promise<void> {
     if (hasFrames && !(await waitForFields())) return;
     // Sans chemin à rejouer, la connexion à l'extranet est attendue aussi avant de remplir.
     await waitForLogin();
-    await startRunner(job, entry === 'learning');
+    await startRunner(job, entry === 'learning' || entry === 'watch');
     return;
   }
   if (!(await waitForFields())) return;
@@ -412,7 +417,9 @@ async function main(): Promise<void> {
   const learning = !!instruction && instruction.mode === 'record';
   if (learning) startRecording();
   if (learning && !instruction.auto) return;
-  await startRunner(job, learning);
+  // Chemin passé ou interrompu sans formulaire atteint : ce cadre est observé jusqu'à ce que le formulaire soit reconnu.
+  const watch = !!instruction && instruction.mode === 'none' && instruction.waitForForm === true;
+  await startRunner(job, learning || watch);
 }
 
 void main().catch(() => undefined);

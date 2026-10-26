@@ -58,7 +58,9 @@ export function instructionFor(entry: TabEntry | null): EntryInstruction {
   if (entry?.mode === 'replaying' && entry.index < entry.actions.length) {
     return { mode: 'replay', action: entry.actions[entry.index], index: entry.index, total: entry.actions.length };
   }
-  return { mode: 'none' };
+  // Chemin passé ou interrompu sans atteindre le formulaire : la page est observée jusqu'à ce qu'il soit reconnu
+  // (jamais le tableau de bord d'un extranet rempli comme un devis).
+  return entry && (entry.mode === 'done' || entry.mode === 'failed') && !entry.reached ? { mode: 'none', waitForForm: true } : { mode: 'none' };
 }
 
 /** Le clic `index` va être fait : enregistré avant le clic (la page peut se recharger aussitôt). */
@@ -66,7 +68,7 @@ export function entryClicked(entry: TabEntry, index: number): TabEntry {
   if (entry.mode !== 'replaying' || index !== entry.index) return entry;
   const next = index + 1;
   return next >= entry.actions.length
-    ? { ...entry, index: next, mode: 'done', message: 'Formulaire de devis atteint : le remplissage commence.' }
+    ? { ...entry, index: next, mode: 'done', reached: true, message: 'Formulaire de devis atteint : le remplissage commence.' }
     : { ...entry, index: next, message: `Chemin d’accès : clic ${next} sur ${entry.actions.length} fait.` };
 }
 
@@ -120,12 +122,15 @@ export function profileFrom(entry: TabEntry, previous: ExtranetProfile | null): 
  * Aucun clic retenu (extranet ouvert directement sur le formulaire) : rien à apprendre, l'onglet passe à « done ».
  */
 export function entryFormReached(entry: TabEntry, previous: ExtranetProfile | null): { entry: TabEntry; profile: ExtranetProfile | null } {
+  // Chemin passé ou interrompu : le formulaire est maintenant reconnu, les pages suivantes se remplissent normalement.
+  if ((entry.mode === 'done' || entry.mode === 'failed') && !entry.reached) return { entry: { ...entry, reached: true }, profile: null };
   if (entry.mode !== 'recording' || !entry.auto) return { entry, profile: null };
   const profile = profileFrom(entry, previous);
   const done: TabEntry = {
     ...entry,
     mode: 'done',
     auto: false,
+    reached: true,
     index: entry.actions.length,
     message: profile
       ? `Chemin d’accès retenu (${profile.entry.length} clic${profile.entry.length > 1 ? 's' : ''}) : il sera rejoué à la prochaine tarification sur cet extranet.`

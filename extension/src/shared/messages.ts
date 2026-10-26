@@ -86,6 +86,11 @@ export interface TabEntry {
   /** Prochain clic à rejouer. */
   index: number;
   message: string | null;
+  /**
+   * Le formulaire de devis a été atteint (chemin rejoué jusqu'au bout, ou formulaire reconnu). Sans cela, un chemin
+   * « terminé » (rejeu passé ou interrompu) ne remplit rien avant que la page soit reconnue comme le formulaire.
+   */
+  reached?: boolean;
 }
 
 /** Ce que le side panel affiche du chemin d'accès de l'onglet actif. */
@@ -105,7 +110,7 @@ export type EntryResponse = { ok: true } | { ok: false; message: string };
 
 /** Réponse à ENTRY_GET : ce que la page doit faire du chemin d'accès. */
 export type EntryInstruction =
-  | { mode: 'none' }
+  | { mode: 'none'; waitForForm?: boolean }
   | { mode: 'record'; auto: boolean }
   | { mode: 'replay'; action: NavAction; index: number; total: number };
 
