@@ -14,9 +14,13 @@ export function missingInSection(sections: QuestionnaireSection[], missing: Cano
 
 /**
  * Valeurs lues dans les pièces du client à écrire dans le dossier : seulement les valeurs sûres (confiance suffisante),
- * et seulement dans les champs encore VIDES (rien de ce que le courtier a saisi n'est écrasé).
+ * seulement dans les champs encore VIDES (rien de ce que le courtier a saisi n'est écrasé), et seulement pour les questions
+ * du dossier (une question `extra.*` d'un extranet non choisi serait refusée par le serveur).
  */
-export function clientPieceAnswers(fields: OcrField[], answers: CanonicalData): OcrField[] {
+export function clientPieceAnswers(fields: OcrField[], answers: CanonicalData, sections: QuestionnaireSection[]): OcrField[] {
+  const paths = new Set(sections.flatMap((section) => section.questions).map((question) => question.canonicalPath));
   const isEmpty = (path: CanonicalPath) => answers[path] === undefined || answers[path] === null || answers[path] === '';
-  return mergeOcrFields(fields).filter((field) => !needsConfirmation(field) && isEmpty(field.canonicalPath));
+  return mergeOcrFields(fields).filter(
+    (field) => paths.has(field.canonicalPath) && !needsConfirmation(field) && isEmpty(field.canonicalPath),
+  );
 }

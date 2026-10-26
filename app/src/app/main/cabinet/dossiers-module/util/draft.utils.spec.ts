@@ -21,10 +21,19 @@ describe('clientPieceAnswers', () => {
     { canonicalPath: 'vehicle.registration', value: 'AB-123-CD', confidence: 0.95 },
     { canonicalPath: 'vehicle.brand', value: 'Renault', confidence: 0.95 },
     { canonicalPath: 'vehicle.fiscalPower', value: 7, confidence: 0.5 },
+    { canonicalPath: 'extra.numero_permis', value: '123456', confidence: 0.95 },
   ];
+  const sections = [
+    { questions: ['vehicle.registration', 'vehicle.brand', 'vehicle.fiscalPower'].map((canonicalPath) => ({ canonicalPath })) },
+  ] as unknown as QuestionnaireSection[];
 
   it('écrit seulement les valeurs sûres, dans les champs vides', () => {
-    const paths = clientPieceAnswers(fields, { 'vehicle.brand': 'Peugeot' }).map((field) => field.canonicalPath);
+    const paths = clientPieceAnswers(fields, { 'vehicle.brand': 'Peugeot' }, sections).map((field) => field.canonicalPath);
     expect(paths).toEqual(['vehicle.registration']);
+  });
+
+  it("ignore les champs absents du questionnaire (question d'un extranet non choisi)", () => {
+    const paths = clientPieceAnswers(fields, {}, sections).map((field) => field.canonicalPath);
+    expect(paths).not.toContain('extra.numero_permis');
   });
 });

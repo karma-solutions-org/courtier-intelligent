@@ -51,7 +51,7 @@ export const ClientPiecesStore = signalStore(
               finalize(() => {
                 patchState(store, { reading: false });
                 if (dossier.selectedId() !== dossierId || !fields.length) return;
-                const toFill = clientPieceAnswers(fields, dossier.answers());
+                const toFill = clientPieceAnswers(fields, dossier.answers(), dossier.schema());
                 if (!toFill.length) return;
                 for (const field of toFill) dossier.edit(field.canonicalPath, field.value);
                 dossier.saveNow({ event: true, sectionIndex: boundedSectionIndex(dossier.sectionIndex(), dossier.schema().length) });
