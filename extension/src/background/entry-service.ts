@@ -187,10 +187,35 @@ export async function loadLearnedProfile(insurerId: string, productId: string): 
 }
 
 /** Chemin commun publié dans le catalogue pour cet assureur et ce produit, ou null. */
-async function catalogProfile(insurerId: string, productId: string): Promise<ExtranetProfile | null> {
+export async function catalogProfile(insurerId: string, productId: string): Promise<ExtranetProfile | null> {
   const insurers = await loadInsurers().catch(() => []);
   const path = insurers.find(insurer => insurer.id === insurerId)?.entryPaths?.[productId];
   return path ? { insurerId, productId, origin: path.origin, version: 0, status: 'validated', entry: path.entry } : null;
+}
+
+/** Oublie le chemin appris dans ce navigateur (il ne se rejoue plus) : le catalogue, ou un nouvel apprentissage, prend le relais. */
+export async function forgetLearnedProfile(insurerId: string, productId: string): Promise<void> {
+  await chrome.storage.local.remove(`${PROFILE_PREFIX}${extranetProfileId(insurerId, productId)}`).catch(() => undefined);
+}
+
+/**
+ * Le chemin rejoué échoue dès son premier clic (chemin appris à moitié, page de départ différente) : on essaie le
+ * chemin du catalogue s'il est différent, sinon on réapprend le chemin à partir des clics du courtier. Jamais d'impasse.
+ */
+export function entryRecovered(entry: TabEntry, catalog: ExtranetProfile | null): TabEntry {
+  const same = (a: { label: string }[], b: { label: string }[]) => a.length === b.length && a.every((action, i) => action.label === b[i].label);
+  if (catalog?.entry.length && !same(catalog.entry, entry.actions)) {
+    return { ...entry, mode: 'replaying', actions: catalog.entry, index: 0, reached: false, message: 'Chemin enregistré introuvable : chemin du catalogue rejoué.' };
+  }
+  return {
+    ...entry,
+    mode: 'recording',
+    auto: true,
+    actions: [],
+    index: 0,
+    reached: false,
+    message: 'Chemin enregistré introuvable : allez jusqu’au formulaire de devis, le nouveau chemin sera retenu.',
+  };
 }
 
 export async function saveProfile(profile: ExtranetProfile): Promise<void> {

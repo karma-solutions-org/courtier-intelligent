@@ -1,7 +1,7 @@
 import type { ExtranetProfile, NavAction } from '@shared';
 import { describe, expect, it } from 'vitest';
 import type { JobContext } from '../shared/messages';
-import { sameSite, entryClicked, entryFailed, entryFormReached, entryRecorded, initialEntry, instructionFor, profileFrom, startRecording } from './entry-service';
+import { sameSite, entryRecovered, entryClicked, entryFailed, entryFormReached, entryRecorded, initialEntry, instructionFor, profileFrom, startRecording } from './entry-service';
 
 const ORIGIN = 'https://zeole.zephir.fr';
 const job: JobContext & { productId: string } = {
@@ -111,5 +111,21 @@ describe('chemin passé ou interrompu : la page est observée jusqu’au formula
     for (let index = 0; index < profile.entry.length; index++) entry = entryClicked(entry, index);
     expect(entry).toMatchObject({ mode: 'done', reached: true });
     expect(instructionFor(entry)).toEqual({ mode: 'none' });
+  });
+});
+
+describe('entryRecovered : premier clic impossible, jamais d’impasse', () => {
+  const replaying = initialEntry(job, ORIGIN, profile);
+  const catalog: ExtranetProfile = { ...profile, entry: [action('Réaliser un Devis'), action('Devis Automobile')] };
+
+  it('chemin du catalogue différent : il est rejoué depuis le début', () => {
+    const next = entryRecovered(replaying, catalog);
+    expect(next).toMatchObject({ mode: 'replaying', index: 0, actions: catalog.entry });
+    expect(instructionFor(next)).toMatchObject({ mode: 'replay', index: 0, action: action('Réaliser un Devis') });
+  });
+
+  it('pas de catalogue, ou le même chemin qui vient d’échouer : réapprentissage automatique', () => {
+    expect(instructionFor(entryRecovered(replaying, null))).toEqual({ mode: 'record', auto: true });
+    expect(instructionFor(entryRecovered({ ...replaying, actions: catalog.entry }, catalog))).toEqual({ mode: 'record', auto: true });
   });
 });

@@ -6,6 +6,9 @@ import {
   entryFormReached,
   entryRecorded,
   initialEntry,
+  catalogProfile,
+  entryRecovered,
+  forgetLearnedProfile,
   instructionFor,
   loadProfile,
   profileFrom,
@@ -88,6 +91,10 @@ export async function entryFromTab(
     if (action) next = entryRecorded(entry, action);
   } else if (message.type === 'ENTRY_CLICKED') {
     next = entryClicked(entry, Number(message.index));
+  } else if (Number(message.index) === 0 && entry.mode === 'replaying' && entry.index === 0) {
+    // Premier clic impossible : chemin du catalogue, sinon réapprentissage (et le chemin appris à tort est oublié).
+    await forgetLearnedProfile(entry.insurerId, entry.productId);
+    next = entryRecovered(entry, await catalogProfile(entry.insurerId, entry.productId));
   } else {
     next = entryFailed(entry, Number(message.index), message.reason === 'skipped' ? 'skipped' : 'not_found');
   }

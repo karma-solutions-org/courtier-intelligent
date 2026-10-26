@@ -345,9 +345,10 @@ async function runEntry(): Promise<'recording' | 'learning' | 'watch' | 'done'> 
       documentsOf(document).some(d => matchesUrlPattern(d.location.href, action.urlPattern)) || !!findActionTarget(document, action);
     for (let waited = 0; index === 0 && !onLearnedPage() && waited < ENTRY_TARGET_TIMEOUT_MS; waited += 500) await delay(500);
     if (index === 0 && !onLearnedPage()) {
-      trace('page différente : chemin passé');
+      trace('page du premier clic absente : chemin du catalogue, ou réapprentissage');
       await send({ type: 'ENTRY_FAILED', index, reason: 'skipped' }).catch(() => undefined);
-      return 'watch';
+      // Le service worker propose la suite (chemin du catalogue, apprentissage) : on la relit.
+      continue;
     }
     let target = findActionTarget(document, action);
     for (let waited = 0; !target && waited < ENTRY_TARGET_TIMEOUT_MS; waited += 500) {
@@ -357,6 +358,7 @@ async function runEntry(): Promise<'recording' | 'learning' | 'watch' | 'done'> 
     if (!target) {
       trace('bouton introuvable');
       await send({ type: 'ENTRY_FAILED', index, reason: 'not_found' }).catch(() => undefined);
+      if (index === 0) continue;
       return 'watch';
     }
     // Avancement non noté (service worker injoignable) : on ne clique pas, la page se remplit telle quelle.
