@@ -1,4 +1,4 @@
-import { CanonicalData, CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, DISCOVERED_LABEL_MAX, type DiscoveredFieldInput, isRelevantField, SIGHTING_MAX_FIELDS } from '@shared';
+import { CanonicalData, CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, DISCOVERED_LABEL_MAX, DISCOVERED_MAX_CHOICES, type DiscoveredFieldInput, isRelevantField, SIGHTING_MAX_FIELDS } from '@shared';
 import { normalize } from './text';
 import type { FormField } from './analyzer';
 import { isCompatible, Mapping } from './mapping';
@@ -101,7 +101,7 @@ export function safeLabel(label: string, max = MAX_LABEL): string | null {
 const MAX_NAME = 80;
 const MAX_FIELD_KEY = 120;
 const MAX_OPTION = 80;
-const MAX_OPTIONS = 40;
+const MAX_OPTIONS = DISCOVERED_MAX_CHOICES;
 
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 /** Plaque d'immatriculation (SIV « AB-123-CD » ou FNI « 1234 AB 75 »). */

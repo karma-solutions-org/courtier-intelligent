@@ -11,7 +11,8 @@ export const DISCOVERED_SECTION_TITLE = 'Questions des assureurs';
 /** Plafonds : au-delà, le signalement est tronqué (un extranet ne doit pas pouvoir gonfler le questionnaire). */
 export const DISCOVERED_MAX_FIELDS_PER_REPORT = 30;
 export const DISCOVERED_MAX_QUESTIONS = 150;
-export const DISCOVERED_MAX_CHOICES = 40;
+/** Choix gardés d'une liste découverte : une liste de pays en compte environ 200. */
+export const DISCOVERED_MAX_CHOICES = 300;
 /** Libellé le plus long d'une question découverte (déclarations de Zephir : « Le véhicule est-il utilisé pour le transport… »). */
 export const DISCOVERED_LABEL_MAX = 250;
 
