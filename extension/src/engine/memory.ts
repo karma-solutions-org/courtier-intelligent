@@ -214,6 +214,8 @@ function describeField(field: FormField, values: ReturnType<typeof clientValues>
       name: safeText(field.name, MAX_NAME, values),
       section: field.section ? safeLabel(field.section) : null,
       options: field.options
+        // Option vide (« Choisissez », « Sélectionner… ») : une invite, jamais un choix.
+        .filter(option => option.value.trim() !== '')
         .filter(option => !looksLikeClientData(option.value, values) && !looksLikeClientData(option.label, values))
         .slice(0, MAX_OPTIONS)
         .map(option => ({ value: option.value.trim().slice(0, MAX_OPTION), label: option.label.trim().slice(0, MAX_OPTION) })),

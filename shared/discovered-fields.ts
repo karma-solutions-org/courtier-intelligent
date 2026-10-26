@@ -83,7 +83,7 @@ export function usableChoices(options: QuestionChoice[]): QuestionChoice[] {
   return options
     .filter(option => typeof option?.value === 'string' && typeof option?.label === 'string')
     .map(option => ({ value: option.value.trim().slice(0, 100), label: option.label.trim().slice(0, 100) }))
-    .filter(option => option.value && option.label && !/^(choisir|selectionner|select|--)/.test(normalizeLabel(option.label)))
+    .filter(option => option.value && option.label && !/^(choisi|selectionn|select|--)/.test(normalizeLabel(option.label)))
     .filter(option => !seen.has(option.value) && seen.add(option.value))
     .slice(0, DISCOVERED_MAX_CHOICES);
 }

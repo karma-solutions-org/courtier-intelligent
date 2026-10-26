@@ -12,7 +12,7 @@ import { adapterFor, type ExtranetAdapter } from './extranets';
 import { advanceButton, AdvanceGuard, leftTextPage, refusalMessage, stepKey } from './flow/advance';
 import { completeWithAi, fillableCount, needsAiCompletion } from './flow/capture-page';
 import { ClaimRows } from './flow/claim-rows';
-import { blockedStepSnapshot } from './flow/step-report';
+import { blockedStepSnapshot, failureCode } from './flow/step-report';
 import { applyOverrides, fillPlan } from './flow/fill-step';
 import { MemorySession, StepSnapshot } from './flow/memory-session';
 import { panelFields, progressSignature, progressUpdate } from './flow/run-report';
@@ -58,6 +58,8 @@ export class FormRunner {
   private readonly requirementsReported = new Set<string>();
   /** Étapes dont les champs sans équivalent ont déjà été signalés (une fois par empreinte). */
   private readonly discoveredReported = new Set<string>();
+  /** Étapes dont les listes sans option correspondant au dossier ont déjà été signalées. */
+  private readonly choicesReported = new Set<string>();
   private observer: MutationObserver | null = null;
   private pending: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> = Promise.resolve();
@@ -404,6 +406,29 @@ export class FormRunner {
       if (discovered.length) {
         this.discoveredReported.add(analysis.fingerprint);
         this.reportNewFields(analysis.fingerprint, discovered, () => this.discoveredReported.delete(analysis.fingerprint));
+      }
+    }
+
+    // Liste obligatoire dont aucune option ne correspond à la réponse du dossier (Oyat : « Profession » parmi « Salarié
+    // Sédentaire, Artisan… » quand le dossier dit « mètreur ») : la question est signalée AVEC les options de
+    // l'extranet, pour que le courtier y réponde dans l'application. Jamais une option choisie au hasard.
+    if (!this.choicesReported.has(analysis.fingerprint)) {
+      const unmatched = new Set(
+        analysis.fields
+          .filter(f => f.required && (f.kind === 'select' || f.kind === 'radio') && f.options.length >= 2)
+          .filter(f => {
+            const result = results.get(f.key);
+            return result?.status === 'failed' && failureCode(result.reason) === 'no_option';
+          })
+          .map(f => f.key),
+      );
+      if (unmatched.size) {
+        const asNew = this.mappings.map(m => (unmatched.has(m.fieldKey) ? { ...m, status: 'unmapped' as const, canonicalPath: null } : m));
+        const fields = toDiscoveredFields(analysis.fields.filter(f => unmatched.has(f.key)), asNew, this.productPaths, this.job.quoteData);
+        if (fields.length) {
+          this.choicesReported.add(analysis.fingerprint);
+          this.reportNewFields(analysis.fingerprint, fields, () => this.choicesReported.delete(analysis.fingerprint));
+        }
       }
     }
 
