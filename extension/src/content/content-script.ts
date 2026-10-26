@@ -88,6 +88,15 @@ const memoryPort: MemoryPort = {
   invalidate: async key => void (await send({ type: 'MEMORY_INVALIDATE', key })),
 };
 
+/** La page principale de l'onglet n'est qu'un <frameset> (même origine) : aucun contenu ne peut s'y afficher. */
+function topIsFrameset(): boolean {
+  try {
+    return window.top?.document.body?.tagName === 'FRAMESET';
+  } catch {
+    return false; // page principale d'une autre origine : illisible
+  }
+}
+
 /**
  * Lance le remplissage de l'extranet pour ce job. `waitForForm` : apprentissage du chemin en cours, la page est
  * seulement observée jusqu'au formulaire de devis (voir RunnerPorts.waitForForm).
@@ -187,8 +196,9 @@ async function startRunner(job: JobContext, waitForForm = false): Promise<void> 
     stop();
     void send({ type: 'RUN_STATE', state: null }).catch(() => undefined);
   });
-  // Page principale seulement : une barre par onglet, jamais dans une iframe de l'extranet.
-  if (window === window.top) {
+  // Une barre par onglet : sur la page principale, ou dans le cadre qui remplit quand la page principale n'est qu'un
+  // <frameset> (Oyat : rien ne peut s'y afficher). Jamais dans une iframe d'une page normale (publicité, menu…).
+  if (window === window.top || topIsFrameset()) {
     const current = runner;
     bar = createFloatingBar(document, {
       pause: () => current.pause(),
