@@ -407,6 +407,17 @@ describe('global resources', () => {
     await assertFails(addDoc(collection(db, 'ci_extensionReports'), { ...report, origin: 'https://extranet.axa.fr/client?id=1' }));
     await assertFails(addDoc(collection(app('brokerA'), 'ci_extensionReports'), report));
   });
+  it('extension reports: blocked-step snapshot only with its codes, capped', async () => {
+    const db = ext('brokerA');
+    const field = { label: 'Usage', kind: 'select', required: true, status: 'failed', path: 'vehicle.usage', failure: 'no_option', optionCount: 0 };
+    const snapshot = { stepNumber: 2, fields: [field], buttons: ['Suivant'] };
+    const blocked = { insurerId: 'axa', origin: 'https://extranet.axa.fr', step: 'fill', issue: 'step_blocked', snapshot, at: serverTimestamp() };
+    await assertSucceeds(addDoc(collection(db, 'ci_extensionReports'), blocked));
+    await assertSucceeds(addDoc(collection(db, 'ci_extensionReports'), { ...blocked, issue: 'advance_refused' }));
+    await assertFails(addDoc(collection(db, 'ci_extensionReports'), { ...blocked, issue: 'fill_failed' }));
+    await assertFails(addDoc(collection(db, 'ci_extensionReports'), { ...blocked, snapshot: { ...snapshot, html: '<form>' } }));
+    await assertFails(addDoc(collection(db, 'ci_extensionReports'), { ...blocked, snapshot: { ...snapshot, fields: Array(81).fill(field) } }));
+  });
   it('catalogue read by active member, write denied', async () => {
     await assertSucceeds(getDoc(doc(app('brokerA'), 'ci_products/p1')));
     await assertFails(setDoc(doc(app('adminA'), 'ci_products/p1'), { name: 'x' }));

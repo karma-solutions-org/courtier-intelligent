@@ -50,13 +50,30 @@ export function describeClick(target: EventTarget | null, url: string): NavActio
 }
 
 /**
+ * La page et les documents de ses cadres de même origine (extranet en `<frameset>` ou `<iframe>`, comme Oyat : le menu
+ * et les boutons sont dans les cadres). Un cadre d'une autre origine est illisible : ignoré.
+ */
+export function documentsOf(doc: Document): Document[] {
+  const frames = [...doc.querySelectorAll<HTMLIFrameElement | HTMLFrameElement>('iframe, frame')].flatMap(frame => {
+    try {
+      return frame.contentDocument ? documentsOf(frame.contentDocument) : [];
+    } catch {
+      return [];
+    }
+  });
+  return [doc, ...frames];
+}
+
+/**
  * L'élément à cliquer pour rejouer `action` : l'élément visible qui porte exactement ce texte ; s'il y en a plusieurs,
  * celui à la position enregistrée (sinon aucun : dans le doute, on ne clique pas). Jamais un bouton interdit.
  */
 export function findActionTarget(doc: Document, action: NavAction): HTMLElement | null {
   if (FORBIDDEN_NAV_LABEL.test(action.label)) return null;
   const wanted = action.label.toLowerCase();
-  const found = [...doc.querySelectorAll<HTMLElement>(CLICKABLE)].filter(el => isVisible(el) && labelOf(el).toLowerCase() === wanted);
+  const found = documentsOf(doc).flatMap(d =>
+    [...d.querySelectorAll<HTMLElement>(CLICKABLE)].filter(el => isVisible(el) && labelOf(el).toLowerCase() === wanted),
+  );
   // Lien dans une entrée de menu (même texte) : un seul élément, le plus profond.
   const matches = found.filter(el => !found.some(other => other !== el && el.contains(other)));
   if (matches.length <= 1) return matches[0] ?? null;

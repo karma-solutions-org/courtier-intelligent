@@ -1,15 +1,18 @@
-import { EXTENSION_REPORT_ISSUES, EXTENSION_REPORT_STEPS, ExtensionReportIssue, ExtensionReportStep } from '@shared';
+import { EXTENSION_REPORT_ISSUES, EXTENSION_REPORT_STEPS, ExtensionReportIssue, ExtensionReportStep, sanitizeSnapshot } from '@shared';
 import { hasPremium, sanitizeOffer } from '../engine/offer';
 import { CaptureEdits, CaptureResponse, ExtensionUser, JobUpdate, RunState, TabMessage, UpdateJobResponse } from '../shared/messages';
 import { MESSAGES, toUserMessage } from './auth-controller';
 import { addExtensionReport, explainJobDenied, updateJob, writeCapturedOffer } from './jobs-service';
 import { jobMatches } from './sender-guard';
+import { sendSighting } from './sighting-service';
 import { activeTabId, broadcast, jobByTab, originOnly, pagesByTab, runByTab, signedInUser } from './worker-state';
 
 /** Signalement d'un échec (E10-4) : seulement des codes connus, l'assureur et l'origine. Une panne n'empêche rien. */
-export async function report(insurerId: string, origin: string, step: ExtensionReportStep, issue: ExtensionReportIssue): Promise<void> {
+export async function report(insurerId: string, origin: string, step: ExtensionReportStep, issue: ExtensionReportIssue, snapshot?: unknown): Promise<void> {
   if (!EXTENSION_REPORT_STEPS.includes(step) || !EXTENSION_REPORT_ISSUES.includes(issue) || !(await signedInUser())) return;
-  await addExtensionReport({ insurerId: insurerId.slice(0, 100), origin: originOnly(origin), step, issue }).catch(() => undefined);
+  // La photo vient de la page : elle est revérifiée ici (codes fermés, plafonds), et ne part qu'avec une étape bloquée.
+  const photo = issue === 'step_blocked' || issue === 'advance_refused' ? sanitizeSnapshot(snapshot) : null;
+  await addExtensionReport({ insurerId: insurerId.slice(0, 100), origin: originOnly(origin), step, issue, ...(photo ? { snapshot: photo } : {}) }).catch(() => undefined);
 }
 
 /** Onglets (et job) dont un tarif est déjà enregistré : une nouvelle sauvegarde ne réécrit que l'offre. */
@@ -96,8 +99,11 @@ async function submitCapture(tabId: number, edits: Partial<CaptureEdits>): Promi
     return { ok: false, message: 'Indiquez au moins la prime annuelle ou la prime mensuelle.' };
   }
   try {
-    await writeCapturedOffer(user, run.dossierId, run.insurerId, offer, savedCaptures.has(captureKey(tabId, run)));
+    const already = savedCaptures.has(captureKey(tabId, run));
+    await writeCapturedOffer(user, run.dossierId, run.insurerId, offer, already);
     savedCaptures.add(captureKey(tabId, run));
+    // Parcours mené jusqu'au tarif : ses champs mettent à jour les questions découvertes (une fois par tarif).
+    if (!already) void sendSighting(tabId, run, pagesByTab.get(tabId)?.origin ?? '');
   } catch (error) {
     // Le tarif reste affiché dans le side panel : le courtier peut le renvoyer de là.
     runByTab.set(tabId, run);

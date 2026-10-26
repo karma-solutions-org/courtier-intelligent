@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getFirebase } from '../shared/firebase';
-import { isExtraPath, questionsOf, type ExtensionReportIssue, type ExtensionReportStep, type QuestionnaireSection } from '@shared';
+import { isExtraPath, questionsOf, type BlockedStepSnapshot, type ExtensionReportIssue, type ExtensionReportStep, type QuestionnaireSection } from '@shared';
 import type { CapturedOffer, ExtensionUser, JobContext, JobUpdate, ProductQuestion } from '../shared/messages';
 import { catalogEntryPaths, insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin, PickOptions } from './origin-match';
 
@@ -169,7 +169,12 @@ async function loadProductQuestions(productId: string): Promise<{ paths: string[
         path: question.canonicalPath as string,
         label: question.label,
         type: question.type,
-        ...(question.choices ? { choices: question.choices.map(choice => choice.label) } : {}),
+        ...(question.choices
+          ? {
+              choices: question.choices.map(choice => choice.label),
+              choiceLabels: Object.fromEntries(question.choices.map(choice => [choice.value, choice.label])),
+            }
+          : {}),
       }));
     const loaded = { paths: [...new Set(questions.map(question => question.canonicalPath as string))], extras };
     productCache.set(productId, loaded);
@@ -288,7 +293,7 @@ export async function writeCapturedOffer(user: ExtensionUser, dossierId: string,
 }
 
 /** Signalement d'un échec (E10-4) : assureur, origine de l'extranet, étape et code. AUCUNE donnée client. */
-export async function addExtensionReport(report: { insurerId: string; origin: string; step: ExtensionReportStep; issue: ExtensionReportIssue }): Promise<void> {
+export async function addExtensionReport(report: { insurerId: string; origin: string; step: ExtensionReportStep; issue: ExtensionReportIssue; snapshot?: BlockedStepSnapshot }): Promise<void> {
   await addDoc(collection(getFirebase().firestore, 'ci_extensionReports'), { ...report, at: serverTimestamp() });
 }
 

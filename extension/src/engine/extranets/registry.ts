@@ -1,5 +1,6 @@
 import type { ExtranetDefinition } from './adapter';
 import { zephirAdapter } from './zephir/adapter';
+import { oyatAdapter } from './oyat/adapter';
 
 /**
  * Extranets qui ont un comportement propre (un dossier `extranets/<insurerId>/` chacun). Les autres assureurs du
@@ -8,5 +9,6 @@ import { zephirAdapter } from './zephir/adapter';
  */
 export const EXTRANETS: readonly ExtranetDefinition[] = [
   { insurerId: 'zephir', hosts: ['zephir.fr'], adapter: zephirAdapter },
+  { insurerId: 'oyat', hosts: ['oyat-assurances.fr'], adapter: oyatAdapter },
   // extranet:new — nouvelles lignes au-dessus de ce repère
 ];

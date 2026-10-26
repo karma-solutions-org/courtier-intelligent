@@ -50,6 +50,17 @@ describe('findNextButton', () => {
     document.body.innerHTML = '<button type="button">Suivant</button><button type="button">Obtenir mon tarif</button>';
     expect(findNextButton(document)?.textContent).toBe('Suivant');
   });
+
+  it('lit le bouton malgré une flèche décorative (« > Continuer Devis » d’Oyat)', () => {
+    document.body.innerHTML = '<a href="#" role="button">Ajouter un Conducteur</a><a href="#" role="button">&gt; Continuer Devis</a>';
+    expect(findNextButton(document)?.textContent).toBe('> Continuer Devis');
+    expect(isFinalStep(document, { current: null, total: null })).toBe(false);
+  });
+
+  it('une flèche ne rend jamais cliquable un bouton final (« › Valider »)', () => {
+    document.body.innerHTML = '<button type="button">› Valider</button>';
+    expect(findNextButton(document)).toBeNull();
+  });
 });
 
 describe('isFinalStep', () => {

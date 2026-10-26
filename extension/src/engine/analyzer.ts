@@ -117,6 +117,35 @@ function labelledBy(element: Element): string | null {
   return text || null;
 }
 
+/**
+ * Libellé de la ligne du champ : le seul `<label>` du plus petit bloc qui contient le champ et AUCUN autre (Oyat :
+ * `div.ligne` > `<label for="oDateReprise">` puis les cases `oDateReprise_jour/_mois/_annee`, dont aucune ne porte
+ * l'id visé ; ou `<label>` sans `for` devant des boutons radio). Trois niveaux au plus ; jamais le libellé d'un autre champ.
+ */
+function rowLabelOf(group: HTMLElement[]): string | null {
+  const own = new Set<Element>(group);
+  for (let node = group[0].parentElement, level = 0; node && level < 3; node = node.parentElement, level++) {
+    if (!group.every(element => node!.contains(element))) continue;
+    const controls = [...node.querySelectorAll(CONTROL_SELECTOR)].filter(control => !(control instanceof HTMLInputElement && control.type === 'hidden'));
+    if (controls.some(control => !own.has(control))) return null;
+    const labels = [...node.querySelectorAll<HTMLLabelElement>('label')].filter(label => !label.querySelector(CONTROL_SELECTOR));
+    if (labels.length > 1) return null;
+    if (labels.length === 1) return questionLine(labels[0]) || null;
+  }
+  return null;
+}
+
+/**
+ * Question d'un label sur plusieurs lignes : sa première ligne, la suite n'étant qu'une aide (Oyat : « Avez-vous été
+ * assuré… ? <br>(Comptabilisez l'intégralité des antécédents depuis…)<br>Aide calcul antécédents »).
+ */
+function questionLine(label: HTMLLabelElement): string {
+  const clone = label.cloneNode(true) as HTMLLabelElement;
+  clone.querySelectorAll('br').forEach(br => br.replaceWith(' ¶ '));
+  const lines = labelText(clone).split('¶').map(line => cleanLabel(line)).filter(Boolean);
+  return lines.length > 1 && lines[0].length >= 8 ? lines[0] : lines.join(' ');
+}
+
 /** Libellé d'un champ : aria-labelledby, `<label for>`, `<label>` englobant, aria-label, cellule voisine, placeholder. */
 function labelOf(element: HTMLElement): string {
   const doc = rootOf(element);
@@ -134,6 +163,14 @@ function labelOf(element: HTMLElement): string {
   }
   const aria = element.getAttribute('aria-label')?.trim();
   if (aria) return cleanLabel(aria);
+  const row = rowLabelOf([element]);
+  if (row) return row;
+  // Case à cocher suivie de son texte dans un petit bloc à elle (Oyat : `<div><input type="checkbox"> Aucune sanction</div>`).
+  const parent = element.parentElement;
+  if (element instanceof HTMLInputElement && element.type === 'checkbox' && parent && parent.querySelectorAll(CONTROL_SELECTOR).length === 1) {
+    const text = textOf(parent);
+    if (text && text.length < 120) return text;
+  }
 
   // Tableau à une ligne par élément (sinistres…) : le libellé est le titre de la colonne.
   const column = tableColumnOf(element);
@@ -152,7 +189,6 @@ function labelOf(element: HTMLElement): string {
     if (text && text.length < 80) return text;
   }
   // Libellé flottant écrit APRÈS le champ, dans le même petit bloc (Material : <div><input><label>Nom</label></div>).
-  const parent = element.parentElement;
   if (parent && parent.querySelectorAll('input, select, textarea').length === 1) {
     for (let next = element.nextElementSibling; next; next = next.nextElementSibling) {
       if (!(next instanceof HTMLLabelElement) || (next.htmlFor && next.htmlFor !== element.id)) continue;
@@ -193,6 +229,14 @@ function tableColumnOf(element: HTMLElement): { header: string; row: number } | 
 
 /** Libellé d'un groupe de boutons radio : légende du fieldset, rôle radiogroup, ou titre juste avant. */
 function groupLabelOf(first: HTMLElement): string {
+  // Boutons radio natifs : la question de leur ligne passe avant la légende du fieldset, qui peut n'être qu'un titre
+  // de section (Oyat : « Antécédents d'assurance » au-dessus de « Avez-vous été assuré… »).
+  const name = first instanceof HTMLInputElement && first.type === 'radio' ? first.name : '';
+  if (name) {
+    const radios = [...rootOf(first).querySelectorAll<HTMLInputElement>('input[type="radio" i]')].filter(radio => radio.name === name && radio.form === (first as HTMLInputElement).form);
+    const row = rowLabelOf(radios);
+    if (row) return row;
+  }
   const fieldset = first.closest('fieldset');
   const legend = fieldset?.querySelector('legend');
   if (legend) return textOf(legend);
@@ -298,9 +342,27 @@ function optionsOf(element: HTMLElement, group: HTMLElement[]): FieldOption[] {
     return group.map(radio => ({ value: customValueOf(radio), label: customValueOf(radio) }));
   }
   if ((element as HTMLInputElement).type === 'radio') {
-    return group.map(radio => ({ value: (radio as HTMLInputElement).value, label: labelOf(radio) || (radio as HTMLInputElement).value }));
+    return group.map(radio => {
+      const input = radio as HTMLInputElement;
+      const label = labelOf(radio);
+      // Sans `<label>`, le libellé retombe sur le nom technique : le texte écrit juste après le bouton est la réponse
+      // (Oyat : `<input type="radio" value="24"> Oui, 24 mois et plus<br>`).
+      const named = !label || label === cleanLabel(input.name);
+      return { value: input.value, label: (named ? textAfter(input) : '') || label || input.value };
+    });
   }
   return [];
+}
+
+/** Texte écrit juste après un bouton, jusqu'au champ ou au saut de ligne suivant. */
+function textAfter(input: HTMLInputElement): string {
+  let text = '';
+  for (let node = input.nextSibling; node; node = node.nextSibling) {
+    if (node instanceof Element && (node.matches('br') || node.matches(CONTROL_SELECTOR) || node.querySelector(CONTROL_SELECTOR))) break;
+    text += node.textContent ?? '';
+  }
+  const label = cleanLabel(text.replace(/\s+/g, ' ').trim());
+  return label.length <= 80 ? label : '';
 }
 
 /**
@@ -353,6 +415,8 @@ export function isAuthPage(root: Document | HTMLElement = document): boolean {
 function segmentGroupLabel(parts: HTMLElement[]): string {
   const column = tableColumnOf(parts[0]);
   if (column) return column.header;
+  const row = rowLabelOf(parts);
+  if (row) return row;
   const own = labelOf(parts[0]);
   if (own.length > 4 && !Object.values(PART_HINTS).some(hint => hint.test(own))) return own;
   for (let node = parts[0].parentElement; node && node !== parts[0].ownerDocument.body; node = node.parentElement) {

@@ -20,6 +20,7 @@ import { removeTabEntry, instructionFor } from './entry-service';
 import { onExternalMessage } from './external-messages';
 import { askAi } from './jobs-service';
 import { invalidateMemory, loadMemory, reportDiscoveredFields, saveMemory, touchMemory } from './memory-service';
+import { addSeenFields, forgetSighting } from './sighting-service';
 import { checkSender, JOB_COMMANDS, jobMatches, MemoryKeyRegistry, sanitizeAiRequest } from './sender-guard';
 import { ensureAlarm, refreshBadge, SESSION_CHECK_ALARM, syncJobsWatch, syncLiveWatch, verifySession } from './session-watch';
 import { findTabJob, forgetAllTabJobs, startJobWatch, stopJobWatch, tabJob, unpinJob } from './tab-jobs';
@@ -185,9 +186,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     case 'ENTRY_CLICKED':
     case 'ENTRY_FAILED':
     case 'ENTRY_FORM_REACHED':
-      // Le formulaire peut être dans une iframe : sa reconnaissance compte, le reste du chemin se joue en page principale.
-      if (sender.frameId !== 0 && message.type !== 'ENTRY_FORM_REACHED') {
-        sendResponse(message.type === 'ENTRY_GET' ? instructionFor(null) : false);
+      // Extranet en cadres (Oyat) : un cadre lit l'instruction (il attend pendant un rejeu, observe pendant un
+      // apprentissage), y enregistre les clics du courtier et signale le formulaire. Le rejeu se joue en page principale.
+      if (sender.frameId !== 0 && (message.type === 'ENTRY_CLICKED' || message.type === 'ENTRY_FAILED')) {
+        sendResponse(false);
         return false;
       }
       entryFromTab(tab!.tabId, message)
@@ -217,7 +219,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
       return false;
 
     case 'REPORT_ISSUE':
-      report(job!.insurerId, tab!.origin, message.step, message.issue)
+      report(job!.insurerId, tab!.origin, message.step, message.issue, message.snapshot)
         .then(() => sendResponse(true))
         .catch(() => sendResponse(false));
       return true;
@@ -265,6 +267,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         .catch(() => sendResponse({ ok: false, mapping: {} } satisfies FieldsDiscoveredResponse));
       return true;
     }
+
+    case 'FIELDS_SEEN':
+      if (Array.isArray(message.fields)) void addSeenFields(tab!.tabId, job!, message.fields);
+      return false;
 
     // Mémoire partagée des formulaires (E8) : une panne ne doit jamais empêcher le remplissage.
     case 'MEMORY_LOAD':
@@ -350,6 +356,7 @@ chrome.tabs.onRemoved.addListener(tabId => {
   stopJobWatch(tabId);
   void unpinJob(tabId);
   void removeTabEntry(tabId);
+  void forgetSighting(tabId);
 });
 // Le side panel montre l'avancement de l'onglet actif : il change avec lui.
 chrome.tabs.onActivated.addListener(() => void broadcast());

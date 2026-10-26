@@ -1,4 +1,4 @@
-import { CanonicalData, CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, DISCOVERED_LABEL_MAX, type DiscoveredFieldInput, isRelevantField } from '@shared';
+import { CanonicalData, CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, DISCOVERED_LABEL_MAX, type DiscoveredFieldInput, isRelevantField, SIGHTING_MAX_FIELDS } from '@shared';
 import { normalize } from './text';
 import type { FormField } from './analyzer';
 import { isCompatible, Mapping } from './mapping';
@@ -184,6 +184,21 @@ export function toDiscoveredFields(
     // jamais un fil d'Ariane ou une barre de navigation (« > Conducteur 1 > Véhicule »).
     .filter(field => !known.has(field.key) && field.required && isRelevantField(field) && !isNavigationLabel(field.label))
     .slice(0, DISCOVERED_MAX_FIELDS_PER_REPORT)
+    .flatMap(field => describeField(field, values));
+}
+
+/**
+ * Constat d'un parcours mené jusqu'au tarif : tous les champs vus, décrits comme un champ découvert (structure
+ * seulement). Le serveur met à jour les questions découvertes et compte celles dont le champ a disparu.
+ */
+export function toSightedFields(fields: FormField[], quoteData?: CanonicalData): DiscoveredFieldInput[] {
+  const values = clientValues(quoteData);
+  return fields.slice(0, SIGHTING_MAX_FIELDS).flatMap(field => describeField(field, values));
+}
+
+/** Description sûre d'un champ, ou aucune (libellé illisible, technique, ou qui ressemble à une donnée client). */
+function describeField(field: FormField, values: ReturnType<typeof clientValues>): DiscoveredFieldInput[] {
+  return [field]
     .map(field => ({
       fieldKey: field.key.slice(0, MAX_FIELD_KEY),
       label: safeLabel(field.label, DISCOVERED_LABEL_MAX) ?? '',

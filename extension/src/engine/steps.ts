@@ -14,7 +14,8 @@ const LOADING = '[aria-busy="true"], .loading, .spinner, [class*="loader"], [cla
 
 const clean = (text: string | null | undefined) => (text ?? '').replace(/\s+/g, ' ').trim();
 
-const labelOf = (el: HTMLElement) => clean(el instanceof HTMLInputElement ? el.value : el.textContent);
+/** Texte du bouton, sans flèche ni puce décorative au début (« > Continuer Devis » chez Oyat, « › Suivant »). */
+const labelOf = (el: HTMLElement) => clean(el instanceof HTMLInputElement ? el.value : el.textContent).replace(/^[^\p{L}\p{N}]+/u, '');
 
 /** Boutons visibles et actifs (et liens qui en jouent le rôle). */
 function visibleButtons(doc: Document): HTMLElement[] {

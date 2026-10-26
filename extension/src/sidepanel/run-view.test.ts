@@ -102,8 +102,10 @@ describe('describeRun', () => {
   });
 
   it('signale que l’IA a aidé, sans la présenter comme une source de données', () => {
-    expect(describeRun(run({ aiUsed: true })).aiNote).toContain('structure du formulaire');
-    expect(describeRun(run({ aiUsed: false })).aiNote).toBeNull();
+    expect(describeRun(run({ aiUsed: true, fields: [field({})] })).aiNote).toContain('structure du formulaire');
+    expect(describeRun(run({ aiUsed: false, fields: [field({})] })).aiNote).toBeNull();
+    // En attente du formulaire de devis (apprentissage du chemin) : rien n'est rempli, rien à signaler.
+    expect(describeRun(run({ aiUsed: true, fields: [] })).aiNote).toBeNull();
   });
 
   it('propose, pour la correction manuelle, les informations du dossier avec un nom lisible, triées', () => {

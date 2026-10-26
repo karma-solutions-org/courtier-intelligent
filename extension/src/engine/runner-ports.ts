@@ -1,4 +1,4 @@
-import type { DiscoveredFieldInput, ExtensionReportIssue, ExtensionReportStep } from '@shared';
+import type { BlockedStepSnapshot, DiscoveredFieldInput, ExtensionReportIssue, ExtensionReportStep } from '@shared';
 import type { JobUpdate, RunState } from '../shared/messages';
 import type { AskAi } from './ai-fallback';
 import type { FormLayout } from './layout-ai';
@@ -18,8 +18,11 @@ export interface RunnerPorts {
   /** Publie l'avancement détaillé pour le side panel. */
   publish(state: RunState): void;
   askAi: AskAi;
-  /** Signale un échec du remplissage ou de la capture du tarif (E10-4) : un code, jamais de donnée client. */
-  reportIssue?(step: ExtensionReportStep, issue: ExtensionReportIssue): Promise<void>;
+  /**
+   * Signale un échec du remplissage ou de la capture du tarif (E10-4) : un code, jamais de donnée client. Une étape
+   * bloquée y ajoute sa photo (structure seulement, voir flow/step-report.ts).
+   */
+  reportIssue?(step: ExtensionReportStep, issue: ExtensionReportIssue, snapshot?: BlockedStepSnapshot): Promise<void>;
   /** Mémoire partagée des formulaires (E8) : sans elle, tout se fait par synonymes puis IA. */
   memory?: MemoryPort;
   /**
@@ -27,6 +30,8 @@ export interface RunnerPorts {
    * question existante) et renvoie, par champ, le chemin de cette question.
    */
   reportDiscovered?(fingerprint: string, fields: DiscoveredFieldInput[], requiredPaths?: string[]): Promise<Record<string, string> | void>;
+  /** Tous les champs de l'étape affichée (structure seulement) : constat du parcours, pour suivre les changements de l'extranet. */
+  fieldsSeen?(fields: DiscoveredFieldInput[]): void;
   /** Lecture de la mise en page déjà faite par l'IA pour un formulaire (cache local du navigateur). */
   layoutCache?: { load(fingerprint: string): Promise<FormLayout | null>; save(fingerprint: string, layout: FormLayout): Promise<void> };
   /** Origine de l'extranet, clé de la mémoire (par défaut : celle de la page). */
@@ -38,6 +43,11 @@ export interface RunnerPorts {
    * l'apprentissage automatique du chemin d'accès.
    */
   formReached?(): void;
+  /**
+   * Apprentissage du chemin d'accès en cours : tant que le formulaire de devis n'est pas reconnu, la page est seulement
+   * observée (tableau de bord, moteur de recherche de l'extranet) : rien n'est rempli, demandé ni signalé.
+   */
+  waitForForm?: boolean;
   quietMs?: number;
   settleTimeoutMs?: number;
 }

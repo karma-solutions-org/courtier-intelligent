@@ -34,9 +34,9 @@ export async function ensureTabEntry(tabId: number, job: JobContext, origin: str
   await writeTabEntry(tabId, initialEntry({ ...job, productId }, origin, await loadProfile(job.insurerId, productId)));
 }
 
-/** Transmet une commande d'apprentissage à la page principale de l'onglet. */
-function sendToTopFrame(tabId: number, message: TabMessage): void {
-  chrome.tabs.sendMessage(tabId, message, { frameId: 0 }).catch(() => undefined);
+/** Transmet une commande d'apprentissage à tous les cadres de l'onglet (extranet en cadres : Oyat). */
+function sendToFrames(tabId: number, message: TabMessage): void {
+  chrome.tabs.sendMessage(tabId, message).catch(() => undefined);
 }
 
 /** Commandes d'apprentissage du side panel, sur l'onglet actif. */
@@ -48,7 +48,7 @@ export async function entryCommand(type: 'ENTRY_RECORD_START' | 'ENTRY_RECORD_SA
   }
   if (type === 'ENTRY_RECORD_START') {
     await writeTabEntry(tabId, startRecording(entry));
-    sendToTopFrame(tabId, { type: 'ENTRY_RECORD_START' });
+    sendToFrames(tabId, { type: 'ENTRY_RECORD_START' });
   } else if (entry.mode !== 'recording') {
     return { ok: false, message: 'Aucun apprentissage en cours sur cet onglet.' };
   } else if (type === 'ENTRY_RECORD_SAVE') {
@@ -61,10 +61,10 @@ export async function entryCommand(type: 'ENTRY_RECORD_START' | 'ENTRY_RECORD_SA
       index: entry.actions.length,
       message: `Chemin enregistré (${profile.entry.length} clic${profile.entry.length > 1 ? 's' : ''}) : il sera rejoué à la prochaine tarification sur cet extranet.`,
     });
-    sendToTopFrame(tabId, { type: 'ENTRY_RECORD_STOP' });
+    sendToFrames(tabId, { type: 'ENTRY_RECORD_STOP' });
   } else {
     await writeTabEntry(tabId, { ...entry, mode: 'done', actions: [], index: 0, message: null });
-    sendToTopFrame(tabId, { type: 'ENTRY_RECORD_STOP' });
+    sendToFrames(tabId, { type: 'ENTRY_RECORD_STOP' });
   }
   void broadcast();
   return { ok: true };

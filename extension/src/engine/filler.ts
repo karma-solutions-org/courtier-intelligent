@@ -101,6 +101,9 @@ const CHOICE_SYNONYMS: Record<string, string[]> = {
   utilitaire: ['utilitaire', 'vu', 'camionnette', 'vehicule utilitaire'],
   moto: ['moto', 'deux roues', '2 roues', 'motocyclette'],
   AAC: ['aac', 'conduite accompagnee'],
+  // Civilité : « Monsieur / Madame » (Zephir) ↔ « Homme / Femme » (Oyat).
+  Monsieur: ['homme', 'masculin', 'monsieur', 'm', 'mr'],
+  Madame: ['femme', 'feminin', 'madame', 'mme'],
   non_paiement: ['non paiement', 'defaut de paiement', 'impaye', 'cotisation'],
   sinistres: ['sinistre', 'sinistralite'],
   fausse_declaration: ['fausse declaration', 'declaration inexacte'],

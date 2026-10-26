@@ -1,4 +1,4 @@
-import type { CanonicalData, CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, DiscoveredFieldInput, MissingField, NavAction, QuoteJobStatus, QuestionType } from '@shared';
+import type { BlockedStepSnapshot, CanonicalData, CanonicalPath, ExtensionReportIssue, ExtensionReportStep, FormMemoryField, DiscoveredFieldInput, MissingField, NavAction, QuoteJobStatus, QuestionType } from '@shared';
 
 /** Utilisateur connecté dans l'extension (affiché dans le side panel). */
 export interface ExtensionUser {
@@ -33,6 +33,8 @@ export interface ProductQuestion {
   label: string;
   type: QuestionType;
   choices?: string[];
+  /** Code de chaque choix → son libellé (`M` → « Marié(e) ») : un autre extranet n'affiche que le libellé. */
+  choiceLabels?: Record<string, string>;
 }
 
 /** Réponse à FIELDS_DISCOVERED : champ de l'extranet → chemin de la question du dossier (créée ou retrouvée). */
@@ -215,7 +217,7 @@ export type ExtensionMessage =
   | { type: 'UPDATE_JOB'; dossierId: string; insurerId: string; update: JobUpdate }
   | { type: 'RUN_STATE'; state: RunState | null }
   | { type: 'ASK_AI'; purpose: 'mapping' | 'capture' | 'layout'; messages: { role: 'user'; content: string }[]; maxTokens: number }
-  | { type: 'REPORT_ISSUE'; insurerId: string; origin: string; step: ExtensionReportStep; issue: ExtensionReportIssue }
+  | { type: 'REPORT_ISSUE'; insurerId: string; origin: string; step: ExtensionReportStep; issue: ExtensionReportIssue; snapshot?: BlockedStepSnapshot }
   // Side panel → service worker : capture du tarif de l'onglet actif
   | { type: 'CONFIRM_CAPTURE'; edits: CaptureEdits }
   | { type: 'REJECT_CAPTURE' }
@@ -230,6 +232,8 @@ export type ExtensionMessage =
   | { type: 'MEMORY_INVALIDATE'; key: string }
   // Champs sans équivalent dans l'application : ajoutés au questionnaire par la function champs-signaler.
   | { type: 'FIELDS_DISCOVERED'; fingerprint: string; fields: DiscoveredFieldInput[]; requiredPaths?: string[] }
+  // Tous les champs d'une étape : constat du parcours, envoyé au serveur quand le tarif est enregistré.
+  | { type: 'FIELDS_SEEN'; fields: DiscoveredFieldInput[] }
   // Chemin d'accès au formulaire (profil d'extranet). Side panel → service worker : apprentissage sur l'onglet actif.
   | { type: 'ENTRY_RECORD_START' }
   | { type: 'ENTRY_RECORD_SAVE' }

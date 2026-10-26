@@ -153,7 +153,7 @@ export function describeRun(run: RunState): RunView {
     summary: `${filled} champ${filled > 1 ? 's' : ''} rempli${filled > 1 ? 's' : ''} sur ${run.fields.length}`,
     message: run.message,
     memoryNote: MEMORY_NOTES[run.memory ?? 'none'],
-    aiNote: run.aiUsed ? 'L’IA a aidé à reconnaître certains champs (seule la structure du formulaire lui est envoyée).' : null,
+    aiNote: run.aiUsed && run.fields.length > 0 ? 'L’IA a aidé à reconnaître certains champs (seule la structure du formulaire lui est envoyée).' : null,
     missing: run.missing.map(m => ({ path: m.canonicalPath, label: m.label })),
     problems,
     assignable: run.assignablePaths.map(path => ({ path, label: pathLabel(path) })).sort((a, b) => a.label.localeCompare(b.label, 'fr')),

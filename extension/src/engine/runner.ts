@@ -1,4 +1,4 @@
-import { CanonicalPath, ExtraCanonicalPath, isExtraPath, ExtensionReportIssue, ExtensionReportStep, MissingField, type DiscoveredFieldInput } from '@shared';
+import { BlockedStepSnapshot, CanonicalData, CanonicalPath, ExtraCanonicalPath, isExtraPath, ExtensionReportIssue, ExtensionReportStep, MissingField, type DiscoveredFieldInput } from '@shared';
 import type { CapturedOffer, CaptureState, JobContext, RunField, RunState } from '../shared/messages';
 import { resolveWithAi } from './ai-fallback';
 import { analyzeForm, FormAnalysis, isAuthPage } from './analyzer';
@@ -6,12 +6,13 @@ import { applyLayout, FormLayout, readLayoutWithAi } from './layout-ai';
 import { detectResultPage, extractFromDom, hasPremium, hasResultHeading, parseAmounts, visibleText } from './capture';
 import type { FillResult } from './filler';
 import { asCanonicalPath, ExtraQuestion, isCompatible, Mapping, mapExtraPaths, mapFields } from './mapping';
-import { toDiscoveredFields, toRequiredPaths } from './memory';
+import { toDiscoveredFields, toRequiredPaths, toSightedFields } from './memory';
 import { FillPlan, planFill, valueOf } from './plan';
 import { adapterFor, type ExtranetAdapter } from './extranets';
 import { advanceButton, AdvanceGuard, leftTextPage, refusalMessage, stepKey } from './flow/advance';
 import { completeWithAi, fillableCount, needsAiCompletion } from './flow/capture-page';
 import { ClaimRows } from './flow/claim-rows';
+import { blockedStepSnapshot } from './flow/step-report';
 import { applyOverrides, fillPlan } from './flow/fill-step';
 import { MemorySession, StepSnapshot } from './flow/memory-session';
 import { panelFields, progressSignature, progressUpdate } from './flow/run-report';
@@ -68,6 +69,8 @@ export class FormRunner {
   /** La page de résultat est en cours de lecture ou lue : le remplissage s'arrête. */
   private capturing = false;
   private readonly reportedIssues = new Set<string>();
+  /** Plan de l'étape affichée, pour la photo d'une étape bloquée. */
+  private lastPlan: FillPlan | null = null;
   /** Dernier problème à signaler au courtier dans le side panel (IA indisponible, session expirée…), ou null. */
   private notice: string | null = null;
   // ── Passage automatique à l'étape suivante ──
@@ -131,6 +134,20 @@ export class FormRunner {
       const question = known.get(path);
       return question ? { path, label: question.label, shape: { type: question.type, choices: question.choices } } : path;
     });
+  }
+
+  /**
+   * Données à remplir : une réponse à une question ajoutée depuis un extranet est un code de choix de cet extranet
+   * (`M`) ; on remplit avec son libellé (« Marié(e) »), le seul qu'un autre extranet affiche.
+   */
+  private get fillData(): CanonicalData {
+    const data: CanonicalData = { ...this.job.quoteData };
+    for (const question of this.job.productQuestions ?? []) {
+      const answer = data[question.path as CanonicalPath];
+      const label = typeof answer === 'string' ? question.choiceLabels?.[answer] : undefined;
+      if (label) data[question.path as CanonicalPath] = label;
+    }
+    return data;
   }
 
   /** Chemins du dossier : seuls ceux-ci peuvent être visés (par l'IA ou à la main). */
@@ -307,6 +324,7 @@ export class FormRunner {
     // Formulaire mal lu par les règles : l'IA en lit la mise en page (une fois par formulaire), puis on remplit sur l'analyse corrigée.
     analysis = await this.refineLayout(analysis);
     this.analysis = analysis;
+    if (analysis.fields.length) this.ports.fieldsSeen?.(toSightedFields(analysis.fields, this.job.quoteData));
 
     if (analysis.fields.length === 0) {
       // Seule la première page compte : en cours de parcours, une page sans champ (chargement, récapitulatif) est normale.
@@ -339,14 +357,21 @@ export class FormRunner {
     }
     this.mappings = this.applyManual(mappings);
     const mappedCount = this.mappings.filter(m => m.status === 'mapped' && m.canonicalPath !== null).length;
-    if (mappedCount === 0) await this.reportIssue('mapping', 'no_field_mapped');
+    // Pendant l'apprentissage du chemin, une page sans champ relié (tableau de bord, menu) est normale.
+    if (mappedCount === 0 && !this.ports.waitForForm) await this.reportIssue('mapping', 'no_field_mapped');
     if (!this.formReachedSent && mappedCount >= FORM_MIN_MAPPED) {
       this.formReachedSent = true;
       this.ports.formReached?.();
     }
+    // Pas encore le formulaire de devis (apprentissage du chemin) : aucun remplissage, aucun manque, aucune question.
+    if (this.ports.waitForForm && !this.formReachedSent) {
+      this.publishState('analyzing', [], [], 'Allez jusqu’au formulaire de devis : le remplissage commencera dès qu’il sera reconnu.');
+      return;
+    }
 
     // 2. Plan : quoi remplir, quoi demander au courtier, quoi laisser.
-    const plan = planFill(analysis.fields, this.mappings, this.job.quoteData);
+    const plan = planFill(analysis.fields, this.mappings, this.fillData);
+    this.lastPlan = plan;
 
     // 3. Remplissage (sans jamais cliquer sur un bouton).
     const results = await fillPlan(plan, analysis, this.written, this.job.quoteData);
@@ -402,8 +427,28 @@ export class FormRunner {
     }
     // Sinistre suivant du dossier : une ligne de plus dans le tableau, remplie à son tour.
     if (this.stepReady && (await this.maybeAddClaimRow(analysis))) return this.runStep(false, depth);
+    // Étape qui ne peut pas avancer (manque du dossier, champ en échec ou non reconnu) : photo de l'étape, pour savoir
+    // ce qui relève du dossier (`missing`) et ce qui relève de l'extension (`failed`, `unmapped`).
+    if (depth === 0 && !this.stepReady && !finalStep && this.formReachedSent) {
+      await this.reportBlocked('step_blocked', (this.analysis ?? analysis).fingerprint, this.blockedPhoto(this.analysis ?? analysis, hint));
+    }
     // Toute l'étape est remplie (relances comprises) : on passe à la suivante.
     if (depth === 0) await this.maybeAdvance();
+  }
+
+  private blockedPhoto(analysis: FormAnalysis, hint: StepHint): BlockedStepSnapshot {
+    // Résultats de la dernière étape remplie, par clé de champ : la page refusée peut avoir une autre empreinte
+    // (champs obligatoires marqués après « Suivant ») mais garde les mêmes champs.
+    const results = this.snapshot?.results ?? new Map<string, FillResult>();
+    return blockedStepSnapshot(this.ports.doc, analysis.fields, this.mappings, this.lastPlan, results, hint, this.job.quoteData);
+  }
+
+  /** Signalement d'une étape bloquée, avec sa photo : une fois par étape (empreinte) et par code. */
+  private async reportBlocked(issue: 'step_blocked' | 'advance_refused', fingerprint: string, photo: BlockedStepSnapshot): Promise<void> {
+    const key = `${issue}:${fingerprint}`;
+    if (this.reportedIssues.has(key) || !this.ports.reportIssue) return;
+    this.reportedIssues.add(key);
+    await this.ports.reportIssue('fill', issue, photo).catch(() => undefined);
   }
 
   /** Ajoute la ligne de sinistre suivante (voir ClaimRows). Renvoie `true` si une ligne a été demandée. */
@@ -447,6 +492,8 @@ export class FormRunner {
     // n'ont pas d'équivalent sont signalés : ils deviennent des questions du dossier, et le prochain passage les remplira.
     const discovered = toDiscoveredFields(refused.fields, mapFields(refused.fields), this.productPaths, this.job.quoteData);
     if (discovered.length) this.reportNewFields(refused.fingerprint, discovered);
+    // Les champs de la page refusée, avec l'état du remplissage de l'étape (mêmes clés de champ).
+    await this.reportBlocked('advance_refused', refused.fingerprint, this.blockedPhoto(refused, after.hint));
     if (this.lastState) this.ports.publish({ ...this.lastState, phase: 'waiting_user', message: refusalMessage(this.ports.doc) });
   }
 

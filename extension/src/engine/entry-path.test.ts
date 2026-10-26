@@ -62,6 +62,13 @@ describe('findActionTarget', () => {
     expect(findActionTarget(document, { label: 'Nouveau devis', selector: null, urlPattern: null })).toBeNull();
   });
 
+  it('cherche aussi dans les cadres de même origine (Oyat)', () => {
+    document.body.innerHTML = `<iframe></iframe>`;
+    const frameDoc = document.querySelector('iframe')!.contentDocument!;
+    frameDoc.body.innerHTML = `<nav><a href="/auto">Automobile</a></nav>`;
+    expect(findActionTarget(document, { label: 'Automobile', selector: null, urlPattern: null })).toBe(frameDoc.querySelector('a'));
+  });
+
   it('ignore un élément masqué', () => {
     document.body.innerHTML = `<div hidden><a href="/x">Auto</a></div>`;
     expect(findActionTarget(document, { label: 'Auto', selector: null, urlPattern: null })).toBeNull();
