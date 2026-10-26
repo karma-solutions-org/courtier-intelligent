@@ -126,14 +126,21 @@ export function isTechnicalLabel(label: string): boolean {
   return !/\s/.test(text) && (/[_\d]/.test(text) || /[a-z][A-Z]/.test(text));
 }
 
-/** Valeurs du dossier (texte de 3 caractères et plus) : une option qui les reprend est une donnée client. */
+/** Réponses qu'on trouve dans tous les dossiers : jamais une donnée qui identifie le client. */
+const GENERIC_ANSWERS = new Set(['oui', 'non', 'yes', 'aucun', 'aucune', 'autre', 'autres', 'true', 'false']);
+
+/**
+ * Valeurs du dossier (texte de 3 caractères et plus) : une option qui les reprend est une donnée client. Sauf les
+ * réponses génériques (« oui » / « non ») : sans cela, les options Oui / Non d'un extranet disparaissaient et la
+ * question était signalée en texte libre (questions en double dans le questionnaire).
+ */
 export function clientValues(quoteData: CanonicalData | undefined): Set<string> {
   const values = new Set<string>();
   for (const raw of Object.values(quoteData ?? {})) {
     const plain = raw !== null && typeof raw === 'object' && 'value' in raw ? (raw as { value: unknown }).value : raw;
     if (typeof plain === 'string' || typeof plain === 'number') {
       const text = normalizeValue(String(plain));
-      if (text.length >= 3) values.add(text);
+      if (text.length >= 3 && !GENERIC_ANSWERS.has(text)) values.add(text);
     }
   }
   return values;

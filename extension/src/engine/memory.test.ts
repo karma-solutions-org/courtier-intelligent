@@ -1,5 +1,5 @@
 import { webcrypto } from 'node:crypto';
-import type { CanonicalPath, FormMemoryField } from '@shared';
+import type { CanonicalData, CanonicalPath, FormMemoryField } from '@shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FormField } from './analyzer';
 import { Mapping } from './mapping';
@@ -160,6 +160,18 @@ describe('toDiscoveredFields : jamais de donnée client, peu de bruit', () => {
     const options = ['Oui', 'Dupont', 'AB-123-CD', 'EF-456-GH', 'x@y.fr', '06 12 34 56 78', '12/03/1985', 'Non'].map(v => ({ value: v, label: v }));
     const [found] = toDiscoveredFields([field('select:q', { kind: 'select', inputType: 'select', label: 'Question libre', options, required: true })], [mapping('select:q', 'unmapped')], [], QUOTE);
     expect(found.options.map(o => o.value)).toEqual(['Oui', 'Non']);
+  });
+
+  it('garde les options Oui / Non même si le dossier contient des réponses « oui » (pas de question en double)', () => {
+    const options = [{ value: '1', label: 'Oui' }, { value: '0', label: 'Non' }];
+    const quote = { 'extra.permis_obtenu_dans_cadre_aac': 'oui', 'extra.autre_question': 'non' } as CanonicalData;
+    const [found] = toDiscoveredFields(
+      [field('radio:onpp', { kind: 'radio', inputType: 'radio', label: 'Avez-vous été résilié pour non-paiement (NPP) ?', options, required: true })],
+      [mapping('radio:onpp', 'unmapped')],
+      [],
+      quote,
+    );
+    expect(found.options).toEqual(options);
   });
 
   it('applique safeLabel au libellé et plafonne les longueurs', () => {
