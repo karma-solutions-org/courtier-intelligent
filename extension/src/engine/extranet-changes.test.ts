@@ -112,3 +112,34 @@ describe('mergeDiscoveredFields : même champ, libellé modifié', () => {
     expect(only(result.schema).label).toBe('Utilisation principale du véhicule');
   });
 });
+
+describe('schemaForCabinet : obligatoire selon les extranets visés', () => {
+  const shared = (requiredOnOyat: boolean, requiredOnZephir: boolean): Question =>
+    usage({
+      required: true,
+      discoveredOn: [
+        { insurerId: 'oyat', origin: ORIGIN, fieldKey: 'select:usage', required: requiredOnOyat },
+        { insurerId: 'zephir', origin: OTHER, fieldKey: 'usage', required: requiredOnZephir },
+      ],
+    });
+
+  it('obligatoire pour Oyat seulement : obligatoire dans un dossier Oyat, facultative dans un dossier Zephir', () => {
+    const schema = schemaWith(shared(true, false));
+    expect(schemaForCabinet(schema, ['oyat'])[0].questions[0].required).toBe(true);
+    expect(schemaForCabinet(schema, ['zephir'])[0].questions[0].required).toBe(false);
+  });
+
+  it('deux extranets visés : obligatoire dès que l’un des deux l’exige', () => {
+    expect(schemaForCabinet(schemaWith(shared(true, false)), ['oyat', 'zephir'])[0].questions[0].required).toBe(true);
+    expect(schemaForCabinet(schemaWith(shared(false, false)), ['oyat', 'zephir'])[0].questions[0].required).toBe(false);
+  });
+
+  it('question enregistrée avant la règle (sans `required` par extranet) : exigence globale gardée', () => {
+    expect(schemaForCabinet(schemaWith(usage({ required: true })), ['assureur-a'])[0].questions[0].required).toBe(true);
+  });
+
+  it('question créée depuis un extranet : son exigence est enregistrée pour cet extranet', () => {
+    const result = mergeDiscoveredFields([], [seen({ fieldKey: 'radio:aac', label: 'Permis obtenu dans le cadre de l’AAC', required: true })], { insurerId: 'oyat', origin: ORIGIN });
+    expect(result.added[0].discoveredOn).toEqual([{ insurerId: 'oyat', origin: ORIGIN, fieldKey: 'radio:aac', required: true }]);
+  });
+});

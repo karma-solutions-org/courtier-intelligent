@@ -42,13 +42,34 @@ async function clearPins(): Promise<void> {
   await chrome.storage.session.remove([...pins.keys()].map(tabId => `${PIN_PREFIX}${tabId}`)).catch(() => undefined);
 }
 
+/**
+ * Jobs que d'autres onglets tiennent encore : seulement ceux d'un onglet toujours ouvert sur cet extranet. Un onglet
+ * parti ailleurs (site public de l'assureur, autre page) ne bloque plus son job : sans cela, l'extranet rouvert dans un
+ * nouvel onglet ne trouvait plus « aucun job » et rien ne démarrait.
+ */
+async function heldElsewhere(pins: Map<number, JobRef>, origin: string): Promise<JobRef[]> {
+  const held: JobRef[] = [];
+  for (const [otherTab, ref] of pins) {
+    const tab = await chrome.tabs.get(otherTab).catch(() => null);
+    let tabOrigin: string | null = null;
+    try {
+      tabOrigin = tab?.url ? new URL(tab.url).origin : null;
+    } catch {
+      tabOrigin = null;
+    }
+    if (tabOrigin === origin) held.push(ref);
+    else await unpinJob(otherTab);
+  }
+  return held;
+}
+
 /** Le job de cet onglet : son job épinglé s'il est toujours à faire, sinon un job libre (épinglé alors à l'onglet). */
 export function findTabJob(user: ExtensionUser, tabId: number, origin: string): Promise<JobContext | null> {
   return withPinLock(async () => {
     const pins = await readPins();
     const pinned = pins.get(tabId) ?? null;
     pins.delete(tabId);
-    const found = await findJobForOrigin(user, origin, { pinned, exclude: [...pins.values()] });
+    const found = await findJobForOrigin(user, origin, { pinned, exclude: await heldElsewhere(pins, origin) });
     if (found) await chrome.storage.session.set({ [`${PIN_PREFIX}${tabId}`]: { dossierId: found.dossierId, insurerId: found.insurerId } });
     else if (pinned) await unpinJob(tabId);
     return found;

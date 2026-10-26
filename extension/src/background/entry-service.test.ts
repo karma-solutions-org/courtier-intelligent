@@ -1,7 +1,7 @@
 import type { ExtranetProfile, NavAction } from '@shared';
 import { describe, expect, it } from 'vitest';
 import type { JobContext } from '../shared/messages';
-import { entryClicked, entryFailed, entryFormReached, entryRecorded, initialEntry, instructionFor, profileFrom, startRecording } from './entry-service';
+import { sameSite, entryClicked, entryFailed, entryFormReached, entryRecorded, initialEntry, instructionFor, profileFrom, startRecording } from './entry-service';
 
 const ORIGIN = 'https://zeole.zephir.fr';
 const job: JobContext & { productId: string } = {
@@ -75,5 +75,18 @@ describe('entry-service', () => {
     expect(entry.actions.map(a => a.label)).toEqual(['Tarificateur', 'Auto']);
     expect(profileFrom(entry, profile)).toMatchObject({ version: 2, origin: ORIGIN, entry: [action('Tarificateur'), action('Auto')] });
     expect(profileFrom(startRecording(entry), null)).toBeNull(); // rien enregistré
+  });
+});
+
+describe('sameSite : chemin rejoué sur un autre sous-domaine du même extranet', () => {
+  it.each([
+    ['https://connexion.oyat-assurances.fr', 'https://extranet.oyat-assurances.fr', true],
+    ['https://extranet.oyat-assurances.fr', 'https://extranet.oyat-assurances.fr', true],
+    ['https://extranet.oyat-assurances.fr', 'https://extranet.axa.fr', false],
+    ['https://oyat-assurances.fr.evil.com', 'https://extranet.oyat-assurances.fr', false],
+    ['http://extranet.oyat-assurances.fr', 'https://extranet.oyat-assurances.fr', false],
+    ['pas une url', 'https://extranet.oyat-assurances.fr', false],
+  ])('%s / %s → %s', (a, b, expected) => {
+    expect(sameSite(a, b)).toBe(expected);
   });
 });

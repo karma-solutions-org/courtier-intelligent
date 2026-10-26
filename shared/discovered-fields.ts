@@ -131,7 +131,7 @@ export function questionFromField(
     type,
     required: field.required === true,
     ...(type === 'choice' ? { choices: usableChoices(field.options) } : {}),
-    discoveredOn: [{ insurerId: source.insurerId, origin: source.origin, fieldKey: field.fieldKey.slice(0, 200) }],
+    discoveredOn: [{ insurerId: source.insurerId, origin: source.origin, fieldKey: field.fieldKey.slice(0, 200), required: field.required === true }],
   };
 }
 
@@ -172,6 +172,7 @@ export function mergeDiscoveredFields(
     const known = findBySource(sections, source.origin, field.fieldKey);
     if (known) {
       refreshFromField(known.question, known.entry, field);
+      if (field.required) known.entry.required = true;
       mapping[field.fieldKey] = known.question.canonicalPath;
       if (field.required) {
         known.question.required = true;
@@ -188,7 +189,7 @@ export function mergeDiscoveredFields(
         if (same.withKnowledge) same.mustBeKnown = true;
       }
       if (same.discoveredOn && !same.discoveredOn.some(s => s.origin === source.origin && s.fieldKey === field.fieldKey)) {
-        same.discoveredOn = [...same.discoveredOn, { ...source, fieldKey: field.fieldKey }].slice(-20);
+        same.discoveredOn = [...same.discoveredOn, { ...source, fieldKey: field.fieldKey, required: field.required === true }].slice(-20);
       }
       continue;
     }
@@ -324,12 +325,23 @@ export function applyInsurerRequirements(
 export function schemaForCabinet(schema: QuestionnaireSection[], enabledInsurers: string[]): QuestionnaireSection[] {
   const enabled = enabledInsurers.length ? new Set(enabledInsurers) : null;
   // Un extranet où le champ a disparu (`absent`) ne compte plus.
-  const visible = (question: Question): boolean =>
-    !question.discoveredOn?.length ||
-    question.discoveredOn.some(source => !source.absent && (!enabled || source.insurerId === null || enabled.has(source.insurerId)));
+  const sourcesOf = (question: Question) =>
+    (question.discoveredOn ?? []).filter(source => !source.absent && (!enabled || source.insurerId === null || enabled.has(source.insurerId)));
+  const visible = (question: Question): boolean => !question.discoveredOn?.length || sourcesOf(question).length > 0;
   return schema
-    .map(section => ({ ...section, questions: section.questions.filter(visible) }))
+    .map(section => ({ ...section, questions: section.questions.filter(visible).map(question => withRequirement(question, sourcesOf(question))) }))
     .filter(section => !section.discovered || section.questions.length > 0);
+}
+
+/**
+ * Question découverte : obligatoire seulement si l'un des extranets visés l'exige (une question obligatoire pour Oyat ne
+ * bloque pas un dossier qui ne vise que Zephir). Sources enregistrées avant cette règle (sans `required`) : on garde
+ * l'exigence globale de la question.
+ */
+function withRequirement(question: Question, sources: DiscoverySource[]): Question {
+  if (!question.discoveredOn?.length || !question.discoveredOn.some(source => source.required !== undefined)) return question;
+  const required = sources.some(source => source.required ?? question.required);
+  return required === question.required ? question : { ...question, required, ...(question.withKnowledge ? { mustBeKnown: required } : {}) };
 }
 
 /**

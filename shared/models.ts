@@ -177,6 +177,8 @@ export interface DiscoverySource {
   missedRuns?: number;
   /** Le champ a disparu de l'extranet : la question n'est plus posée pour lui (elle revient s'il réapparaît). */
   absent?: boolean;
+  /** Cet extranet exige la réponse : la question est obligatoire dans un dossier qui le vise (voir schemaForCabinet). */
+  required?: boolean;
 }
 
 export interface QuestionnaireSection {

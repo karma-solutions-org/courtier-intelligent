@@ -15,11 +15,28 @@ const PROFILE_PREFIX = 'extranetProfile:';
 // ── Transitions (pures) ─────────────────────────────────────────────────────
 
 /**
+ * Même site, sous-domaine près : un chemin appris depuis la page de connexion (`connexion.oyat-assurances.fr`) se
+ * rejoue sur l'extranet (`extranet.oyat-assurances.fr`). Comparaison sur les deux derniers éléments du nom d'hôte.
+ */
+export function sameSite(a: string, b: string): boolean {
+  const site = (origin: string) => {
+    try {
+      const { protocol, hostname } = new URL(origin);
+      return `${protocol}//${hostname.split('.').slice(-2).join('.')}`;
+    } catch {
+      return null;
+    }
+  };
+  const left = site(a);
+  return left !== null && left === site(b);
+}
+
+/**
  * État d'un onglet qui commence un job : rejeu du profil s'il y en a un ; sinon apprentissage automatique (premier
  * passage sur cet extranet pour ce produit) : les clics du courtier sont retenus jusqu'au formulaire de devis.
  */
 export function initialEntry(job: JobContext & { productId: string }, origin: string, profile: ExtranetProfile | null): TabEntry {
-  const replay = !!profile && profile.origin === origin && profile.entry.length > 0;
+  const replay = !!profile && sameSite(profile.origin, origin) && profile.entry.length > 0;
   return {
     dossierId: job.dossierId,
     insurerId: job.insurerId,

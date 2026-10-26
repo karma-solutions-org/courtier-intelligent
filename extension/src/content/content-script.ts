@@ -319,9 +319,13 @@ async function waitForLogin(): Promise<void> {
  * une page rechargée reprend au clic suivant (l'avancement est gardé par le service worker, noté AVANT chaque clic).
  * Renvoie `recording` si le courtier apprend le chemin, `done` quand il faut remplir la page.
  */
+/** Étapes du chemin d'accès dans la console de la page (jamais de donnée : libellés des boutons et adresses des cadres). */
+const trace = (...parts: unknown[]) => console.info('[Courtier Intelligent] chemin :', ...parts);
+
 async function runEntry(): Promise<'recording' | 'learning' | 'done'> {
   for (;;) {
     const instruction = await send<EntryInstruction | false>({ type: 'ENTRY_GET' }).catch(() => false as const);
+    trace('instruction', instruction ? instruction.mode : 'injoignable');
     if (!instruction || instruction.mode === 'none') return 'done';
     if (instruction.mode === 'record') {
       startRecording();
@@ -332,9 +336,11 @@ async function runEntry(): Promise<'recording' | 'learning' | 'done'> {
     // Page de connexion : le courtier se connecte lui-même ; le chemin reprend dès qu'elle disparaît.
     await waitForLogin();
     const { action, index } = instruction;
+    trace(`clic ${index + 1} : « ${action.label} »`, 'page attendue', action.urlPattern, 'pages vues', documentsOf(document).map(d => d.location.pathname));
     // Le premier clic se fait sur la page où il a été appris : ailleurs (formulaire déjà ouvert), le chemin est passé.
     // Clic appris dans un cadre (Oyat) : c'est l'adresse du cadre qui compte.
     if (index === 0 && !documentsOf(document).some(d => matchesUrlPattern(d.location.href, action.urlPattern))) {
+      trace('page différente : chemin passé');
       await send({ type: 'ENTRY_FAILED', index, reason: 'skipped' }).catch(() => undefined);
       return 'done';
     }
@@ -344,11 +350,16 @@ async function runEntry(): Promise<'recording' | 'learning' | 'done'> {
       target = findActionTarget(document, action);
     }
     if (!target) {
+      trace('bouton introuvable');
       await send({ type: 'ENTRY_FAILED', index, reason: 'not_found' }).catch(() => undefined);
       return 'done';
     }
     // Avancement non noté (service worker injoignable) : on ne clique pas, la page se remplit telle quelle.
-    if (!(await send<boolean>({ type: 'ENTRY_CLICKED', index }).catch(() => false))) return 'done';
+    if (!(await send<boolean>({ type: 'ENTRY_CLICKED', index }).catch(() => false))) {
+      trace('avancement non enregistré : pas de clic');
+      return 'done';
+    }
+    trace('clic fait dans', target.ownerDocument.location.pathname);
     target.click();
     await waitForSettled(document);
   }
@@ -368,12 +379,18 @@ async function main(): Promise<void> {
   const hasFrames = document.querySelector('iframe, frame') !== null;
   if (isTopFrame) {
     // Y a-t-il un job de tarification pour l'assureur de cet extranet ?
+    trace('page principale chargée');
     const job = await findJob();
-    if (!job) return;
+    if (!job) {
+      trace('aucun job de tarification pour cet extranet');
+      return;
+    }
     // Page principale : d'abord le chemin d'accès jusqu'au formulaire (appris ou rejoué), même si les boutons sont
     // dans des cadres (Oyat), puis le remplissage.
     currentJob = job;
+    trace('page principale : job', job.insurerId);
     const entry = await runEntry();
+    trace('fin du chemin :', entry);
     if (entry === 'recording') return;
     // Formulaire dans un cadre : c'est le script du cadre qui remplit.
     if (hasFrames && !(await waitForFields())) return;
