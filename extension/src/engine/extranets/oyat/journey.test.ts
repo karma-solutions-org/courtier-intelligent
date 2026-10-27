@@ -1,4 +1,4 @@
-import type { CanonicalData } from '@shared';
+import { learnInsurerQuestions, schemaForInsurers, type CanonicalData, type Question, type QuestionnaireSection } from '@shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { JobContext } from '../../../shared/messages';
 import { runJourney } from '../testing/journey';
@@ -89,5 +89,47 @@ describe('PARCOURS OYAT : étape « Conducteur 1 »', () => {
     expect(oyat.snapshots['conducteur:antecedents']).toBe('24');
     expect(oyat.snapshots['conducteur:resiliation']).toBe('0');
     expect(oyat.snapshots['conducteur:crm']).toBe('0.95');
+  }, 30_000);
+});
+
+describe('PARCOURS OYAT : le questionnaire apprend ce que demande l’extranet', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('après un parcours, un dossier Oyat ne pose que les questions d’Oyat', async () => {
+    const question = (canonicalPath: string): Question => ({ canonicalPath: canonicalPath as Question['canonicalPath'], label: canonicalPath, type: 'text', required: false });
+    const discovered = (canonicalPath: string, insurerId: string): Question => ({
+      ...question(canonicalPath),
+      discoveredOn: [{ insurerId, origin: `https://${insurerId}.test`, fieldKey: canonicalPath }],
+    });
+    // Questionnaire de l'application : celles d'Oyat, plus d'autres qu'Oyat ne demande pas (Zephir, catalogue).
+    const NOT_OYAT = ['client.lastName', 'vehicle.brand', 'vehicle.energyType', 'driver.licenseType', 'insuranceHistory.terminationReason'];
+    const oyatPaths = Object.keys(QUOTE_DATA).filter(path => !path.startsWith('extra.'));
+    const schema: QuestionnaireSection[] = [
+      { title: 'Catalogue', questions: [...oyatPaths, ...NOT_OYAT].map(question) },
+      {
+        title: 'Questions des assureurs',
+        discovered: true,
+        questions: [...['extra.civilite', 'extra.situation_matrimoniale', 'extra.ville_naissance'].map(p => discovered(p, 'oyat')), discovered('extra.titulaire_carte_grise', 'zephir')],
+      },
+    ];
+
+    const { seen } = await runJourney(mountOyat(document), job, { origin: OYAT_ORIGIN, finalPage: 'tarifs' });
+    const learned = learnInsurerQuestions(schema, undefined, seen, OYAT_ORIGIN).questions;
+    const extras = ['extra.civilite', 'extra.situation_matrimoniale', 'extra.ville_naissance'];
+    const pathsOf = (sections: QuestionnaireSection[]) => sections.flatMap(section => section.questions.map(q => q.canonicalPath as string));
+
+    // Appris : seulement ce qu'Oyat a demandé (aucune question d'un autre extranet ou du catalogue hors Oyat).
+    expect(learned.length).toBeGreaterThan(10);
+    for (const path of learned) expect([...oyatPaths, ...extras], path).toContain(path);
+    const learnedOnly = pathsOf(schemaForInsurers(schema, [{ id: 'oyat' }], 'auto', { oyat: learned }));
+    for (const path of [...NOT_OYAT, 'extra.titulaire_carte_grise']) expect(learnedOnly, path).not.toContain(path);
+    expect(learnedOnly).toEqual(expect.arrayContaining(extras));
+
+    // Avec la liste du catalogue (oyat.json), rien ne manque : les champs que l'extension remplit autrement (pays,
+    // ancienneté) y sont.
+    const asked = pathsOf(schemaForInsurers(schema, [{ id: 'oyat', questions: { auto: oyatPaths } }], 'auto', { oyat: learned }));
+    expect([...asked].sort()).toEqual([...oyatPaths, ...extras].sort());
   }, 30_000);
 });

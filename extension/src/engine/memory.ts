@@ -198,9 +198,15 @@ export function toDiscoveredFields(
  * Constat d'un parcours mené jusqu'au tarif : tous les champs vus, décrits comme un champ découvert (structure
  * seulement). Le serveur met à jour les questions découvertes et compte celles dont le champ a disparu.
  */
-export function toSightedFields(fields: FormField[], quoteData?: CanonicalData): DiscoveredFieldInput[] {
+export function toSightedFields(fields: FormField[], quoteData?: CanonicalData, mappings: Mapping[] = []): DiscoveredFieldInput[] {
   const values = clientValues(quoteData);
-  return fields.slice(0, SIGHTING_MAX_FIELDS).flatMap(field => describeField(field, values));
+  // Question remplie dans chaque champ : le serveur en apprend ce que demande l'extranet (learnInsurerQuestions).
+  const paths = new Map(
+    mappings.filter(m => m.status === 'mapped' && m.canonicalPath !== null && isCanonicalPath(m.canonicalPath)).map(m => [m.fieldKey, m.canonicalPath as string]),
+  );
+  return fields
+    .slice(0, SIGHTING_MAX_FIELDS)
+    .flatMap(field => describeField(field, values).map(described => (paths.has(field.key) ? { ...described, canonicalPath: paths.get(field.key) } : described)));
 }
 
 /** Description sûre d'un champ, ou aucune (libellé illisible, technique, ou qui ressemble à une donnée client). */

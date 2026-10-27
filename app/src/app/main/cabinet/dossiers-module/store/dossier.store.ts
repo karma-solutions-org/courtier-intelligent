@@ -157,6 +157,7 @@ export const DossierStore = signalStore(
         product()?.questionnaireSchema ?? [],
         insurers,
         store.dossier()?.productId ?? '',
+        product()?.insurerQuestions ?? {},
       );
     });
     const missing = computed<CanonicalPath[]>(() => computeMissing(schema(), store.answers()));

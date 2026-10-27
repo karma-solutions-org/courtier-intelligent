@@ -360,6 +360,8 @@ export class FormRunner {
     }
     this.mappings = this.applyManual(mappings);
     const mappedCount = this.mappings.filter(m => m.status === 'mapped' && m.canonicalPath !== null).length;
+    // Même constat, avec la question remplie dans chaque champ : le serveur apprend ce que demande l'extranet.
+    if (analysis.fields.length) this.ports.fieldsSeen?.(toSightedFields(analysis.fields, this.job.quoteData, this.mappings));
     // Pendant l'apprentissage du chemin, une page sans champ relié (tableau de bord, menu) est normale.
     if (mappedCount === 0 && !this.ports.waitForForm) await this.reportIssue('mapping', 'no_field_mapped');
     if (!this.formReachedSent && mappedCount >= FORM_MIN_MAPPED) {
@@ -425,7 +427,10 @@ export class FormRunner {
       );
       if (unmatched.size) {
         const asNew = this.mappings.map(m => (unmatched.has(m.fieldKey) ? { ...m, status: 'unmapped' as const, canonicalPath: null } : m));
-        const fields = toDiscoveredFields(analysis.fields.filter(f => unmatched.has(f.key)), asNew, this.productPaths, this.job.quoteData);
+        // L'extranet n'accepte que sa liste : la question la garde, jamais fusionnée avec une question d'une autre forme.
+        const fields = toDiscoveredFields(analysis.fields.filter(f => unmatched.has(f.key)), asNew, this.productPaths, this.job.quoteData).map(
+          field => ({ ...field, needsChoice: true }),
+        );
         if (fields.length) {
           this.choicesReported.add(analysis.fingerprint);
           this.reportNewFields(analysis.fingerprint, fields, () => this.choicesReported.delete(analysis.fingerprint));

@@ -1,4 +1,4 @@
-import { findMatchingQuestion, labelSimilarity, mergeDiscoveredFields, schemaForInsurers, questionTypeOf, sameAnswerShape, type DiscoveredFieldInput, type QuestionnaireSection } from '@shared';
+import { applySighting, buildJobQuoteData, findMatchingQuestion, labelSimilarity, learnInsurerQuestions, mergeDiscoveredFields, mergeDuplicateQuestions, questionTypeOf, sameAnswerShape, schemaForCabinet, schemaForInsurers, type DiscoveredFieldInput, type Question, type QuestionnaireSection } from '@shared';
 import { describe, expect, it } from 'vitest';
 
 // Règle commune à l'extension et au serveur (shared/question-matching.ts), éprouvée sur les libellés réels de Zephir.
@@ -170,5 +170,130 @@ describe('schemaForInsurers : Oyat seul, Oyat + Zephir', () => {
       'extra.civilite', 'extra.titulaire_carte_grise', 'extra.remorque',
     ]);
     expect(new Set(result).size).toBe(result.length);
+  });
+});
+
+describe('Questionnaire tenu à jour par les parcours', () => {
+  const ORIGIN = 'https://extranet.oyat-assurances.fr';
+  const catalog: QuestionnaireSection = {
+    title: 'Conducteur',
+    questions: [
+      { canonicalPath: 'driver.profession', label: 'Profession', type: 'text', required: true },
+      { canonicalPath: 'insuranceHistory.claimsCount', label: 'Sinistres déclarés sur les 36 derniers mois', type: 'number', required: true },
+    ],
+  };
+  const extra = (canonicalPath: string, label: string, more: Partial<Question> = {}): Question => ({
+    canonicalPath: canonicalPath as Question['canonicalPath'],
+    label,
+    type: 'text',
+    required: true,
+    discoveredOn: [{ insurerId: 'oyat', origin: ORIGIN, fieldKey: `text:${canonicalPath.slice(6)}`, required: true }],
+    ...more,
+  });
+  const discovered = (...questions: Question[]): QuestionnaireSection => ({ title: 'Questions des assureurs', discovered: true, questions });
+  const paths = (sections: QuestionnaireSection[]) => sections.flatMap(section => section.questions.map(q => q.canonicalPath));
+
+  it('les doublons du catalogue sont fusionnés et ne sont plus posés', () => {
+    const schema = [
+      catalog,
+      discovered(
+        extra('extra.profession', 'Profession'),
+        extra('extra.nombres_sinistres', 'Nombres de sinistres survenus sur les 36 derniers mois'),
+        extra('extra.remorque', 'Possédez-vous une remorque de plus de 500Kg ?'),
+      ),
+    ];
+    const result = mergeDuplicateQuestions(schema);
+    expect(result.changed).toBe(true);
+    expect(result.schema[1].questions.map(q => q.mergedInto ?? null)).toEqual(['driver.profession', 'insuranceHistory.claimsCount', null]);
+    expect(paths(schemaForCabinet(result.schema, ['oyat']))).toEqual(['driver.profession', 'insuranceHistory.claimsCount', 'extra.remorque']);
+    expect(mergeDuplicateQuestions(result.schema).changed).toBe(false);
+  });
+
+  it('une liste que l’extranet impose (keepSeparate) n’est jamais fusionnée', () => {
+    const choices = [{ value: '104', label: 'Salarié Sédentaire' }, { value: '105', label: 'Artisan' }];
+    const schema = [catalog, discovered(extra('extra.profession', 'Profession', { type: 'choice', choices, keepSeparate: true }))];
+    expect(mergeDuplicateQuestions(schema).changed).toBe(false);
+  });
+
+  it('un champ dont l’extranet refuse la réponse du catalogue reste à part (needsChoice)', () => {
+    const field: DiscoveredFieldInput = {
+      fieldKey: 'select:oprofession',
+      label: 'Profession',
+      kind: 'select',
+      inputType: 'select',
+      name: null,
+      section: null,
+      required: true,
+      needsChoice: true,
+      options: [{ value: '104', label: 'Salarié Sédentaire' }, { value: '105', label: 'Artisan' }],
+    };
+    const result = mergeDiscoveredFields([catalog], [field], { insurerId: 'oyat', origin: ORIGIN });
+    expect(result.added).toHaveLength(1);
+    expect(result.added[0].keepSeparate).toBe(true);
+  });
+
+  it('la réponse de la question du catalogue remplit le champ de la question fusionnée', () => {
+    const schema = mergeDuplicateQuestions([catalog, discovered(extra('extra.profession', 'Profession'))]).schema;
+    expect(buildJobQuoteData(schema, { 'driver.profession': 'Enseignant' })['extra.profession']).toBe('Enseignant');
+    expect(buildJobQuoteData(schema, { 'extra.profession': 'Ancienne réponse' })['extra.profession']).toBe('Ancienne réponse');
+  });
+
+  it('constat : forme réelle du champ, exigence actuelle et assureur retrouvé', () => {
+    const schema = [
+      discovered(extra('extra.utilisation_professionnelle', 'Utilisation Professionnelle du véhicule ?'), {
+        ...extra('extra.immatriculation_nom_devis', 'Immatriculation ou nom, n° devis'),
+        discoveredOn: [{ insurerId: null, origin: ORIGIN, fieldKey: 'text:immatriculation_nom_devis', required: true }],
+      }),
+    ];
+    const result = applySighting(
+      schema,
+      [
+        {
+          fieldKey: 'text:utilisation_professionnelle',
+          label: 'Utilisation Professionnelle du véhicule ?',
+          kind: 'radio',
+          inputType: 'radio',
+          required: true,
+          options: [{ value: '1', label: 'Oui' }, { value: '0', label: 'Non' }],
+        },
+        { fieldKey: 'text:immatriculation_nom_devis', label: 'Immatriculation ou nom, n° devis', kind: 'text', inputType: 'text', required: false, options: [] },
+      ],
+      ORIGIN,
+      'oyat',
+    );
+    const [usage, devis] = result.schema[0].questions;
+    expect(usage.type).toBe('boolean');
+    expect(devis.discoveredOn?.[0]).toMatchObject({ insurerId: 'oyat', required: false });
+    // Facultatif sur Oyat : il ne bloque plus un dossier Oyat.
+    expect(schemaForCabinet(result.schema, ['oyat'])[0].questions[1].required).toBe(false);
+  });
+
+  it('questions apprises : chemins remplis et questions découvertes, ajoutées sans jamais en retirer', () => {
+    const schema = mergeDuplicateQuestions([catalog, discovered(extra('extra.profession', 'Profession'), extra('extra.remorque', 'Remorque'))]).schema;
+    const first = learnInsurerQuestions(
+      schema,
+      undefined,
+      [
+        { fieldKey: 'text:remorque', label: 'Remorque', options: [] },
+        { fieldKey: 'text:profession', label: 'Profession', options: [] },
+        { fieldKey: 'number:nb', label: 'Sinistres', options: [], canonicalPath: 'insuranceHistory.claimsCount' },
+        { fieldKey: 'text:inconnu', label: 'Inconnu', options: [], canonicalPath: 'vehicle.brand' },
+      ],
+      ORIGIN,
+    );
+    expect(first.questions).toEqual(['driver.profession', 'insuranceHistory.claimsCount', 'extra.remorque']);
+    expect(learnInsurerQuestions(schema, first.questions, [], ORIGIN)).toEqual({ questions: first.questions, changed: false });
+  });
+
+  it('Oyat + Zephir : listes apprises réunies, chaque question une seule fois', () => {
+    const schema: QuestionnaireSection[] = [
+      {
+        title: 'Q',
+        questions: ['client.email', 'vehicle.brand', 'driver.lastName', 'vehicle.usage'].map(p => ({ canonicalPath: p as Question['canonicalPath'], label: p, type: 'text' as const, required: true })),
+      },
+    ];
+    const learned = { oyat: ['client.email', 'driver.lastName'], zephir: ['vehicle.brand', 'driver.lastName'] };
+    expect(paths(schemaForInsurers(schema, [{ id: 'oyat' }], 'auto', learned))).toEqual(['client.email', 'driver.lastName']);
+    expect(paths(schemaForInsurers(schema, [{ id: 'oyat' }, { id: 'zephir' }], 'auto', learned))).toEqual(['client.email', 'vehicle.brand', 'driver.lastName']);
   });
 });

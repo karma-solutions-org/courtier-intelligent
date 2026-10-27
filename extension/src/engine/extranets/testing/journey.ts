@@ -1,3 +1,4 @@
+import type { DiscoveredFieldInput } from '@shared';
 import type { JobContext, RunState } from '../../../shared/messages';
 import { FormRunner } from '../../runner';
 import type { ExtranetSimulator } from './simulator';
@@ -7,6 +8,8 @@ export interface JourneyResult {
   states: RunState[];
   /** Tarif lu sur la dernière page (`capture_review`), ou null. */
   offer: NonNullable<RunState['capture']>['offer'] | null;
+  /** Constat du parcours (champs vus, et question remplie dans chacun), tel qu'envoyé à `champs-constater`. */
+  seen: DiscoveredFieldInput[];
 }
 
 /**
@@ -19,10 +22,13 @@ export async function runJourney(
   { origin, finalPage, timeoutMs = 20_000 }: { origin: string; finalPage: string; timeoutMs?: number },
 ): Promise<JourneyResult> {
   const states: RunState[] = [];
+  const seen = new Map<string, DiscoveredFieldInput>();
   const runner = new FormRunner(job, {
     doc: document,
     report: async () => undefined,
     publish: state => void states.push(state),
+    // Comme le service worker (addSeenFields) : un champ revu garde sa dernière description.
+    fieldsSeen: fields => fields.forEach(field => seen.set(field.fieldKey, field)),
     askAi: async () => '{"mappings":[]}',
     origin,
     autoAdvance: true,
@@ -41,7 +47,7 @@ export async function runJourney(
         );
       }
     }
-    return { states, offer: states.find(state => state.phase === 'capture_review')?.capture?.offer ?? null };
+    return { states, offer: states.find(state => state.phase === 'capture_review')?.capture?.offer ?? null, seen: [...seen.values()] };
   } finally {
     runner.stop();
   }
