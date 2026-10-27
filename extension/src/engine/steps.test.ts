@@ -193,3 +193,14 @@ describe('Recherche du véhicule (Zephir)', () => {
     expect(pickResultRow(found, null).id).toBe('r1');
   });
 });
+
+describe('findResultRows sans thead', () => {
+  it('trouve les lignes à bouton radio (liste de véhicules Oyat)', () => {
+    document.body.innerHTML = `<table><tr><th></th><th>Véhicule</th><th>CV</th></tr>
+      <tr><td><input type="radio" name="v"></td><td>TRAFIC GENERIQUE</td><td>7</td></tr>
+      <tr><td><input type="radio" name="v"></td><td>TRAFIC CONFORT</td><td>7</td></tr></table>`;
+    const found = findResultRows(document)!;
+    expect(found.rows).toHaveLength(2);
+    expect(pickResultRow(found, null)).toBe(found.rows[0]);
+  });
+});

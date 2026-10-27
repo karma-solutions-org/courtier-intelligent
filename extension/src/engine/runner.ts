@@ -17,7 +17,7 @@ import { applyOverrides, fillPlan } from './flow/fill-step';
 import { MemorySession, StepSnapshot } from './flow/memory-session';
 import { panelFields, progressSignature, progressUpdate } from './flow/run-report';
 import { JobUpdateError, RunnerPorts } from './runner-ports';
-import { clickRow, detectStepHint, findResultRows, pickResultRow, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
+import { clickRow, detectStepHint, findRadioResultRows, findResultRows, pickResultRow, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
 
 /** Relances maximales dans une étape quand le remplissage révèle de nouveaux champs. */
 const MAX_FOLLOW_UPS = 3;
@@ -60,6 +60,7 @@ export class FormRunner {
   private readonly discoveredReported = new Set<string>();
   /** Étapes dont les listes sans option correspondant au dossier ont déjà été signalées. */
   private readonly choicesReported = new Set<string>();
+  private readonly vehiclePickedFor = new Set<string>();
   private observer: MutationObserver | null = null;
   private pending: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> = Promise.resolve();
@@ -439,9 +440,43 @@ export class FormRunner {
     if (plan.missing.length === 0 && finalStep) await this.maybeLearn(this.snapshot);
     this.publishFromPlan(plan, results, hint);
     // Un champ facultatif pour l'extranet (Préfecture sur Zephir) qui n'a pas pu être rempli ne bloque pas l'étape.
-    const required = new Set(analysis.fields.filter(f => f.required).map(f => f.key));
+    // Un champ obligatoire en échec que le courtier a rempli à la main (valeur du dossier refusée par l'extranet) ne bloque plus.
+    const handFilled = (key: string): boolean =>
+      (analysis.elements.get(key) ?? []).some(el =>
+        el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox') ? el.checked : (el as HTMLInputElement).value?.trim() !== '',
+      );
+    const required = new Set(analysis.fields.filter(f => f.required && !(results.get(f.key)?.status === 'failed' && handFilled(f.key))).map(f => f.key));
     this.stepReady =
       plan.missing.length === 0 && !finalStep && ![...results.values()].some(r => r.status === 'failed' && required.has(r.fieldKey));
+
+    console.info(
+      '[Courtier Intelligent] étape :',
+      this.stepReady ? 'prête' : 'pas prête',
+      JSON.stringify({
+        manquants: plan.missing.map(m => m.label),
+        echoues: analysis.fields.filter(f => required.has(f.key) && results.get(f.key)?.status === 'failed').map(f => `${f.label} (${(results.get(f.key) as { reason?: string }).reason ?? ''})`),
+        derniereEtape: finalStep,
+        bouton: !!advanceButton(this.ports.doc, this.filledElements()),
+      }),
+    );
+    // Étape bloquée par un champ obligatoire en échec : on le dit au courtier (sinon la barre reste sur « remplissage »).
+    const failedRequired = analysis.fields.filter(f => required.has(f.key) && results.get(f.key)?.status === 'failed');
+    if (plan.missing.length === 0 && !finalStep && failedRequired.length && this.lastState) {
+      const names = failedRequired.map(f => f.label).join(' ; ');
+      this.ports.publish({ ...this.lastState, phase: 'waiting_user', message: `À remplir à la main pour continuer : ${names}` });
+    }
+
+    // Liste de véhicules affichée (la recherche recharge souvent la page : le choix qui suivait le clic n'a alors jamais lieu).
+    if (this.ports.autoAdvance && !this.stopped && !this.capturing && !this.paused && !this.vehiclePickedFor.has(analysis.fingerprint)) {
+      const list = findRadioResultRows(this.ports.doc);
+      if (list) {
+        this.vehiclePickedFor.add(analysis.fingerprint);
+        const value = valueOf(this.job.quoteData['vehicle.vehicleValue']);
+        const hint = [this.job.quoteData['vehicle.model'], this.job.quoteData['vehicle.version']].map(v => valueOf(v)).filter(Boolean).join(' ');
+        clickRow(pickResultRow(list, typeof value === 'number' ? value : null, hint));
+        await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
+      }
+    }
 
     // Une réponse a pu faire apparaître d'autres champs dans la même étape : on les remplit aussi.
     if (depth < MAX_FOLLOW_UPS && this.analyze().fingerprint !== analysis.fingerprint) {
@@ -493,18 +528,30 @@ export class FormRunner {
    */
   private async maybeAdvance(): Promise<void> {
     if (!this.ports.autoAdvance || !this.stepReady || this.stopped || this.capturing || this.paused || !this.analysis) return;
+    // La page peut finir ses propres calculs après la dernière saisie (liste dépendante, valeur recalculée) : on la laisse
+    // se stabiliser avant l'unique clic, sinon l'extranet refuse l'étape et on n'a pas de second essai.
+    await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
+    if (this.stopped || this.capturing || this.paused) return;
     const key = stepKey(this.analysis, this.ports.doc);
     const found = advanceButton(this.ports.doc, this.filledElements());
-    if (!found || !this.advanceGuard.firstTry(key)) return;
+    const firstTry = !!found && this.advanceGuard.firstTry(key);
+    console.info('[Courtier Intelligent] avancer :', JSON.stringify({ bouton: found?.button.textContent?.trim() ?? null, premierEssai: firstTry }));
+    if (!found || !firstTry) return;
     const before = this.lastStep;
+    // Le dernier champ saisi garde le focus : l'extranet ne valide ses valeurs qu'à la sortie du champ.
+    (this.ports.doc.activeElement as HTMLElement | null)?.blur?.();
     found.button.click();
     await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
     if (this.stopped || this.capturing) return;
     if (found.search) {
       const results = findResultRows(this.ports.doc);
+      const radios = [...this.ports.doc.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+      const chain = (e: Element | null) => { const out: string[] = []; for (let n = e; n && out.length < 6; n = n.parentElement) out.push(n.tagName + (n.className ? `.${n.className}` : '')); return out.join(' < '); };
+      console.info('[Courtier Intelligent] résultats :', JSON.stringify({ lignes: results?.rows.length ?? null, radios: radios.length, premier: chain(radios[0] ?? null), texteTrafic: (this.ports.doc.body.innerText ?? '').includes('TRAFIC') }));
       if (results) {
         const value = valueOf(this.job.quoteData['vehicle.vehicleValue']);
-        clickRow(pickResultRow(results, typeof value === 'number' ? value : null));
+        const hint = [this.job.quoteData['vehicle.model'], this.job.quoteData['vehicle.version']].map(v => valueOf(v)).filter(Boolean).join(' ');
+        clickRow(pickResultRow(results, typeof value === 'number' ? value : null, hint));
         await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
         if (this.stopped || this.capturing) return;
       }

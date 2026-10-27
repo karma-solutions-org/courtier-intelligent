@@ -70,6 +70,23 @@ export function findResultRows(doc: Document): { headers: string[]; rows: HTMLTa
     const rows = [...table.querySelectorAll<HTMLTableRowElement>('tbody tr')].filter(row => row.cells.length >= 2);
     if (headers.length >= 2 && rows.length > 0) return { headers, rows };
   }
+  return findRadioResultRows(doc);
+}
+
+/**
+ * Tableau sans <thead> (Oyat : liste de véhicules à boutons radio, en-tête dans une ligne ordinaire) : les lignes qui
+ * portent un bouton radio sont les résultats, tant qu'aucune n'est déjà choisie.
+ */
+export function findRadioResultRows(doc: Document): { headers: string[]; rows: HTMLTableRowElement[] } | null {
+  for (const table of doc.querySelectorAll('table')) {
+    if (table.closest('[hidden]')) continue;
+    const rows = [...table.querySelectorAll<HTMLTableRowElement>('tr')].filter(
+      row => row.cells.length >= 3 && row.querySelector('input[type="radio"]'),
+    );
+    if (rows.length < 2 || rows.some(row => row.querySelector<HTMLInputElement>('input[type="radio"]')?.checked)) continue;
+    const headerRow = [...table.querySelectorAll<HTMLTableRowElement>('tr')].find(row => !row.querySelector('input[type="radio"]') && row.cells.length >= 3);
+    return { headers: [...(headerRow?.cells ?? [])].map(cell => clean(cell.textContent)), rows };
+  }
   return null;
 }
 
@@ -77,7 +94,15 @@ export function findResultRows(doc: Document): { headers: string[]; rows: HTMLTa
  * Ligne de résultat à choisir : la plus proche de la valeur du véhicule au dossier (colonne « Valeur »), sinon la
  * première. Le courtier n'intervient pas : il faut un véhicule pour obtenir le tarif.
  */
-export function pickResultRow(found: { headers: string[]; rows: HTMLTableRowElement[] }, vehicleValue: number | null): HTMLTableRowElement {
+export function pickResultRow(found: { headers: string[]; rows: HTMLTableRowElement[] }, vehicleValue: number | null, hint = ''): HTMLTableRowElement {
+  // Modèle et version du dossier (carte grise) : la ligne qui en reprend le plus de mots l'emporte.
+  const words = (text: string) => new Set(clean(text).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9+]+/).filter(w => w.length >= 3));
+  const wanted = words(hint);
+  if (wanted.size) {
+    const score = (row: HTMLTableRowElement) => [...words(row.textContent ?? '')].filter(w => wanted.has(w)).length;
+    const best = found.rows.reduce((a, b) => (score(b) > score(a) ? b : a));
+    if (score(best) > 0) return best;
+  }
   const column = found.headers.findIndex(header => /valeur|prix/i.test(header));
   if (vehicleValue === null || column < 0) return found.rows[0];
   const amount = (row: HTMLTableRowElement) => Number((row.cells[column]?.textContent ?? '').replace(/[^\d]/g, ''));
