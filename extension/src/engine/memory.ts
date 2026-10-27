@@ -220,6 +220,7 @@ function describeField(field: FormField, values: ReturnType<typeof clientValues>
         .slice(0, MAX_OPTIONS)
         .map(option => ({ value: option.value.trim().slice(0, MAX_OPTION), label: option.label.trim().slice(0, MAX_OPTION) })),
       required: field.required,
+      ...(field.maxLength !== null && field.maxLength > 0 && field.maxLength <= 200 && field.options.length === 0 ? { maxLength: field.maxLength } : {}),
     }))
     // Libellé illisible ou qui ressemble à une donnée client : le champ n'est pas signalé du tout.
     .filter(field => field.label !== '')

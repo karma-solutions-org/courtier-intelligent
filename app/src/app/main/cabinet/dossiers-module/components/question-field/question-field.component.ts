@@ -92,6 +92,7 @@ const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
                 matInput
                 type="number"
                 step="any"
+                [attr.max]="question().maxLength ? 10 ** question().maxLength! - 1 : null"
                 [value]="value() ?? ''"
                 [readonly]="readonly()"
                 (input)="changed.emit(toNumber($any($event.target).valueAsNumber))"
@@ -124,6 +125,7 @@ const KNOWLEDGE_OPTIONS: { mode: KnowledgeMode; label: string }[] = [
                 matInput
                 [value]="value() ?? ''"
                 [readonly]="readonly()"
+                [attr.maxlength]="question().maxLength ?? null"
                 autocomplete="off"
                 (input)="changed.emit(toText($any($event.target).value))"
               />
