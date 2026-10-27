@@ -1,4 +1,4 @@
-import { findMatchingQuestion, labelSimilarity, mergeDiscoveredFields, questionTypeOf, sameAnswerShape, type DiscoveredFieldInput, type QuestionnaireSection } from '@shared';
+import { findMatchingQuestion, labelSimilarity, mergeDiscoveredFields, schemaForInsurers, questionTypeOf, sameAnswerShape, type DiscoveredFieldInput, type QuestionnaireSection } from '@shared';
 import { describe, expect, it } from 'vitest';
 
 // Règle commune à l'extension et au serveur (shared/question-matching.ts), éprouvée sur les libellés réels de Zephir.
@@ -94,5 +94,81 @@ describe('labelSimilarity : mots voisins mais différents', () => {
 
   it('le féminin et le pluriel ne comptent pas', () => {
     expect(labelSimilarity('Conducteurs assurés', 'conducteur assuré')).toBeGreaterThan(0);
+  });
+});
+
+describe('Même question chez Oyat et dans l’application, quelle que soit sa forme', () => {
+  const field = (fieldKey: string, label: string, kind: DiscoveredFieldInput['kind'], options: { value: string; label: string }[] = []): DiscoveredFieldInput => ({
+    fieldKey,
+    label,
+    kind,
+    inputType: kind === 'select' ? 'select' : 'text',
+    name: null,
+    section: null,
+    options,
+    required: true,
+  });
+  const schema: QuestionnaireSection[] = [
+    {
+      title: 'Conducteur',
+      questions: [{ canonicalPath: 'driver.profession', label: 'Profession', type: 'text', required: false }],
+    },
+    {
+      title: 'Historique',
+      questions: [{ canonicalPath: 'insuranceHistory.claimsCount', label: 'Sinistres déclarés sur les 36 derniers mois', type: 'number', required: true }],
+    },
+  ];
+
+  it('« Profession » en liste (Oyat) = « Profession » en texte (application)', () => {
+    const options = [{ value: '1', label: 'Professionnels de l’automobile' }, { value: '2', label: 'Enseignant' }];
+    const result = mergeDiscoveredFields(schema, [field('prof', 'Profession :', 'select', options)], { insurerId: 'oyat', origin: 'https://extranet.oyat-assurances.fr' });
+    expect(result.added).toEqual([]);
+    expect(result.mapping.prof).toBe('driver.profession');
+  });
+
+  it('« Nombres de sinistres survenus sur les 36 derniers mois » = « Sinistres déclarés sur les 36 derniers mois »', () => {
+    const result = mergeDiscoveredFields(schema, [field('nb', 'Nombres de sinistres survenus sur les 36 derniers mois :', 'text')], { insurerId: 'oyat', origin: 'https://extranet.oyat-assurances.fr' });
+    expect(result.added).toEqual([]);
+    expect(result.mapping.nb).toBe('insuranceHistory.claimsCount');
+  });
+
+  it('une question voisine en autre forme reste une autre question', () => {
+    expect(findMatchingQuestion([{ id: 'alcool-texte', label: ALCOOL_APP, shape: { type: 'text' as const } }], { label: STUPEFIANT, shape: { type: 'boolean' } })).toBeNull();
+  });
+});
+
+describe('schemaForInsurers : Oyat seul, Oyat + Zephir', () => {
+  const q = (canonicalPath: string, label = canonicalPath) => ({ canonicalPath, label, type: 'text' as const, required: true });
+  const discovered = (canonicalPath: string, insurerId: string) => ({
+    ...q(canonicalPath),
+    discoveredOn: [{ insurerId, origin: `https://${insurerId}`, fieldKey: canonicalPath, required: true }],
+  });
+  const schema = [
+    { title: 'Souscripteur', questions: [q('client.lastName'), q('client.email')] },
+    { title: 'Véhicule', questions: [q('vehicle.brand'), q('vehicle.registration')] },
+    { title: 'Conducteur', questions: [q('driver.lastName'), q('driver.profession')] },
+    {
+      title: 'Questions des assureurs',
+      discovered: true,
+      questions: [discovered('extra.civilite', 'oyat'), discovered('extra.titulaire_carte_grise', 'zephir'), { ...discovered('extra.remorque', 'oyat'), discoveredOn: [...discovered('extra.remorque', 'oyat').discoveredOn, ...discovered('extra.remorque', 'zephir').discoveredOn] }],
+    },
+  ] as QuestionnaireSection[];
+  const oyat = { id: 'oyat', questions: { auto: ['client.email', 'vehicle.registration', 'driver.lastName', 'driver.profession'] } };
+  const zephir = { id: 'zephir', questions: { auto: ['client.lastName', 'vehicle.brand', 'vehicle.registration', 'driver.lastName'] } };
+  const paths = (sections: QuestionnaireSection[]) => sections.flatMap(section => section.questions.map(question => question.canonicalPath));
+
+  it('Oyat seul : seulement les questions d’Oyat', () => {
+    expect(paths(schemaForInsurers(schema, [oyat], 'auto'))).toEqual([
+      'client.email', 'vehicle.registration', 'driver.lastName', 'driver.profession', 'extra.civilite', 'extra.remorque',
+    ]);
+  });
+
+  it('Oyat + Zephir : les questions des deux, chacune une seule fois', () => {
+    const result = paths(schemaForInsurers(schema, [oyat, zephir], 'auto'));
+    expect(result).toEqual([
+      'client.lastName', 'client.email', 'vehicle.brand', 'vehicle.registration', 'driver.lastName', 'driver.profession',
+      'extra.civilite', 'extra.titulaire_carte_grise', 'extra.remorque',
+    ]);
+    expect(new Set(result).size).toBe(result.length);
   });
 });
