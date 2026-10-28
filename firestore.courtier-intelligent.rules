@@ -201,7 +201,12 @@
                          'enabledInsurers', 'enabledProducts']) &&
         request.resource.data.name is string &&
         request.resource.data.name.size() > 0 &&
-        request.resource.data.name.size() < 200;
+        request.resource.data.name.size() < 200 &&
+        // Identifiants du catalogue : listes de textes, bornées (les règles ne peuvent pas vérifier chaque élément).
+        request.resource.data.get('enabledInsurers', []) is list &&
+        request.resource.data.get('enabledInsurers', []).size() <= 100 &&
+        request.resource.data.get('enabledProducts', []) is list &&
+        request.resource.data.get('enabledProducts', []).size() <= 50;
 
       match /ci_members/{uid} {
         // L'extension relit sa propre fiche pour savoir si sa session est toujours ouverte.

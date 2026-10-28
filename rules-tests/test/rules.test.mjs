@@ -198,6 +198,10 @@ describe('members', () => {
     await assertFails(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { planId: 'max' }));
     await assertFails(updateDoc(doc(app('brokerA'), `ci_cabinets/${A}`), { name: 'Nouveau nom' }));
     await assertSucceeds(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { name: 'Nouveau nom' }));
+    await assertSucceeds(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { enabledInsurers: ['axa', 'oyat'], enabledProducts: ['auto'] }));
+    await assertFails(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { enabledInsurers: 'axa' }));
+    await assertFails(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { enabledInsurers: Array.from({ length: 101 }, (_, i) => `a${i}`) }));
+    await assertFails(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { enabledProducts: { auto: true } }));
   });
 });
 
@@ -219,9 +223,10 @@ describe('assures', () => {
   const col = () => collection(app('brokerA'), `ci_cabinets/${A}/ci_assures`);
   const as1 = () => doc(app('brokerA'), `ci_cabinets/${A}/ci_assures/as1`);
   const created = (o = {}, extra = {}) => ({ ...assureData(o), createdBy: 'brokerA', createdAt: serverTimestamp(), ...extra });
-  it('create with legitimate payloads (AssuresService.create)', async () => {
-    await assertSucceeds(addDoc(col(), created()));
-    await assertSucceeds(addDoc(col(), created({ type: 'pro', civilite: null, birthDate: null, companyName: 'ACME', siret: '12345678901234' })));
+  // Création par la function assures-creer seulement (contrôle de doublon en transaction).
+  it('create denied even with a legitimate payload', async () => {
+    await assertFails(addDoc(col(), created()));
+    await assertFails(addDoc(collection(app('adminA'), `ci_cabinets/${A}/ci_assures`), created({}, { createdBy: 'adminA' })));
   });
   it('create denied with createdBy of someone else', async () => {
     await assertFails(addDoc(col(), created({}, { createdBy: 'broker2A' })));
@@ -231,8 +236,11 @@ describe('assures', () => {
     await assertFails(addDoc(col(), created({ lastName: 'x'.repeat(201) })));
     await assertFails(addDoc(col(), created({ firstName: 'x'.repeat(201) })));
   });
-  it('update with legitimate payload (AssuresService.update)', async () => {
-    await assertSucceeds(updateDoc(as1(), { ...assureData({ firstName: 'Paul', email: null }), updatedAt: serverTimestamp() }));
+  it('update with legitimate payload, email and SIRET unchanged', async () => {
+    await assertSucceeds(updateDoc(as1(), { ...assureData({ firstName: 'Paul' }), updatedAt: serverTimestamp() }));
+  });
+  it('update denied: email change (function assures-modifier only)', async () => {
+    await assertFails(updateDoc(as1(), { ...assureData({ email: 'autre@example.fr' }), updatedAt: serverTimestamp() }));
   });
   it('update denied: createdBy change, unknown keys, oversized names, big address', async () => {
     await assertFails(updateDoc(as1(), { ...assureData(), createdBy: 'brokerA', updatedAt: serverTimestamp() }));
@@ -242,9 +250,10 @@ describe('assures', () => {
     const address = Object.fromEntries(Array.from({ length: 11 }, (_, i) => [`k${i}`, 'v']));
     await assertFails(updateDoc(as1(), { ...assureData({ address }), updatedAt: serverTimestamp() }));
   });
-  it('delete: admin only', async () => {
+  // Rattaché à ses dossiers : corbeille et suppression passent par les functions.
+  it('delete denied, admin included', async () => {
     await assertFails(deleteDoc(as1()));
-    await assertSucceeds(deleteDoc(doc(app('adminA'), `ci_cabinets/${A}/ci_assures/as1`)));
+    await assertFails(deleteDoc(doc(app('adminA'), `ci_cabinets/${A}/ci_assures/as1`)));
   });
 });
 
@@ -290,6 +299,17 @@ describe('offers (extension writeCapturedOffer batch)', () => {
     batch.update(doc(db, `${base}/ci_quoteJobs/${id}`), { status: 'captured', missingFields: [], error: null, updatedAt: serverTimestamp() });
     return batch.commit();
   }
+  // L'extension n'écrit d'offre que pendant la tarification (ciExtDossierPricing).
+  const setDossier = data =>
+    env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), `ci_cabinets/${A}/ci_dossiers/${D}`), data));
+  beforeEach(() => setDossier({ status: 'tarification' }));
+
+  it('denied outside pricing or in the trash', async () => {
+    await setDossier({ status: 'en_cours' });
+    await assertFails(capture('axa'));
+    await setDossier({ status: 'comparaison', deletedAt: new Date() });
+    await assertFails(capture('axa'));
+  });
   it('owner writes auto offer + job captured in one batch', async () => {
     await assertSucceeds(capture('axa'));
   });
