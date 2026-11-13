@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { Dossier, DOSSIER_STATUS_LABELS, DossierStatus } from '@shared';
-import { StatusChipComponent } from '../../../../dossiers-module/components/status-chip/status-chip.component';
+import { StatusChipPresentationComponent } from '../../../../dossiers-module/components/status-chip/status-chip-presentation/status-chip-presentation.component';
 import { STATUS_ORDER } from '../../../../dossiers-module/util/dossiers.utils';
 import { ConversionRate } from '../../../util/dashboard.utils';
 import { DASHBOARD_STRUCTURE } from '../dashboard.structure';
@@ -23,7 +23,7 @@ export interface ConversionRow extends ConversionRate {
 /** Tableau de bord : compteurs par statut, dossiers à traiter, relances et (admin) taux de conversion. */
 @Component({
   selector: 'app-dashboard-presentation',
-  imports: [DatePipe, PercentPipe, RouterLink, MatIconModule, StatusChipComponent],
+  imports: [DatePipe, PercentPipe, RouterLink, MatIconModule, StatusChipPresentationComponent],
   templateUrl: './dashboard-presentation.component.html',
   styleUrl: './dashboard-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

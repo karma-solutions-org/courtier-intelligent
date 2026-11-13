@@ -29,7 +29,7 @@ export const CABINET_ROUTES: Routes = [
         // Vue transverse (compteurs du tableau de bord) ; la gestion courante passe par l'espace client.
         title: 'Dossiers — Courtier Intelligent',
         loadComponent: () =>
-          import('../../../main/cabinet/dossiers-module/components/dossiers-container/dossiers-container.component').then(
+          import('../../../main/cabinet/dossiers-module/components/dossiers/dossiers-container/dossiers-container.component').then(
             (c) => c.DossiersContainerComponent,
           ),
       },
@@ -37,7 +37,7 @@ export const CABINET_ROUTES: Routes = [
         path: CabinetRouteContainerModel.DOSSIER_NEW_ROUTE.path,
         title: 'Nouveau dossier — Courtier Intelligent',
         loadComponent: () =>
-          import('../../../main/cabinet/dossiers-module/components/new-dossier-container/new-dossier-container.component').then(
+          import('../../../main/cabinet/dossiers-module/components/new-dossier/new-dossier-container/new-dossier-container.component').then(
             (c) => c.NewDossierContainerComponent,
           ),
       },
@@ -48,7 +48,7 @@ export const CABINET_ROUTES: Routes = [
         providers: [DossierStore],
         canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
-          import('../../../main/cabinet/dossiers-module/components/dossier-draft-container/dossier-draft-container.component').then(
+          import('../../../main/cabinet/dossiers-module/components/dossier-draft/dossier-draft-container/dossier-draft-container.component').then(
             (c) => c.DossierDraftContainerComponent,
           ),
       },
@@ -58,7 +58,7 @@ export const CABINET_ROUTES: Routes = [
         providers: [DossierStore],
         canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
-          import('../../../main/cabinet/dossiers-module/components/dossier-detail-container/dossier-detail-container.component').then(
+          import('../../../main/cabinet/dossiers-module/components/dossier-detail/dossier-detail-container/dossier-detail-container.component').then(
             (c) => c.DossierDetailContainerComponent,
           ),
       },

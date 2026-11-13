@@ -7,7 +7,7 @@ import { RouterLink } from '@angular/router';
 import { Assure, AssureDocument, Dossier } from '@shared';
 import { TabQueryParamDirective } from '../../../../../../core/directives/tab-query-param.directive';
 import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
-import { StatusChipComponent } from '../../../../dossiers-module/components/status-chip/status-chip.component';
+import { StatusChipPresentationComponent } from '../../../../dossiers-module/components/status-chip/status-chip-presentation/status-chip-presentation.component';
 import { AssureFormModel } from '../../../models/assure-form.model';
 import { DuplicateCandidate, DuplicateMatch, displayName } from '../../../util/assures.utils';
 import { AssureFormPresentationComponent } from '../../assure-form/assure-form-presentation/assure-form-presentation.component';
@@ -22,7 +22,7 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
  */
 @Component({
   selector: 'app-assure-detail-presentation',
-  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, MatTabsModule, TabQueryParamDirective, AssureFormPresentationComponent, StatusChipComponent],
+  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, MatTabsModule, TabQueryParamDirective, AssureFormPresentationComponent, StatusChipPresentationComponent],
   templateUrl: './assure-detail-presentation.component.html',
   styleUrl: './assure-detail-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
