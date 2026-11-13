@@ -55,8 +55,7 @@
   }
 </section>
 
-<section class="card">
-  <h2 class="card-title">{{ structure.eyebrow }}</h2>
+<app-card [heading]="structure.eyebrow" [padded]="false">
 
   @if (!loaded()) {
     <p class="empty">{{ structure.loading }}</p>
@@ -93,4 +92,4 @@
       <span>{{ structure.loadingMore }}</span>
     }
   </div>
-</section>
+</app-card>

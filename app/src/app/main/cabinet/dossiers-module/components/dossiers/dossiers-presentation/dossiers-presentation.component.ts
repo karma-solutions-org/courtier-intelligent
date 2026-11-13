@@ -1,3 +1,4 @@
+import { CardPresentationComponent } from '../../../../../../core/components/card/card-presentation/card-presentation.component';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -32,7 +33,7 @@ export interface Option {
 /** Liste des dossiers : filtres (statut, produit, courtier, « Mes dossiers »), tableau et défilement infini. */
 @Component({
   selector: 'app-dossiers-list',
-  imports: [
+  imports: [CardPresentationComponent, 
     TablePresentationComponent,
     TableCellDirective,
     DatePipe,

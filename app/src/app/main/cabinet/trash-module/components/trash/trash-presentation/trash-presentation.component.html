@@ -58,8 +58,7 @@
 }
 
 @for (group of groups(); track group.title) {
-  <section class="card">
-    <h2>{{ group.title }} ({{ group.rows.length }}{{ group.hasMore ? '+' : '' }})</h2>
+  <app-card [heading]="group.title + ' (' + group.rows.length + (group.hasMore ? '+' : '') + ')'">
     @if (group.rows.length) {
       <ul class="rows">
         @for (row of group.rows; track row.id) {
@@ -143,5 +142,5 @@
         <span>Chargement de la suite…</span>
       }
     </div>
-  </section>
+  </app-card>
 }

@@ -1,3 +1,4 @@
+import { CardPresentationComponent } from '../../../../../../core/components/card/card-presentation/card-presentation.component';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { AuditLogEntry, Member } from '@shared';
@@ -10,7 +11,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
 /** Journal des connexions et des appareils du cabinet (lecture seule, réservé aux admins). */
 @Component({
   selector: 'app-audit-log-panel',
-  imports: [DatePipe, InfiniteScrollDirective, TablePresentationComponent, TableCellDirective],
+  imports: [CardPresentationComponent, DatePipe, InfiniteScrollDirective, TablePresentationComponent, TableCellDirective],
   templateUrl: './audit-log-panel-presentation.component.html',
   styleUrls: ['../settings.scss', './audit-log-panel-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,

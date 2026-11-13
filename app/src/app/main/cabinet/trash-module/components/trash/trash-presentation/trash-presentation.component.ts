@@ -1,3 +1,4 @@
+import { CardPresentationComponent } from '../../../../../../core/components/card/card-presentation/card-presentation.component';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, effect, ElementRef, input, output, viewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -13,7 +14,7 @@ import { TrashKind } from '../../../services/trash.service';
 /** Corbeille : filtres, groupes (clients, dossiers), restauration et suppression définitive confirmée en ligne. */
 @Component({
   selector: 'app-trash-presentation',
-  imports: [DatePipe, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule, MatProgressSpinnerModule, InfiniteScrollDirective],
+  imports: [CardPresentationComponent, DatePipe, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule, MatProgressSpinnerModule, InfiniteScrollDirective],
   templateUrl: './trash-presentation.component.html',
   styleUrl: './trash-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

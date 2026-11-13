@@ -1,6 +1,4 @@
-<section class="card">
-  <h2>{{ structure.title }}</h2>
-  <p class="hint">{{ structure.hint }}</p>
+<app-card [heading]="structure.title" [subtitle]="structure.hint">
   @if (rows().length) {
     <app-table [columns]="columns" [rows]="rows()" [trackBy]="byId">
       <ng-template appTableCell="date" let-row>{{ row.entry.at?.toMillis() | date: 'd MMM y HH:mm' }}</ng-template>
@@ -25,4 +23,4 @@
       <span>Chargement de la suite…</span>
     }
   </div>
-</section>
+</app-card>

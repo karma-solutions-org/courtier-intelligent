@@ -1,3 +1,4 @@
+import { CardPresentationComponent } from '../../../../../../core/components/card/card-presentation/card-presentation.component';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -17,7 +18,7 @@ import { ASSURES_STRUCTURE } from '../../assures.structure';
  */
 @Component({
   selector: 'app-assures-list',
-  imports: [RouterLink, MatButtonModule, MatIconModule, InfiniteScrollDirective, TablePresentationComponent, TableCellDirective],
+  imports: [CardPresentationComponent, RouterLink, MatButtonModule, MatIconModule, InfiniteScrollDirective, TablePresentationComponent, TableCellDirective],
   templateUrl: './assures-presentation.component.html',
   styleUrl: './assures-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
