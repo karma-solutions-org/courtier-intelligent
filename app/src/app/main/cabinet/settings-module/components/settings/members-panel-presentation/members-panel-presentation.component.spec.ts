@@ -3,12 +3,12 @@ import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { faker } from '@faker-js/faker';
 import { Invitation, Member, MemberStatus, CabinetRole } from '@shared';
 import { page } from 'vitest/browser';
-import { mockInvitation, mockMember, mockTimestamp } from '../../../../../core/utils/unit-test-utils/mocks/cabinet.mock';
-import { MembersPanelComponent } from './members-panel.component';
+import { mockInvitation, mockMember, mockTimestamp } from '../../../../../../core/utils/unit-test-utils/mocks/cabinet.mock';
+import { MembersPanelPresentationComponent } from './members-panel-presentation.component';
 
 /** L'onglet « Membres » des paramètres, tel que l'admin du cabinet le manipule. */
 class MembersPanelTester {
-  readonly fixture = TestBed.createComponent(MembersPanelComponent);
+  readonly fixture = TestBed.createComponent(MembersPanelPresentationComponent);
   readonly root = page.elementLocator(this.fixture.nativeElement);
 
   readonly inviteEmail = this.root.getByRole('textbox', { name: 'Email' });
@@ -49,7 +49,7 @@ class MembersPanelTester {
   }
 }
 
-describe('MembersPanelComponent', () => {
+describe('MembersPanelPresentationComponent', () => {
   let tester: MembersPanelTester;
 
   beforeEach(() => {

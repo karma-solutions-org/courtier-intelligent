@@ -11,11 +11,11 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
 @Component({
   selector: 'app-members-panel',
   imports: [DatePipe, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
-  templateUrl: './members-panel.component.html',
-  styleUrls: ['../settings.scss', './members-panel.component.scss'],
+  templateUrl: './members-panel-presentation.component.html',
+  styleUrls: ['../settings.scss', './members-panel-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MembersPanelComponent {
+export class MembersPanelPresentationComponent {
   readonly members = input<Member[]>([]);
   readonly invitations = input<Invitation[]>([]);
   /** Nombre d'utilisateurs autorisés par l'offre du cabinet (admin compris). */

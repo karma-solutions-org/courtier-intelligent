@@ -1,18 +1,18 @@
 import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
-import { TabQueryParamDirective } from '../../../../../core/directives/tab-query-param.directive';
-import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
-import { SettingsStore } from '../../store/settings.store';
-import { MembersPanelComponent } from '../members-panel/members-panel.component';
+import { TabQueryParamDirective } from '../../../../../../core/directives/tab-query-param.directive';
+import { AuthStore } from '../../../../../commons/authentication-module/store/auth.store';
+import { SettingsStore } from '../../../store/settings.store';
+import { MembersPanelPresentationComponent } from '../members-panel-presentation/members-panel-presentation.component';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
-import { AuditLogPanelComponent } from '../audit-log-panel/audit-log-panel.component';
-import { CatalogPanelComponent } from '../catalog-panel/catalog-panel.component';
-import { CabinetFormComponent } from '../cabinet-form/cabinet-form.component';
+import { AuditLogPanelPresentationComponent } from '../audit-log-panel-presentation/audit-log-panel-presentation.component';
+import { CatalogPanelPresentationComponent } from '../catalog-panel-presentation/catalog-panel-presentation.component';
+import { CabinetFormPresentationComponent } from '../cabinet-form-presentation/cabinet-form-presentation.component';
 
 @Component({
   selector: 'app-settings-container',
-  imports: [MatTabsModule, TabQueryParamDirective, CabinetFormComponent, MembersPanelComponent, CatalogPanelComponent, AuditLogPanelComponent],
+  imports: [MatTabsModule, TabQueryParamDirective, CabinetFormPresentationComponent, MembersPanelPresentationComponent, CatalogPanelPresentationComponent, AuditLogPanelPresentationComponent],
   templateUrl: './settings-container.component.html',
   styleUrl: './settings-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

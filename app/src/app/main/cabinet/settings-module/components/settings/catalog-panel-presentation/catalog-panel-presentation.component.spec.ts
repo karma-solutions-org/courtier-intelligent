@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { Insurer, Product } from '@shared';
-import { CabinetInsurerInput } from '../../services/settings.service';
-import { CatalogPanelComponent } from './catalog-panel.component';
+import { CabinetInsurerInput } from '../../../services/settings.service';
+import { CatalogPanelPresentationComponent } from './catalog-panel-presentation.component';
 
 const product = (id: string): Product => ({ id, name: 'Habitation', active: true, questionnaireSchema: [], guaranteeCatalog: [] });
 
@@ -16,10 +16,10 @@ const INSURER: Insurer = {
   custom: true,
 };
 
-describe('CatalogPanelComponent', () => {
+describe('CatalogPanelPresentationComponent', () => {
   it("modifier un assureur dont le produit a été supprimé : n'envoie que les produits encore proposés", async () => {
     TestBed.configureTestingModule({ providers: [{ provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } }] });
-    const fixture = TestBed.createComponent(CatalogPanelComponent);
+    const fixture = TestBed.createComponent(CatalogPanelPresentationComponent);
     // Seul le nouveau produit est proposé : l'ancien, archivé, n'est plus dans la liste.
     fixture.componentRef.setInput('products', [product('cab-habitation-new')]);
     fixture.componentRef.setInput('insurers', [INSURER]);
@@ -44,7 +44,7 @@ describe('CatalogPanelComponent', () => {
 
   it('un assureur du catalogue global peut aussi être modifié et retiré', async () => {
     TestBed.configureTestingModule({ providers: [{ provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } }] });
-    const fixture = TestBed.createComponent(CatalogPanelComponent);
+    const fixture = TestBed.createComponent(CatalogPanelPresentationComponent);
     const global: Insurer = { ...INSURER, id: 'assureur-a', name: 'Assureur A', custom: undefined };
     fixture.componentRef.setInput('insurers', [global]);
     await fixture.whenStable();
@@ -57,7 +57,7 @@ describe('CatalogPanelComponent', () => {
 
   it('un produit du catalogue global (Auto) peut aussi être modifié et retiré', async () => {
     TestBed.configureTestingModule({ providers: [{ provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } }] });
-    const fixture = TestBed.createComponent(CatalogPanelComponent);
+    const fixture = TestBed.createComponent(CatalogPanelPresentationComponent);
     fixture.componentRef.setInput('products', [{ ...product('auto'), name: 'Auto' }]);
     await fixture.whenStable();
 

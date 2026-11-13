@@ -13,7 +13,7 @@ import {
   QUESTION_TYPES,
   QuestionType,
 } from '@shared';
-import { CabinetProductInput } from '../../services/settings.service';
+import { CabinetProductInput } from '../../../services/settings.service';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
 
 /** Question en cours d'édition : `choicesText` porte un choix par ligne ; `path` vide pour une question nouvelle. */
@@ -53,11 +53,11 @@ let nextKey = 1;
 @Component({
   selector: 'app-product-editor',
   imports: [MatButtonModule, MatIconModule],
-  templateUrl: './product-editor.component.html',
-  styleUrl: './product-editor.component.scss',
+  templateUrl: './product-editor-presentation.component.html',
+  styleUrl: './product-editor-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ProductEditorComponent implements OnInit {
+export class ProductEditorPresentationComponent implements OnInit {
   readonly product = input.required<Product>();
   readonly isPending = input(false);
   readonly saved = output<CabinetProductInput>();

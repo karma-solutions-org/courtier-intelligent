@@ -1,18 +1,18 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { AuditLogEntry, Member } from '@shared';
-import { InfiniteScrollDirective } from '../../../../../core/directives/infinite-scroll.directive';
+import { InfiniteScrollDirective } from '../../../../../../core/directives/infinite-scroll.directive';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
 
 /** Journal des connexions et des appareils du cabinet (lecture seule, réservé aux admins). */
 @Component({
   selector: 'app-audit-log-panel',
   imports: [DatePipe, InfiniteScrollDirective],
-  templateUrl: './audit-log-panel.component.html',
-  styleUrls: ['../settings.scss', './audit-log-panel.component.scss'],
+  templateUrl: './audit-log-panel-presentation.component.html',
+  styleUrls: ['../settings.scss', './audit-log-panel-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AuditLogPanelComponent {
+export class AuditLogPanelPresentationComponent {
   readonly entries = input<AuditLogEntry[]>([]);
   readonly members = input<Member[]>([]);
   readonly hasMore = input(false);

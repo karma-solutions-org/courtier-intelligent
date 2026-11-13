@@ -107,7 +107,7 @@ export const CABINET_ROUTES: Routes = [
     title: 'Paramètres — Courtier Intelligent',
     providers: [SettingsStore],
     loadComponent: () =>
-      import('../../../main/cabinet/settings-module/components/settings-container/settings-container.component').then(
+      import('../../../main/cabinet/settings-module/components/settings/settings-container/settings-container.component').then(
         (c) => c.SettingsContainerComponent,
       ),
   },

@@ -5,7 +5,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { Cabinet } from '@shared';
-import { CabinetInfoModel } from '../../models/cabinet-info.model';
+import { CabinetInfoModel } from '../../../models/cabinet-info.model';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
@@ -13,11 +13,11 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 @Component({
   selector: 'app-cabinet-form',
   imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule],
-  templateUrl: './cabinet-form.component.html',
-  styleUrls: ['../settings.scss', './cabinet-form.component.scss'],
+  templateUrl: './cabinet-form-presentation.component.html',
+  styleUrls: ['../settings.scss', './cabinet-form-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CabinetFormComponent {
+export class CabinetFormPresentationComponent {
   readonly cabinet = input<Cabinet | null>(null);
   readonly isPending = input(false);
   readonly saved = output<CabinetInfoModel>();

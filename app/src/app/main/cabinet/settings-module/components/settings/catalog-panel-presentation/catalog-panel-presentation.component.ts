@@ -4,9 +4,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { Insurer, parseExtranetUrl, Product } from '@shared';
-import { CatalogChoicesModel } from '../../models/catalog-choices.model';
-import { CabinetInsurerInput, CabinetProductInput } from '../../services/settings.service';
-import { ProductEditorComponent } from '../product-editor/product-editor.component';
+import { CatalogChoicesModel } from '../../../models/catalog-choices.model';
+import { CabinetInsurerInput, CabinetProductInput } from '../../../services/settings.service';
+import { ProductEditorPresentationComponent } from '../product-editor-presentation/product-editor-presentation.component';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
 
 /**
@@ -15,12 +15,12 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
  */
 @Component({
   selector: 'app-catalog-panel',
-  imports: [NgTemplateOutlet, MatButtonModule, MatCheckboxModule, MatIconModule, ProductEditorComponent],
-  templateUrl: './catalog-panel.component.html',
-  styleUrls: ['../settings.scss', './catalog-panel.component.scss'],
+  imports: [NgTemplateOutlet, MatButtonModule, MatCheckboxModule, MatIconModule, ProductEditorPresentationComponent],
+  templateUrl: './catalog-panel-presentation.component.html',
+  styleUrls: ['../settings.scss', './catalog-panel-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CatalogPanelComponent {
+export class CatalogPanelPresentationComponent {
   readonly products = input<Product[]>([]);
   readonly insurers = input<Insurer[]>([]);
   /** Choix actuels du cabinet. */
