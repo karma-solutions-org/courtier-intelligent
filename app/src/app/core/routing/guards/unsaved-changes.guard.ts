@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { CanDeactivateFn } from '@angular/router';
 import { Observable } from 'rxjs';
-import { openConfirmDialog } from '../../components/confirm-dialog/confirm-dialog.component';
+import { openConfirmDialog } from '../../components/confirm-dialog/util/confirm-dialog.util';
 
 /** Page qui peut avoir des modifications pas encore enregistrées. */
 export interface HasUnsavedChanges {

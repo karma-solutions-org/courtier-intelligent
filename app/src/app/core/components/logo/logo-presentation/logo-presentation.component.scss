@@ -1,0 +1,21 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.symbol {
+  display: block;
+  width: auto;
+}
+
+.name {
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--ci-navy-900);
+}
+
+.inverse {
+  color: #fff;
+}

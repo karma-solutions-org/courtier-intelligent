@@ -2,12 +2,12 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
-import { LogoComponent } from '../../../../../../core/components/logo/logo.component';
+import { LogoPresentationComponent } from '../../../../../../core/components/logo/logo-presentation/logo-presentation.component';
 import { ACCEPT_INVITATION_PAGE_STRUCTURE } from './accept-invitation-page.structure';
 
 @Component({
   selector: 'app-accept-invitation-presentation',
-  imports: [RouterLink, MatButtonModule, MatProgressSpinnerModule, LogoComponent],
+  imports: [RouterLink, MatButtonModule, MatProgressSpinnerModule, LogoPresentationComponent],
   template: `
     <div class="auth-card">
       <app-logo class="auth-logo" [size]="44" />

@@ -4,12 +4,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { LogoComponent } from '../../../../../../core/components/logo/logo.component';
+import { LogoPresentationComponent } from '../../../../../../core/components/logo/logo-presentation/logo-presentation.component';
 import { CREATE_CABINET_PAGE_STRUCTURE } from './create-cabinet-page.structure';
 
 @Component({
   selector: 'app-create-cabinet-presentation',
-  imports: [LogoComponent, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressSpinnerModule],
+  imports: [LogoPresentationComponent, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressSpinnerModule],
   templateUrl: './create-cabinet-presentation.component.html',
   styleUrl: '../../auth-layout.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

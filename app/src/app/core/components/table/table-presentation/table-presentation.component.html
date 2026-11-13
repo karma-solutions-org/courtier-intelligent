@@ -1,0 +1,38 @@
+@if (loading()) {
+  <p class="message">{{ loadingMessage() }}</p>
+} @else if (rows().length) {
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          @for (column of columns(); track column.key) {
+            <th scope="col" [style.width]="column.width" [attr.data-align]="column.align">{{ column.label }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track trackBy()(row); let index = $index) {
+          <tr
+            [class.clickable]="clickable()"
+            [attr.tabindex]="clickable() ? 0 : null"
+            (click)="onRowClick(row)"
+            (keydown.enter)="onRowClick(row)"
+          >
+            @for (column of columns(); track column.key) {
+              <td [attr.data-align]="column.align" [class.mono]="column.mono">
+                @if (templates().get(column.key); as template) {
+                  <ng-container *ngTemplateOutlet="template; context: { $implicit: row, index: index }" />
+                } @else {
+                  {{ valueOf(row, column.key) }}
+                }
+              </td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+} @else {
+  <p class="message">{{ emptyMessage() }}</p>
+}
+<ng-content />

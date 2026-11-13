@@ -3,7 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CanonicalData, questionsOf } from '@shared';
-import { openConfirmDialog } from '../../../../../core/components/confirm-dialog/confirm-dialog.component';
+import { openConfirmDialog } from '../../../../../core/components/confirm-dialog/util/confirm-dialog.util';
 import { ExtensionStore } from '../../../../commons/extension-module/store/extension.store';
 import { DossierStore } from '../../store/dossier.store';
 import { PricingCard, PricingStore } from '../../store/pricing.store';

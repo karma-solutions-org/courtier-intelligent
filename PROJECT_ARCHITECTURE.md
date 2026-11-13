@@ -11,8 +11,9 @@
 | Framework | **Angular 22** : standalone, zoneless, OnPush, TypeScript strict |
 | État | **NgRx SignalStore** (`@ngrx/signals`, `@ngrx/signals/entities`, `@ngrx/signals/rxjs-interop`) |
 | Async | `rxMethod()` pour les flux Firestore temps réel et les écritures ; `resource()` pour une lecture ponctuelle |
-| UI | **Angular Material** + SCSS |
+| UI | **Angular Material** + SCSS ; composants partagés du projet dans `core/components/` (`app-card`, `app-table`, `app-logo`, `app-confirm-dialog`) |
 | Backend | **Firebase** (Auth, Firestore, Functions, Storage) via le **SDK `firebase`**, **derrière nos providers** (`core/providers/`, même rôle que `ngx-sg`) |
+| Bibliothèque interne | **`@karma-solutions-org/ngx-sg` 24** (installée, registre GitHub `@karma-solutions-org`). Elle ne contient plus de cartes ni de tableaux : seulement des providers Firebase, des features SignalStore (`withRequestStatus`, `withLoad`, `withWrite`, `withLivePages`) et un sélecteur de documents. À n'utiliser qu'après accord, à la place d'un équivalent de `core/` |
 | Locale | `fr-FR` |
 
 **Interdit dans le code :**
@@ -22,7 +23,8 @@
 - `@Input` / `@Output` / `@ViewChild` ;
 - l'injection par constructeur ;
 - `subscribe()` manuel dans un composant ;
-- un import de `firebase/*` en dehors de `core/providers/` ; `@angular/fire` et `ngx-sg` (incompatibles avec Angular 22).
+- un import de `firebase/*` en dehors de `core/providers/` ; `@angular/fire` ;
+- un `template:` ou des `styles:` dans le `.ts` d'un composant (toujours `templateUrl` + `styleUrl`).
 
 ## 2. Couches et règle de dépendance
 
@@ -50,25 +52,30 @@ app/src/app/
 │   │   ├── cabinet-routes/                   # cabinet.routes.ts + cabinet-route-container.model.ts
 │   │   ├── guards/                           # auth.guard.ts, role.guard.ts (fonctionnels, canMatch)
 │   │   └── matcher/                          # matchers d'URL si besoin
-│   ├── components/                           # composants transverses (statistics-card…)
+│   ├── components/                           # composants transverses, même découpage que les modules
+│   │   ├── card/card-presentation/           # <app-card heading subtitle [padded]> + slot [cardActions]
+│   │   ├── table/                            # <app-table [columns] [rows]> + gabarits appTableCell
+│   │   │   ├── table-presentation/
+│   │   │   ├── directives/table-cell.directive.ts
+│   │   │   └── models/table-column.model.ts
+│   │   ├── logo/logo-presentation/
+│   │   └── confirm-dialog/                   # confirm-dialog-presentation/ + models/ + util/openConfirmDialog
+│   ├── directives/                           # infinite-scroll, tab-query-param
+│   ├── providers/                            # ports Firebase (seul endroit qui importe firebase/*)
 │   ├── store-features/                       # signalStoreFeature réutilisables (withRequestStatus…)
-│   ├── structures/                           # general-dialog, general-error, snackbar .structure.ts
-│   └── utils/                                # date-utils, route-utils…
+│   └── utils/                                # backend-error.utils, outils de test…
 └── main/
     ├── commons/                              # zone partagée
-    │   ├── authentication-module/            # signin, forget-password, accept-invitation
-    │   ├── main-module/                      # shell / layout
-    │   ├── navbar-module/
-    │   ├── toolbar-module/
-    │   └── extension-module/                 # détection de l'extension Chrome (installée / absente)
-    ├── cabinet/                              # zone cabinet (admin + courtier)
-    │   ├── home-module/                      # tableau de bord
-    │   ├── assures-module/
-    │   ├── dossiers-module/                  # stepper, détail, besoin, historique
-    │   ├── tarification-module/              # jobs, champs manquants, saisie manuelle
-    │   ├── comparatif-module/
-    │   ├── proposition-module/
-    │   └── settings-module/                  # cabinet, membres, assureurs actifs
+    │   ├── authentication-module/            # signin, signup, forget-password, accept-invitation, create-cabinet
+    │   ├── main-module/                      # shell (sidebar, topbar), accueil, page introuvable
+    │   ├── extension-module/                 # détection de l'extension Chrome (installée / absente)
+    │   └── presentation-module/              # page d'accueil publique
+    └── cabinet/                              # zone cabinet (admin + courtier)
+        ├── dashboard-module/                 # tableau de bord
+        ├── assures-module/                   # clients et leurs pièces
+        ├── dossiers-module/                  # brouillon, détail, besoin, tarification, comparatif, proposition
+        ├── settings-module/                  # cabinet, membres, catalogue, journal
+        └── trash-module/                     # corbeille (admin)
 ```
 
 ### Anatomie d'un module
@@ -76,15 +83,21 @@ app/src/app/
 ```
 dossiers-module/
 ├── components/
-│   ├── dossiers-container/                  # smart : injecte le store
-│   │   ├── dossiers-container.component.ts|html|scss
-│   ├── list-dossiers/                       # dumb : input()/output()
-│   │   ├── list-dossiers.component.ts|html|scss
-│   │   └── list-dossiers.component.structure.ts   # textes, colonnes, config UI
-│   └── new-dossier/
-│       ├── new-dossier-container/
-│       └── new-dossier-presentation/
-├── models/                                  # *.model.ts, *.enum.ts
+│   ├── dossier-detail/
+│   │   ├── dossier-detail-container/                    # smart : injecte les stores, aucun appel de service
+│   │   │   ├── dossier-detail-container.component.ts
+│   │   │   ├── dossier-detail-container.component.html
+│   │   │   ├── dossier-detail-container.component.scss
+│   │   │   └── dossier-detail-container.component.spec.ts
+│   │   └── dossier-detail-presentation/                 # dumb : input() / output(), n'injecte rien
+│   │       ├── dossier-detail-presentation.component.ts
+│   │       ├── dossier-detail-presentation.component.html
+│   │       ├── dossier-detail-presentation.component.scss
+│   │       ├── dossier-detail-presentation.component.spec.ts
+│   │       └── dossier-detail-presentation.component.structure.ts   # textes, colonnes, config UI
+│   └── status-chip/
+│       └── status-chip-presentation/                    # petit composant réutilisable : présentation seule
+├── models/                                  # *.model.ts, *.enum.ts (modèles propres à l'UI)
 ├── services/
 │   └── dossiers.service.ts                  # seul accès aux providers
 ├── store/
@@ -94,9 +107,13 @@ dossiers-module/
 ```
 
 **Nommage :**
-- `xxx-container` = composant smart ;
-- `xxx-presentation` (ou nom métier simple) = composant dumb ;
+- un écran = un dossier `xxx/` contenant `xxx-container/` (smart) et `xxx-presentation/` (dumb) ;
+- un petit composant réutilisable (puce, champ, boîte de dialogue simple) = `xxx/xxx-presentation/` seul ;
+- chaque dossier de composant contient **4 fichiers** : `.ts`, `.html`, `.scss`, `.spec.ts` (+ `.structure.ts` si besoin) ;
+- classes : `XxxContainerComponent`, `XxxPresentationComponent` ; sélecteurs préfixés `app-` ;
 - `xxx.component.structure.ts` = textes et configuration de l'UI, sans aucune logique.
+
+**Specs :** un `.spec.ts` encore sans test contient un `it.todo('à écrire')` : Vitest refuse un fichier sans aucun test.
 
 ## 4. Modèles partagés
 
@@ -219,8 +236,9 @@ Aucun `provideStore`, `provideState` ni `provideEffects`.
 
 ## 9. Extension Chrome
 
-- `main/commons/extension-module/` contient un `ExtensionService`, qui détecte si l'extension est installée (message `PING`). Aucun identifiant n'est transmis : l'extension a sa propre connexion Firebase, avec le même compte que le courtier.
-- Après la connexion, l'app ne parle **jamais** directement à l'extension : tout passe par Firestore (`quoteJobs`, `offers`), écouté en temps réel par `TarificationStore`.
+- `main/commons/extension-module/` contient un `ExtensionService`, qui détecte si l'extension est installée (message `PING`).
+- Connexion de l'extension : l'app obtient un jeton de la function `sessions-emettreJetonExtension` et l'envoie à l'extension (message `CONNECT`, via `core/providers/extension.provider.ts`). C'est le seul échange direct.
+- Ensuite, l'app ne parle **jamais** directement à l'extension : tout passe par Firestore (`ci_quoteJobs`, `ci_offers`), écouté en temps réel par `PricingStore`.
 
 ## 10. Règles pour les agents IA
 

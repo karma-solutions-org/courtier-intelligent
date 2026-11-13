@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
-import { LogoComponent } from '../../../../../core/components/logo/logo.component';
+import { LogoPresentationComponent } from '../../../../../core/components/logo/logo-presentation/logo-presentation.component';
 
 @Component({
   selector: 'app-not-found',
-  imports: [RouterLink, MatButtonModule, LogoComponent],
+  imports: [RouterLink, MatButtonModule, LogoPresentationComponent],
   template: `
     <main class="not-found">
       <app-logo [size]="44" />

@@ -16,7 +16,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DossierOutcomeResult, PROPOSAL_MESSAGE_MAX } from '@shared';
-import { openConfirmDialog } from '../../../../../core/components/confirm-dialog/confirm-dialog.component';
+import { openConfirmDialog } from '../../../../../core/components/confirm-dialog/util/confirm-dialog.util';
 import { DossierStore } from '../../store/dossier.store';
 import { ProposalStore } from '../../store/proposal.store';
 import {
