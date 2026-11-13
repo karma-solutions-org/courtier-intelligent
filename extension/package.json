@@ -6,9 +6,10 @@
   "type": "module",
   "scripts": {
     "build": "node build.js",
+    "build:dev": "node build.js --dev",
     "build:emulators": "node build.js --emulators",
     "build:demo": "node build.js --demo",
-    "watch": "node build.js --watch",
+    "watch": "node build.js --watch --dev",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "demo:extranet": "npx --yes http-server@14.1.1 demo-extranet -p 8090 -c-1",

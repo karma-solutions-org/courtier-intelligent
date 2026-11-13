@@ -59,7 +59,9 @@ const MONTHS = 'janv(?:ier|\\.)?|f[ée]vr?(?:ier|\\.)?|mars|avr(?:il|\\.)?|mai|j
 
 /** Formats reconnaissables de données personnelles, masqués quel que soit le dossier. */
 const PERSONAL_PATTERNS: RegExp[] = [
-  /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, // email
+  // email ; le lookbehind fait partir la recherche du début du mot (sans lui, un long mot sans « @ » est relu à partir
+  // de chaque caractère : 2 s pour 50 000 caractères, page de l'extranet figée).
+  /(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g,
   /\b[A-Z]{2}\d{2}(?:[\s-]?[A-Z0-9]{4}){2,7}(?:[\s-]?[A-Z0-9]{1,3})?\b/g, // IBAN
   /\b[12][\s.]?\d{2}[\s.]?(?:0[1-9]|1[0-2]|[2-9]\d)[\s.]?(?:\d{2}|2[AB])[\s.]?\d{3}[\s.]?\d{3}(?:[\s.]?\d{2})?\b/gi, // NIR (sécurité sociale)
   /(?:(?:\+|00)33[\s.-]?(?:\(0\)[\s.-]?)?|\b0)[1-9](?:[\s.-]?\d{2}){4}\b/g, // téléphone français

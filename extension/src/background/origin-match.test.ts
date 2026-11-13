@@ -89,6 +89,18 @@ describe('extranetPatterns', () => {
     expect(extranetPatterns(['com', '', 'localhost', 'a b.fr'])).toEqual([]);
     expect(extranetPatterns(['localhost'], { allowLocalhost: true })).toEqual(['http://localhost/*']);
   });
+
+  it('refuse les suffixes publics (le script serait injecté sur les sites de tous leurs titulaires)', () => {
+    expect(extranetPatterns(['github.io', '*.web.app', 'co.uk', 'com.tn', 'netlify.app.'])).toEqual([]);
+    expect(hostMatchesDomain('pirate.github.io', 'github.io')).toBe(false);
+    // Un sous-domaine précis d'un hébergeur reste un extranet valable.
+    expect(extranetPatterns(['assureur.github.io', 'assureur.co.uk'])).toEqual([
+      'https://assureur.github.io/*',
+      'https://*.assureur.github.io/*',
+      'https://assureur.co.uk/*',
+      'https://*.assureur.co.uk/*',
+    ]);
+  });
 });
 
 describe('pickJobForOrigin', () => {

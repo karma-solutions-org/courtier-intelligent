@@ -1,4 +1,4 @@
-import { QuoteJobStatus } from '@shared';
+import { isPublicSuffix, QuoteJobStatus } from '@shared';
 import type { JobContext } from '../shared/messages';
 
 /** Un assureur du catalogue (`insurers/{id}`) : ce dont l'extension a besoin pour reconnaître son extranet. */
@@ -26,10 +26,10 @@ export interface JobRecord {
  */
 export const RUNNABLE_STATUSES: QuoteJobStatus[] = ['requested', 'analyzing', 'needs_info', 'filling', 'awaiting_submit'];
 
-/** Remplacé par esbuild : `npm run build:emulators` ou `npm run build:demo`. Absent (tests) : build de production. */
+/** Remplacé par esbuild : vrai avec `npm run build:dev`, `build:demo`, `build:emulators` ou `watch`. Absent (tests) : build de production. */
 declare const __ALLOW_LOCALHOST__: boolean;
 
-/** `http://localhost` (extranet de démonstration) n'est accepté que dans un build de développement (emulators ou démo). */
+/** `http://localhost` (extranet de démonstration) n'est accepté que dans un build de développement. */
 export const DEV_BUILD: boolean = typeof __ALLOW_LOCALHOST__ !== 'undefined' && __ALLOW_LOCALHOST__;
 
 export interface MatchOptions {
@@ -41,7 +41,7 @@ export interface MatchOptions {
 const LOCALHOST_DOMAIN = /^localhost(:\d{1,5})?$/;
 
 /**
- * Domaine du catalogue normalisé (`*.x.fr` → `x.fr`), ou null s'il est inacceptable (vide, sans point).
+ * Domaine du catalogue normalisé (`*.x.fr` → `x.fr`), ou null s'il est inacceptable (vide, sans point, suffixe public).
  * En développement, `localhost:8090` est accepté : le port fait partie du domaine (deux démos sur deux ports).
  */
 export function normalizeDomain(domain: string, { allowLocalhost = DEV_BUILD }: MatchOptions = {}): string | null {
@@ -49,6 +49,8 @@ export function normalizeDomain(domain: string, { allowLocalhost = DEV_BUILD }: 
   if (LOCALHOST_DOMAIN.test(wanted)) return allowLocalhost ? wanted : null;
   // Un domaine sans point (« com », « fr », un nom d'hôte interne) couvrirait trop de sites : refusé.
   if (!wanted.includes('.') || wanted.startsWith('.') || /[\s/:*]/.test(wanted)) return null;
+  // Un suffixe public (« co.uk », « github.io », « web.app »…) couvrirait les sites de milliers d'inconnus : refusé.
+  if (isPublicSuffix(wanted)) return null;
   return wanted;
 }
 
@@ -98,6 +100,7 @@ export function insurerForOrigin(origin: string, insurers: InsurerInfo[], option
  */
 export const APP_ORIGINS: readonly string[] = [
   'http://localhost:4200',
+  'http://localhost:60225',
   'https://courtier-intelligent-test.web.app',
   'https://courtier-intelligent-test.firebaseapp.com',
 ];

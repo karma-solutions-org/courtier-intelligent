@@ -207,6 +207,24 @@
         allow read, write: if false;
       }
 
+      // Assureurs propres au cabinet : lus par l'app et l'extension du cabinet, écrits par les functions assureurs-*.
+      match /ci_insurers/{insurerId} {
+        allow read: if ciActive(cabinetId) || ciExtActive(cabinetId);
+        allow write: if false;
+      }
+
+      // Produits propres au cabinet : lus par l'app du cabinet, écrits par les functions produits-* et champs-signaler.
+      match /ci_products/{productId} {
+        allow read: if ciActive(cabinetId);
+        allow write: if false;
+      }
+
+      // Mémoire des formulaires propre au cabinet (structure seulement) : lue par son extension, écrite par les functions.
+      match /ci_formMemories/{memoryKey} {
+        allow read: if ciExtActive(cabinetId);
+        allow write: if false;
+      }
+
       match /ci_assures/{assureId} {
         allow read: if ciActive(cabinetId);
         // Champs écrits par AssuresService.create (toAssureData + createdBy + createdAt), mêmes limites qu'à l'update.

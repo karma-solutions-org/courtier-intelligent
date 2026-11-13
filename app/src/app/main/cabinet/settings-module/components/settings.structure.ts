@@ -84,7 +84,7 @@ export const SETTINGS_STRUCTURE = {
     errors: {
       productName: 'Indiquez le nom du produit (2 caractères minimum).',
       name: "Indiquez le nom de l'assureur (2 caractères minimum).",
-      url: 'Adresse invalide : une adresse https:// est attendue, port accepté (ex. https://extranet.assureur.fr ou localhost:8091).',
+      url: 'Adresse invalide : une adresse https:// est attendue, port accepté (ex. https://extranet.assureur.fr ou localhost:8091), jamais un domaine d’hébergeur seul (github.io, web.app…).',
       products: 'Choisissez au moins un produit tarifé.',
     },
   },
