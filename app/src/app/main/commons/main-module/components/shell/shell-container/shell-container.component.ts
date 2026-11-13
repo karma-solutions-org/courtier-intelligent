@@ -9,14 +9,14 @@ import { ExtensionStore } from '../../../../extension-module/store/extension.sto
 import { AuthStore } from '../../../../authentication-module/store/auth.store';
 import { navigationFor, ROLE_LABELS } from '../navigation.structure';
 import { CabinetStatusStore } from '../../../store/cabinet-status.store';
-import { LimitBannerComponent } from '../limit-banner/limit-banner.component';
-import { SidebarComponent } from '../sidebar/sidebar.component';
-import { TopbarComponent } from '../topbar/topbar.component';
+import { LimitBannerPresentationComponent } from '../limit-banner-presentation/limit-banner-presentation.component';
+import { SidebarPresentationComponent } from '../sidebar-presentation/sidebar-presentation.component';
+import { TopbarPresentationComponent } from '../topbar-presentation/topbar-presentation.component';
 
 /** Layout de l'espace connecté : menu latéral selon le rôle, barre du haut, contenu routé. */
 @Component({
   selector: 'app-shell-container',
-  imports: [RouterOutlet, MatSidenavModule, SidebarComponent, TopbarComponent, LimitBannerComponent],
+  imports: [RouterOutlet, MatSidenavModule, SidebarPresentationComponent, TopbarPresentationComponent, LimitBannerPresentationComponent],
   templateUrl: './shell-container.component.html',
   styleUrl: './shell-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

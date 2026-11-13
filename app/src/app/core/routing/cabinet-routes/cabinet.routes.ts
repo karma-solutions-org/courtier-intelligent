@@ -14,7 +14,7 @@ export const CABINET_ROUTES: Routes = [
     path: CabinetRouteContainerModel.DASHBOARD_ROUTE.path,
     title: 'Tableau de bord — Courtier Intelligent',
     loadComponent: () =>
-      import('../../../main/commons/main-module/components/home-container/home-container.component').then(
+      import('../../../main/commons/main-module/components/home/home-container/home-container.component').then(
         (c) => c.HomeContainerComponent,
       ),
   },
