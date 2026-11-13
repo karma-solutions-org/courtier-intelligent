@@ -1,0 +1,6 @@
+<h1>Bonjour {{ firstName() }}</h1>
+@if (!authStore.cabinetId()) {
+  <p class="notice">Votre compte n'est rattaché à aucun cabinet pour l'instant.</p>
+} @else {
+  <app-dashboard-container />
+}

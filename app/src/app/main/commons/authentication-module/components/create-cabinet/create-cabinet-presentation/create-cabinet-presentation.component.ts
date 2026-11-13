@@ -11,7 +11,7 @@ import { CREATE_CABINET_PAGE_STRUCTURE } from './create-cabinet-page.structure';
   selector: 'app-create-cabinet-presentation',
   imports: [LogoPresentationComponent, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressSpinnerModule],
   templateUrl: './create-cabinet-presentation.component.html',
-  styleUrl: '../../auth-layout.scss',
+  styleUrls: ['../../auth-layout.scss', './create-cabinet-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CreateCabinetPresentationComponent implements OnInit {

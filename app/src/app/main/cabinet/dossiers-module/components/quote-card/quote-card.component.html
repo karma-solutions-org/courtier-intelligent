@@ -1,0 +1,108 @@
+@let job = card().job;
+@let offer = card().offer;
+<article class="card" [attr.data-tone]="tone()" [attr.aria-label]="card().insurer.name">
+  <header>
+    <h3>
+      <span class="insurer-mark" aria-hidden="true">{{ card().insurer.name.charAt(0) }}</span
+      >{{ card().insurer.name }}
+    </h3>
+    <span class="status" [class]="tone()">{{ statusLabel() }}</span>
+  </header>
+
+  @if (job && job.attempts > 1) {
+    <p class="meta">{{ job.attempts }}e {{ text.attempt }}</p>
+  }
+
+  @if (offer) {
+    <div class="offer">
+      @if (offer.premiumAnnual !== null) {
+        <strong
+          >{{ offer.premiumAnnual | currency: 'EUR' : 'symbol' : '1.0-2' }}
+          {{ text.perYear }}</strong
+        >
+      }
+      @if (offer.premiumMonthly !== null) {
+        <span
+          >{{ offer.premiumMonthly | currency: 'EUR' : 'symbol' : '1.0-2' }}
+          {{ text.perMonth }}</span
+        >
+      }
+      @if (offer.quoteNumber) {
+        <span class="meta">{{ text.quoteNumber }} {{ offer.quoteNumber }}</span>
+      }
+      @if (offer.source === 'manual') {
+        <span class="badge">{{ text.manual }}</span>
+      }
+    </div>
+    @if (offer.stale) {
+      <p class="error" role="status">{{ text.stale }}</p>
+    }
+  } @else if (job) {
+    @switch (job.status) {
+      @case ('requested') {
+        <p class="hint">{{ text.requested }}</p>
+      }
+      @case ('needs_info') {
+        @if (job.missingFields.length) {
+          <app-missing-fields-form
+            [fields]="job.missingFields"
+            [schemaQuestions]="schemaQuestions()"
+            [initial]="answers()"
+            [busy]="busy()"
+            (submitted)="answered.emit($event)"
+          />
+        } @else {
+          <p class="hint">{{ text.resuming }}</p>
+        }
+      }
+      @case ('awaiting_submit') {
+        <p class="hint">{{ text.awaitingSubmit }}</p>
+      }
+      @case ('failed') {
+        <p class="error" role="alert">{{ text.failed }} {{ job.error }}</p>
+      }
+      @case ('cancelled') {
+        <p class="hint">{{ text.cancelled }}</p>
+      }
+    }
+    @if (progress(); as progress) {
+      <div class="steps">
+        <span class="meta"
+          >{{ text.step }} {{ progress.current }} {{ text.of }} {{ progress.total }}</span
+        >
+        <mat-progress-bar mode="determinate" [value]="progress.percent" />
+      </div>
+    } @else if (job.status === 'analyzing' || job.status === 'filling') {
+      <mat-progress-bar mode="indeterminate" />
+    }
+  }
+
+  <footer>
+    @if (canLaunch()) {
+      <button
+        mat-flat-button
+        type="button"
+        [disabled]="!canPrice() || busy()"
+        (click)="launch.emit()"
+      >
+        @if (busy()) {
+          <mat-progress-spinner class="busy" mode="indeterminate" diameter="16" aria-hidden="true" />
+        }
+        {{ job ? text.retry : text.price }}
+      </button>
+    }
+    @if (active()) {
+      <button mat-stroked-button type="button" (click)="openExtranet.emit()">
+        <mat-icon>open_in_new</mat-icon>{{ text.openExtranet }}
+      </button>
+      <button mat-button type="button" [disabled]="busy()" [attr.aria-busy]="busy()" (click)="cancel.emit()">
+        @if (busy()) {
+          <mat-progress-spinner class="busy" mode="indeterminate" diameter="16" aria-hidden="true" />
+        } @else {
+          <mat-icon>cancel</mat-icon>
+        }
+        {{ text.cancel }}
+      </button>
+    }
+  </footer>
+</article>

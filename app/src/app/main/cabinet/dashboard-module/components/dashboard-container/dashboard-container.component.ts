@@ -15,31 +15,8 @@ import {
   selector: 'app-dashboard-container',
   imports: [DashboardPresentationComponent],
   providers: [DashboardStore],
-  template: `
-    @if (store.error()) {
-      <p class="error" role="alert">{{ store.error() }}</p>
-    }
-    <app-dashboard-presentation
-      [loaded]="store.loaded()"
-      [isAdmin]="store.isAdmin()"
-      [counts]="store.counts()"
-      [toProcess]="toProcess()"
-      [toFollowUp]="toFollowUp()"
-      [conversionByCourtier]="conversionByCourtier()"
-      [conversionByProduct]="conversionByProduct()"
-      [dossiersUrl]="dossiersUrl"
-    />
-  `,
-  styles: `
-    .error {
-      margin: 0 0 16px;
-      padding: 12px 14px;
-      border-left: 3px solid var(--ci-danger);
-      border-radius: 8px;
-      color: var(--ci-danger);
-      background: var(--ci-danger-soft);
-    }
-  `,
+  templateUrl: './dashboard-container.component.html',
+  styleUrl: './dashboard-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardContainerComponent {

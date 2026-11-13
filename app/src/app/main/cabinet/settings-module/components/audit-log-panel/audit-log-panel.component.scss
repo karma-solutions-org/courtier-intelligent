@@ -1,0 +1,41 @@
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--ci-border);
+}
+
+th {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ci-text-muted);
+}
+
+.sub {
+  display: block;
+  font-size: 13px;
+  color: var(--ci-text-muted);
+}
+
+.more {
+  min-height: 1px;
+  padding: 8px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ci-text-muted);
+}
+
+.refused td:last-child {
+  color: var(--mat-sys-error);
+}

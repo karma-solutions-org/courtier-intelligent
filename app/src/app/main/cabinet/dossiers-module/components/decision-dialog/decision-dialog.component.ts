@@ -16,28 +16,8 @@ export interface DecisionDialogData {
 @Component({
   selector: 'app-decision-dialog',
   imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule],
-  template: `
-    <h2 mat-dialog-title>{{ text.title }} · {{ data.insurerName }}</h2>
-    <mat-dialog-content>
-      <mat-form-field appearance="outline" class="field">
-        <mat-label>{{ text.justification }}</mat-label>
-        <textarea matInput rows="5" [formControl]="justification" [maxlength]="max"></textarea>
-        <mat-hint>{{ text.hint }}</mat-hint>
-      </mat-form-field>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button type="button" mat-dialog-close>{{ text.cancel }}</button>
-      <button mat-flat-button type="button" [disabled]="!valid()" (click)="submit()">
-        {{ text.confirm }}
-      </button>
-    </mat-dialog-actions>
-  `,
-  styles: `
-    .field {
-      width: 100%;
-      min-width: min(480px, 80vw);
-    }
-  `,
+  templateUrl: './decision-dialog.component.html',
+  styleUrl: './decision-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DecisionDialogComponent {

@@ -1,0 +1,44 @@
+<section class="card">
+  <h2>{{ structure.title }}</h2>
+  <p class="hint">{{ structure.hint }}</p>
+  @if (rows().length) {
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ structure.columns.date }}</th>
+            <th>{{ structure.columns.member }}</th>
+            <th>{{ structure.columns.event }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.entry.id) {
+            <tr [class.refused]="row.refused">
+              <td>{{ row.entry.at?.toMillis() | date: 'd MMM y HH:mm' }}</td>
+              <td>{{ row.member }}</td>
+              <td>
+                {{ row.label }}
+                @if (row.device) {
+                  <span class="sub">{{ structure.device }} : {{ row.device }}</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else if (!hasMore()) {
+    <p class="hint">{{ structure.empty }}</p>
+  }
+  <div
+    class="more"
+    appInfiniteScroll
+    [appInfiniteScrollDisabled]="!hasMore() || loadingMore()"
+    [appInfiniteScrollCount]="entries().length"
+    (reached)="loadMore.emit()"
+  >
+    @if (hasMore()) {
+      <span>Chargement de la suite…</span>
+    }
+  </div>
+</section>

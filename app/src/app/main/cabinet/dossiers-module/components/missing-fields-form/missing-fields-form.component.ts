@@ -15,40 +15,8 @@ const TEXT = {
 @Component({
   selector: 'app-missing-fields-form',
   imports: [MatButtonModule, QuestionFieldComponent],
-  template: `
-    <form (submit)="$event.preventDefault(); submit()" novalidate>
-      <p class="intro">{{ text.intro }}</p>
-      @for (question of questions(); track question.canonicalPath) {
-        <app-question-field
-          [question]="question"
-          [value]="answers()[question.canonicalPath]"
-          [readonly]="busy()"
-          [showMissing]="touched()"
-          (changed)="set(question.canonicalPath, $event)"
-        />
-      }
-      <div class="actions">
-        <button mat-flat-button type="submit" [disabled]="busy()">{{ text.submit }}</button>
-      </div>
-    </form>
-  `,
-  styles: `
-    form {
-      display: grid;
-      gap: 12px;
-    }
-
-    .intro {
-      margin: 0;
-      font-size: 13px;
-      color: var(--ci-text-muted);
-    }
-
-    .actions {
-      display: flex;
-      justify-content: flex-end;
-    }
-  `,
+  templateUrl: './missing-fields-form.component.html',
+  styleUrl: './missing-fields-form.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MissingFieldsFormComponent {

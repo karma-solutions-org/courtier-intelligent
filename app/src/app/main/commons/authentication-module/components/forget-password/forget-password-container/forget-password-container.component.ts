@@ -6,15 +6,8 @@ import { ForgetPasswordPresentationComponent } from '../forget-password-presenta
 @Component({
   selector: 'app-forget-password-container',
   imports: [ForgetPasswordPresentationComponent],
-  template: `
-    <app-forget-password-presentation
-      [isPending]="authStore.isPending()"
-      [error]="authStore.error()"
-      [emailSent]="authStore.resetEmailSent()"
-      [signinUrl]="signinUrl"
-      (submitted)="authStore.sendPasswordReset($event)"
-    />
-  `,
+  templateUrl: './forget-password-container.component.html',
+  styleUrl: './forget-password-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ForgetPasswordContainerComponent implements OnInit {

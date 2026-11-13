@@ -13,75 +13,8 @@ import { SESSION_ISSUE_ACTIONS, SESSION_ISSUE_PAGE_STRUCTURE, SessionIssueKind }
 @Component({
   selector: 'app-session-issue',
   imports: [MatButtonModule, MatIconModule, RouterLink],
-  template: `
-    <div class="card" role="alert">
-      <mat-icon class="icon">{{ content().icon }}</mat-icon>
-      <h1>{{ content().title }}</h1>
-      <p>{{ content().explanation }}</p>
-      <ul>
-        @for (step of content().steps; track step) {
-          <li>{{ step }}</li>
-        }
-      </ul>
-      @if (authStore.sessionNotice(); as notice) {
-        <p class="detail">{{ notice }}</p>
-      }
-      <a mat-flat-button [routerLink]="signinUrl">{{ actions.backToSignin }}</a>
-    </div>
-  `,
-  styles: `
-    :host {
-      display: flex;
-      min-height: 100vh;
-      align-items: center;
-      justify-content: center;
-      padding: 24px 16px;
-      box-sizing: border-box;
-      background: var(--ci-bg);
-    }
-
-    .card {
-      width: 100%;
-      max-width: 460px;
-      padding: 32px;
-      box-sizing: border-box;
-      border-radius: 8px;
-      border: 1px solid var(--ci-border);
-      background: var(--ci-surface);
-      box-shadow: var(--ci-shadow-sm);
-    }
-
-    .icon {
-      width: 28px;
-      height: 28px;
-      padding: 10px;
-      box-sizing: content-box;
-      border-radius: 8px;
-      font-size: 28px;
-      color: var(--ci-danger);
-      background: var(--ci-danger-soft);
-    }
-
-    h1 {
-      margin: 16px 0 8px;
-      font-size: 22px;
-      font-weight: 600;
-    }
-
-    ul {
-      padding-left: 20px;
-      color: var(--ci-text-muted);
-    }
-
-    .detail {
-      font-size: 13px;
-      color: var(--ci-text-muted);
-    }
-
-    a {
-      margin-top: 8px;
-    }
-  `,
+  templateUrl: './session-issue.component.html',
+  styleUrl: './session-issue.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SessionIssueComponent {

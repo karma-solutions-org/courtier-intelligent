@@ -16,33 +16,8 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
 @Component({
   selector: 'app-new-assure-container',
   imports: [AssureFormComponent, AssureDocumentImportComponent],
-  template: `
-    <h1>{{ structure.createTitle }}</h1>
-    <app-assure-document-import (pieceRead)="pieces.update(list => [...list, $event])" />
-    <app-assure-form
-      [prefill]="prefill()"
-      mode="create"
-      [isPending]="store.isPending()"
-      [error]="store.error()"
-      [duplicates]="duplicates()"
-      (candidateChanged)="checkDuplicates($event)"
-      (submitted)="store.create($event)"
-      (cancelled)="back()"
-    />
-  `,
-  styles: `
-    :host {
-      display: grid;
-      gap: 20px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 22px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-    }
-  `,
+  templateUrl: './new-assure-container.component.html',
+  styleUrl: './new-assure-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NewAssureContainerComponent implements OnInit, HasUnsavedChanges {

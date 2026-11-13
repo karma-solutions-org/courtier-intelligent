@@ -6,44 +6,8 @@ import { LogoPresentationComponent } from '../../../../../core/components/logo/l
 @Component({
   selector: 'app-not-found',
   imports: [RouterLink, MatButtonModule, LogoPresentationComponent],
-  template: `
-    <main class="not-found">
-      <app-logo [size]="44" />
-      <p class="code">404</p>
-      <h1>Cette page n'existe pas</h1>
-      <p class="text">Le lien est peut-être erroné, ou la page a été déplacée.</p>
-      <a mat-flat-button routerLink="/">Retour à l'accueil</a>
-    </main>
-  `,
-  styles: `
-    .not-found {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 24px;
-      text-align: center;
-    }
-
-    .code {
-      margin: 40px 0 0;
-      font-size: 72px;
-      font-weight: 600;
-      line-height: 1;
-      color: var(--ci-navy-900);
-    }
-
-    h1 {
-      margin: 12px 0 8px;
-      font-size: 24px;
-    }
-
-    .text {
-      margin: 0 0 28px;
-      color: var(--ci-text-muted);
-    }
-  `,
+  templateUrl: './not-found.component.html',
+  styleUrl: './not-found.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NotFoundComponent {}

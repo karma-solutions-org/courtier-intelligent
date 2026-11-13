@@ -26,7 +26,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
     MatProgressSpinnerModule,
   ],
   templateUrl: './signup-presentation.component.html',
-  styleUrl: '../../auth-layout.scss',
+  styleUrls: ['../../auth-layout.scss', './signup-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SignupPresentationComponent {

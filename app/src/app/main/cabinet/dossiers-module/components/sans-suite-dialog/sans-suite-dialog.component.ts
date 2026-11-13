@@ -14,34 +14,8 @@ export interface SansSuiteDialogData {
 @Component({
   selector: 'app-sans-suite-dialog',
   imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule],
-  template: `
-    <h2 mat-dialog-title>Classer sans suite{{ data.reference ? ' · ' + data.reference : '' }}</h2>
-    <mat-dialog-content>
-      <p class="note">
-        Le dossier sera clos définitivement et ne pourra plus avancer.
-        Les tarifications encore en cours seront annulées.
-      </p>
-      <mat-form-field appearance="outline" class="field">
-        <mat-label>Motif</mat-label>
-        <textarea matInput rows="4" [formControl]="motif" [maxlength]="max"></textarea>
-        <mat-hint align="end">{{ motif.value.length }} / {{ max }}</mat-hint>
-      </mat-form-field>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button type="button" mat-dialog-close>Annuler</button>
-      <button mat-flat-button type="button" [disabled]="!valid()" (click)="submit()">Classer sans suite</button>
-    </mat-dialog-actions>
-  `,
-  styles: `
-    .note {
-      margin: 0 0 12px;
-    }
-
-    .field {
-      width: 100%;
-      min-width: min(480px, 80vw);
-    }
-  `,
+  templateUrl: './sans-suite-dialog.component.html',
+  styleUrl: './sans-suite-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SansSuiteDialogComponent {

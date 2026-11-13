@@ -1,0 +1,13 @@
+@if (store.error()) {
+  <p class="error" role="alert">{{ store.error() }}</p>
+}
+<app-dashboard-presentation
+  [loaded]="store.loaded()"
+  [isAdmin]="store.isAdmin()"
+  [counts]="store.counts()"
+  [toProcess]="toProcess()"
+  [toFollowUp]="toFollowUp()"
+  [conversionByCourtier]="conversionByCourtier()"
+  [conversionByProduct]="conversionByProduct()"
+  [dossiersUrl]="dossiersUrl"
+/>

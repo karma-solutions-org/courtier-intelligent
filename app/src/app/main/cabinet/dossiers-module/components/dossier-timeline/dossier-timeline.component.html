@@ -1,0 +1,51 @@
+<section class="card">
+  <h2>{{ structure.title }}</h2>
+  @if (items().length) {
+    <ol>
+      @for (item of items(); track item.id) {
+        <li [attr.data-kind]="item.icon">
+          <span class="icon" aria-hidden="true"
+            ><mat-icon>{{ item.icon }}</mat-icon></span
+          >
+          <div>
+            <strong>{{ item.title }}</strong>
+            @if (item.detail) {
+              <span class="detail">{{ item.detail }}</span>
+            }
+            <span class="meta">{{ item.author }} · {{ item.at | date: 'd MMM y, HH:mm' }}</span>
+          </div>
+        </li>
+      }
+    </ol>
+    <div
+      class="more"
+      appInfiniteScroll
+      [appInfiniteScrollDisabled]="!hasMore() || loadingMore()"
+      [appInfiniteScrollCount]="events().length"
+      (reached)="loadMore.emit()"
+    >
+      @if (hasMore()) {
+        <span>Chargement de la suite…</span>
+      }
+    </div>
+  } @else {
+    <div class="empty-wrap">
+      <svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true">
+        <rect
+          x="30"
+          y="14"
+          width="60"
+          height="50"
+          rx="8"
+          fill="#fff"
+          stroke="#d1d5db"
+          stroke-width="2"
+        />
+        <rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db" />
+        <rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb" />
+        <rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb" />
+      </svg>
+      <p class="empty">{{ structure.empty }}</p>
+    </div>
+  }
+</section>

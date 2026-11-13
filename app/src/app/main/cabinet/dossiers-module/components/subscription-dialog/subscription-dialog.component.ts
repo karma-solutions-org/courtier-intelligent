@@ -24,55 +24,8 @@ export interface SubscriptionDialogResult {
     MatFormFieldModule,
     MatInputModule,
   ],
-  template: `
-    <h2 mat-dialog-title>{{ text.title }}</h2>
-    <mat-dialog-content class="content">
-      <mat-form-field appearance="outline">
-        <mat-label>{{ text.contractNumber }}</mat-label>
-        <input matInput [formControl]="contractNumber" [maxlength]="max" />
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>{{ text.effectiveDate }}</mat-label>
-        <input
-          matInput
-          [matDatepicker]="effectivePicker"
-          [formControl]="effectiveDate"
-          placeholder="jj/mm/aaaa"
-        />
-        <mat-datepicker-toggle matIconSuffix [for]="effectivePicker" />
-        <mat-datepicker #effectivePicker />
-        @if (effectiveDate.value && dateProblem()) {
-          <mat-hint class="problem">{{ dateProblem() }}</mat-hint>
-        }
-      </mat-form-field>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button type="button" mat-dialog-close>{{ text.cancel }}</button>
-      <button mat-flat-button type="button" [disabled]="!valid()" (click)="submit()">
-        {{ text.confirm }}
-      </button>
-    </mat-dialog-actions>
-  `,
-  styles: `
-    .content {
-      display: grid;
-      gap: 8px;
-      min-width: min(400px, 80vw);
-    }
-
-    .content {
-      padding: 14px 16px;
-      border-radius: 8px;
-      background: var(--ci-surface);
-    }
-
-    .problem {
-      padding: 8px 12px;
-      border-radius: 8px;
-      color: var(--ci-danger);
-      background: var(--ci-danger-soft);
-    }
-  `,
+  templateUrl: './subscription-dialog.component.html',
+  styleUrl: './subscription-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SubscriptionDialogComponent {

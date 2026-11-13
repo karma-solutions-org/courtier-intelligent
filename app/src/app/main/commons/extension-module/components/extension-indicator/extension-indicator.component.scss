@@ -1,0 +1,27 @@
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ci-text-muted);
+  background: var(--mat-sys-surface-container);
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+  }
+
+  &.installed {
+    color: var(--ci-success);
+    background: var(--ci-success-soft);
+  }
+}
+
+@media (max-width: 600px) {
+  .text {
+    display: none;
+  }
+}

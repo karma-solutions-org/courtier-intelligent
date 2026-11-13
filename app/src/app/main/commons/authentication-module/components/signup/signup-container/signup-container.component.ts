@@ -6,16 +6,8 @@ import { SignupPresentationComponent } from '../signup-presentation/signup-prese
 @Component({
   selector: 'app-signup-container',
   imports: [SignupPresentationComponent],
-  template: `
-    <app-signup-presentation
-      [isPending]="authStore.isPending()"
-      [error]="authStore.error()"
-      [verificationEmailSent]="authStore.verificationEmailSent()"
-      [signinUrl]="signinUrl"
-      [withCabinet]="!joiningByInvitation()"
-      (submitted)="authStore.signUp($event)"
-    />
-  `,
+  templateUrl: './signup-container.component.html',
+  styleUrl: './signup-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SignupContainerComponent implements OnInit {

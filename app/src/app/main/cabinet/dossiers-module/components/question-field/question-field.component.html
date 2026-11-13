@@ -1,0 +1,113 @@
+<div class="field" [class.invalid]="invalid()">
+  @if (question().withKnowledge) {
+    <span class="label">{{ labelText() }}</span>
+    @if (question().mustBeKnown) {
+      <span class="hint">Exigé par les assureurs : un chiffre est nécessaire.</span>
+    } @else {
+    <mat-button-toggle-group
+      [value]="knowledgeMode()"
+      [disabled]="readonly()"
+      [attr.aria-label]="question().label"
+      hideSingleSelectionIndicator
+      (change)="setKnowledgeMode($event.value)"
+    >
+      @for (option of knowledgeOptions; track option.mode) {
+        <mat-button-toggle [value]="option.mode">{{ option.label }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+    }
+    @if (knowledgeMode() === 'known' || question().mustBeKnown) {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="known-value">
+        <mat-label>{{ question().label }}</mat-label>
+        <input
+          matInput
+          type="number"
+          step="any"
+          [value]="knownNumber() ?? ''"
+          [readonly]="readonly()"
+          (input)="setKnownNumber($any($event.target).valueAsNumber)"
+        />
+      </mat-form-field>
+    }
+  } @else {
+    @switch (question().type) {
+      @case ('boolean') {
+        <span class="label">{{ labelText() }}</span>
+        <mat-button-toggle-group
+          [value]="value()"
+          [disabled]="readonly()"
+          [attr.aria-label]="question().label"
+          hideSingleSelectionIndicator
+          (change)="changed.emit($event.value)"
+        >
+          <mat-button-toggle [value]="true">Oui</mat-button-toggle>
+          <mat-button-toggle [value]="false">Non</mat-button-toggle>
+        </mat-button-toggle-group>
+      }
+      @case ('choice') {
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>{{ labelText() }}</mat-label>
+          <mat-select
+            [value]="value() ?? null"
+            [disabled]="readonly()"
+            (selectionChange)="changed.emit($event.value)"
+          >
+            @for (choice of question().choices ?? []; track choice.value) {
+              <mat-option [value]="choice.value">{{ choice.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+      @case ('number') {
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>{{ labelText() }}</mat-label>
+          <input
+            matInput
+            type="number"
+            step="any"
+            [value]="value() ?? ''"
+            [readonly]="readonly()"
+            (input)="changed.emit(toNumber($any($event.target).valueAsNumber))"
+          />
+        </mat-form-field>
+      }
+      @case ('date') {
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>{{ labelText() }}</mat-label>
+          <input
+            matInput
+            [matDatepicker]="datePicker"
+            [value]="value() ?? null"
+            [readonly]="readonly()"
+            placeholder="jj/mm/aaaa"
+            (dateChange)="
+              changed.emit($event.value && $event.value !== 'invalid' ? $event.value : null)
+            "
+          />
+          @if (!readonly()) {
+            <mat-datepicker-toggle matIconSuffix [for]="datePicker" />
+          }
+          <mat-datepicker #datePicker />
+        </mat-form-field>
+      }
+      @default {
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>{{ labelText() }}</mat-label>
+          <input
+            matInput
+            [value]="value() ?? ''"
+            [readonly]="readonly()"
+            autocomplete="off"
+            (input)="changed.emit(toText($any($event.target).value))"
+          />
+        </mat-form-field>
+      }
+    }
+  }
+  @if (invalid()) {
+    <span class="missing" role="alert">Ce champ est obligatoire</span>
+  }
+  @if (prefilled()) {
+    <span class="prefilled">Pré-rempli d'après l'immatriculation : vérifiez et corrigez si besoin.</span>
+  }
+</div>

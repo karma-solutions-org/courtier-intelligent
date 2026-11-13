@@ -1,0 +1,115 @@
+<header class="page-head">
+  <div>
+    <p class="eyebrow">{{ structure.eyebrow }}</p>
+    <h1>
+      {{ structure.title }}
+      @if (loaded()) {
+        <span class="count">({{ total() }}{{ hasMore() ? '+' : '' }})</span>
+      }
+    </h1>
+  </div>
+  <a mat-flat-button class="ci-cta" [routerLink]="createUrl()">
+    <mat-icon>add</mat-icon>
+    {{ structure.create }}
+  </a>
+</header>
+
+<section class="card toolbar" [attr.aria-label]="structure.filters.label">
+  <label class="search">
+    <mat-icon aria-hidden="true">search</mat-icon>
+    <input
+      type="search"
+      [placeholder]="structure.searchPlaceholder"
+      [attr.aria-label]="structure.search"
+      [value]="query()"
+      (input)="queryChanged.emit($any($event.target).value)"
+    />
+  </label>
+
+  <select
+    class="select"
+    [attr.aria-label]="structure.filters.type"
+    [value]="filters().type"
+    (change)="filtersChanged.emit({ type: $any($event.target).value })"
+  >
+    <option value="all">{{ structure.filters.allTypes }}</option>
+    @for (type of types; track type.value) {
+      <option [value]="type.value">{{ type.label }}</option>
+    }
+  </select>
+
+  <select
+    class="select"
+    [attr.aria-label]="structure.filters.sort"
+    [value]="filters().sort"
+    (change)="filtersChanged.emit({ sort: $any($event.target).value })"
+  >
+    <option value="name">{{ structure.filters.sortName }}</option>
+    <option value="recent">{{ structure.filters.sortRecent }}</option>
+  </select>
+
+  @if (hasFilters()) {
+    <button type="button" class="clear" (click)="filtersCleared.emit()">
+      <mat-icon aria-hidden="true">filter_alt_off</mat-icon>{{ structure.filters.clear }}
+    </button>
+  }
+</section>
+
+<section class="card">
+  <h2 class="card-title">{{ structure.eyebrow }}</h2>
+
+  @if (!loaded()) {
+    <p class="empty">{{ structure.loading }}</p>
+  } @else if (assures().length) {
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ structure.columns.name }}</th>
+            <th>{{ structure.columns.type }}</th>
+            <th>{{ structure.columns.identifier }}</th>
+            <th>{{ structure.columns.phone }}</th>
+            <th>{{ structure.columns.city }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (assure of assures(); track assure.id) {
+            <tr [routerLink]="[detailBaseUrl(), assure.id]">
+              <td>
+                <div class="who">
+                  <span class="avatar" aria-hidden="true">
+                    <mat-icon>{{ assure.type === 'pro' ? 'apartment' : 'person' }}</mat-icon>
+                  </span>
+                  <span class="who-text">
+                    <a [routerLink]="[detailBaseUrl(), assure.id]" (click)="$event.stopPropagation()">{{
+                      nameOf(assure)
+                    }}</a>
+                    <span class="sub">{{ assure.email || '—' }}</span>
+                  </span>
+                </div>
+              </td>
+              <td class="type">{{ typeLabels[assure.type] }}</td>
+              <td class="mono">{{ assure.siret || '—' }}</td>
+              <td>{{ assure.phone || '—' }}</td>
+              <td>{{ assure.address?.city || '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <p class="empty">{{ hasFilters() ? structure.noResult : structure.empty }}</p>
+  }
+
+  <div
+    class="more"
+    appInfiniteScroll
+    [appInfiniteScrollDisabled]="!loaded() || !hasMore() || loadingMore()"
+    [appInfiniteScrollCount]="loadedCount()"
+    (reached)="loadMore.emit()"
+  >
+    @if (loaded() && hasMore()) {
+      <span>{{ structure.loadingMore }}</span>
+    }
+  </div>
+</section>

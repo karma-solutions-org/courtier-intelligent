@@ -17,85 +17,8 @@ import { TopbarComponent } from '../topbar/topbar.component';
 @Component({
   selector: 'app-shell-container',
   imports: [RouterOutlet, MatSidenavModule, SidebarComponent, TopbarComponent, LimitBannerComponent],
-  template: `
-    <div class="app-container">
-      <app-topbar
-        [moduleTitle]="moduleTitle()"
-        [displayName]="displayName()"
-        [logoUrl]="cabinetStatus.cabinet()?.logoPath ?? null"
-        [email]="authStore.user()?.email ?? null"
-        [roleLabel]="roleLabel()"
-        [showMenuButton]="isMobile()"
-        [extension]="extensionStore.ping()"
-        (menuToggled)="sidenav.toggle()"
-        (signedOut)="authStore.signOut()"
-      />
-
-      <mat-sidenav-container class="main-body">
-        <mat-sidenav
-          #sidenav
-          class="sidenav"
-          [mode]="isMobile() ? 'over' : 'side'"
-          [opened]="!isMobile()"
-        >
-          <app-sidebar
-            [sections]="sections()"
-            (navigated)="isMobile() && sidenav.close()"
-            (signedOut)="authStore.signOut()"
-          />
-        </mat-sidenav>
-
-        <mat-sidenav-content class="content-area">
-          @if (cabinetStatus.graceEndsAt(); as graceEndsAt) {
-            <app-limit-banner [graceEndsAt]="graceEndsAt" [maxUtilisateurs]="cabinetStatus.maxUtilisateurs()" [role]="authStore.role()" />
-          }
-          <main class="page">
-            <router-outlet />
-          </main>
-        </mat-sidenav-content>
-      </mat-sidenav-container>
-    </div>
-  `,
-  styles: `
-    /* Disposition BAZZ-CRM : barre du haut pleine largeur, rail sombre dessous, contenu à droite. */
-    .app-container {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    .main-body {
-      flex: 1;
-      min-height: 0;
-      background: var(--ci-bg);
-    }
-
-    .sidenav {
-      width: 16.389rem;
-      border: none;
-      border-radius: 0;
-      background: var(--ci-sidebar-bg);
-    }
-
-    .content-area {
-      display: flex;
-      flex-direction: column;
-      background: var(--ci-bg);
-    }
-
-    .page {
-      flex: 1;
-      min-width: 0;
-      padding: 2rem;
-    }
-
-    @media (max-width: 600px) {
-      .page {
-        padding: 1.25rem 1rem;
-      }
-    }
-  `,
+  templateUrl: './shell-container.component.html',
+  styleUrl: './shell-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ShellContainerComponent {

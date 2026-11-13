@@ -6,43 +6,8 @@ import { ExtensionPing } from '../../../../../core/providers/extension.provider'
 @Component({
   selector: 'app-extension-indicator',
   imports: [MatIconModule],
-  template: `
-    @if (view(); as view) {
-      <span class="indicator" [class.installed]="view.installed" role="status" [attr.title]="view.title">
-        <mat-icon>{{ view.installed ? 'check_circle' : 'extension_off' }}</mat-icon>
-        <span class="text">{{ view.text }}</span>
-      </span>
-    }
-  `,
-  styles: `
-    .indicator {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 13px;
-      color: var(--ci-text-muted);
-      background: var(--mat-sys-surface-container);
-
-      mat-icon {
-        width: 18px;
-        height: 18px;
-        font-size: 18px;
-      }
-
-      &.installed {
-        color: var(--ci-success);
-        background: var(--ci-success-soft);
-      }
-    }
-
-    @media (max-width: 600px) {
-      .text {
-        display: none;
-      }
-    }
-  `,
+  templateUrl: './extension-indicator.component.html',
+  styleUrl: './extension-indicator.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ExtensionIndicatorComponent {

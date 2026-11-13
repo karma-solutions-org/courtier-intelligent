@@ -1,0 +1,105 @@
+@if (!loaded()) {
+  <p class="muted">{{ structure.loading }}</p>
+} @else {
+  <section>
+    <h2>{{ structure.counters.title }}</h2>
+    <div class="counters">
+      @for (status of statuses; track status) {
+        <a
+          class="counter"
+          [attr.data-status]="status"
+          [routerLink]="dossiersUrl()"
+          [queryParams]="{ statut: status }"
+          [attr.aria-label]="statusLabels[status] + ' : ' + counts()[status] + ' — ' + structure.counters.hint"
+        >
+          <span class="count">{{ counts()[status] }}</span>
+          <span class="label">{{ statusLabels[status] }}</span>
+        </a>
+      }
+    </div>
+  </section>
+
+  <div class="columns">
+    <section class="card card--process">
+      <h2><mat-icon aria-hidden="true">assignment</mat-icon>{{ structure.toProcess.title }}</h2>
+      @if (toProcess().length) {
+        <ul class="rows">
+          @for (row of toProcess(); track row.dossier.id) {
+            <li>
+              <a [routerLink]="dossierLink(row.dossier)">{{ row.dossier.reference || '—' }}</a>
+              <span class="name">{{ row.assureName }} · {{ row.productName }}</span>
+              <app-status-chip [status]="row.dossier.status" />
+            </li>
+          }
+        </ul>
+      } @else {
+        <div class="empty"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="muted">{{ structure.toProcess.empty }}</p></div>
+      }
+    </section>
+
+    <section class="card card--follow">
+      <h2><mat-icon aria-hidden="true">schedule_send</mat-icon>{{ structure.followUp.title }}</h2>
+      <p class="hint">{{ structure.followUp.hint }}</p>
+      @if (toFollowUp().length) {
+        <ul class="rows">
+          @for (row of toFollowUp(); track row.dossier.id) {
+            <li>
+              <a [routerLink]="dossierLink(row.dossier)">{{ row.dossier.reference || '—' }}</a>
+              <span class="name">{{ row.assureName }} · {{ row.productName }}</span>
+              <span class="date">
+                {{ structure.followUp.sentOn }} {{ row.dossier.proposal?.sentAt?.toMillis() | date: 'd MMM y' }}
+              </span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <div class="empty"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="muted">{{ structure.followUp.empty }}</p></div>
+      }
+    </section>
+  </div>
+
+  @if (isAdmin()) {
+    <section class="card card--conversion">
+      <h2><mat-icon aria-hidden="true">insights</mat-icon>{{ structure.conversion.title }}</h2>
+      <p class="hint">{{ structure.conversion.hint }}</p>
+      <div class="columns">
+        @for (table of conversionTables(); track table.title) {
+          <div>
+            <h3>{{ table.title }}</h3>
+            @if (table.rows.length) {
+              <table>
+                <thead>
+                  <tr>
+                    <th>{{ structure.conversion.columns.name }}</th>
+                    <th class="num">{{ structure.conversion.columns.closed }}</th>
+                    <th class="num">{{ structure.conversion.columns.souscrit }}</th>
+                    <th class="num">{{ structure.conversion.columns.rate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of table.rows; track row.key) {
+                    <tr>
+                      <td>{{ row.name }}</td>
+                      <td class="num">{{ row.closed }}</td>
+                      <td class="num">{{ row.souscrit }}</td>
+                      <td class="num">
+                        <span class="rate-cell">
+                          <span class="bar" aria-hidden="true"
+                            ><span [class]="rateClass(row.rate ?? 0)" [style.width.%]="(row.rate ?? 0) * 100"></span
+                          ></span>
+                          <span class="rate">{{ row.rate | percent: '1.0-0' }}</span>
+                        </span>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <div class="empty"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="muted">{{ structure.conversion.empty }}</p></div>
+            }
+          </div>
+        }
+      </div>
+    </section>
+  }
+}

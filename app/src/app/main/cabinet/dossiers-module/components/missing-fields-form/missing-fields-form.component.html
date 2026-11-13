@@ -1,0 +1,15 @@
+<form (submit)="$event.preventDefault(); submit()" novalidate>
+  <p class="intro">{{ text.intro }}</p>
+  @for (question of questions(); track question.canonicalPath) {
+    <app-question-field
+      [question]="question"
+      [value]="answers()[question.canonicalPath]"
+      [readonly]="busy()"
+      [showMissing]="touched()"
+      (changed)="set(question.canonicalPath, $event)"
+    />
+  }
+  <div class="actions">
+    <button mat-flat-button type="submit" [disabled]="busy()">{{ text.submit }}</button>
+  </div>
+</form>

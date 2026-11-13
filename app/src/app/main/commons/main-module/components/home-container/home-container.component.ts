@@ -6,30 +6,8 @@ import { AuthStore } from '../../../authentication-module/store/auth.store';
 @Component({
   selector: 'app-home-container',
   imports: [DashboardContainerComponent],
-  template: `
-    <h1>Bonjour {{ firstName() }}</h1>
-    @if (!authStore.cabinetId()) {
-      <p class="notice">Votre compte n'est rattaché à aucun cabinet pour l'instant.</p>
-    } @else {
-      <app-dashboard-container />
-    }
-  `,
-  styles: `
-    h1 {
-      margin: 0 0 16px;
-      font-size: 22px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-    }
-
-    .notice {
-      margin: 0;
-      padding: 14px 16px;
-      border-radius: 8px;
-      color: var(--mat-sys-on-tertiary-container);
-      background: var(--mat-sys-tertiary-container);
-    }
-  `,
+  templateUrl: './home-container.component.html',
+  styleUrl: './home-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HomeContainerComponent {

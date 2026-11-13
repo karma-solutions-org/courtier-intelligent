@@ -7,19 +7,8 @@ import { CreateCabinetPresentationComponent } from '../create-cabinet-presentati
 @Component({
   selector: 'app-create-cabinet-container',
   imports: [CreateCabinetPresentationComponent],
-  template: `
-    <app-create-cabinet-presentation
-      [isPending]="authStore.isPending()"
-      [error]="authStore.error()"
-      [email]="authStore.user()?.email ?? ''"
-      [emailVerified]="emailVerified()"
-      [verificationEmailSent]="authStore.verificationEmailSent()"
-      [initialCabinetName]="initialCabinetName"
-      (submitted)="authStore.createCabinet($event)"
-      (resend)="authStore.resendEmailVerification()"
-      (signOut)="authStore.signOut()"
-    />
-  `,
+  templateUrl: './create-cabinet-container.component.html',
+  styleUrl: './create-cabinet-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CreateCabinetContainerComponent implements OnInit {

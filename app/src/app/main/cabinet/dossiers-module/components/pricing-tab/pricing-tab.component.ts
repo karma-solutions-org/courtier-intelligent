@@ -24,81 +24,8 @@ const TEXT = {
   selector: 'app-pricing-tab',
   imports: [MatIconModule, QuoteCardComponent],
   providers: [PricingStore],
-  template: `
-    @if (!store.canPrice()) {
-      <!-- Avant la validation : ce qu'il reste à faire. Après (décision, proposition, sans suite…) : simple lecture. -->
-      @if (awaitingCoverage()) {
-        <p class="banner" role="status"><mat-icon>lock</mat-icon>{{ text.needNotValidated }}</p>
-      } @else {
-        <p class="banner" role="status"><mat-icon>info</mat-icon>{{ text.closed }}</p>
-      }
-    } @else if (extensionMissing()) {
-      <p class="banner" role="status"><mat-icon>extension_off</mat-icon>{{ text.noExtension }}</p>
-    }
-    @if (store.error()) {
-      <p class="error" role="alert">{{ store.error() }}</p>
-    }
-
-    @if (!store.loaded() && !store.error()) {
-      <p class="hint" role="status">{{ text.loading }}</p>
-    } @else if (store.cards().length) {
-      <div class="cards">
-        @for (card of store.cards(); track card.insurer.id) {
-          <app-quote-card
-            [card]="card"
-            [canPrice]="store.canPrice()"
-            [busy]="store.busy().includes(card.insurer.id)"
-            [schemaQuestions]="questions()"
-            [answers]="dossierStore.answers()"
-            (launch)="launch(card)"
-            (cancel)="cancel(card)"
-            (openExtranet)="openExtranet(card)"
-            (answered)="complete(card, $event)"
-          />
-        }
-      </div>
-    } @else if (dossierStore.insurers().length) {
-      <p class="hint">{{ text.noInsurer }}</p>
-    }
-  `,
-  styles: `
-    :host {
-      display: grid;
-      gap: 16px;
-    }
-
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 16px;
-      align-items: start;
-    }
-
-    .banner,
-    .error {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 0;
-      padding: 12px 14px;
-      border-radius: 8px;
-    }
-
-    .banner {
-      color: var(--mat-sys-on-tertiary-container);
-      background: var(--mat-sys-tertiary-container);
-    }
-
-    .error {
-      color: var(--mat-sys-on-error-container);
-      background: var(--mat-sys-error-container);
-    }
-
-    .hint {
-      margin: 0;
-      color: var(--ci-text-muted);
-    }
-  `,
+  templateUrl: './pricing-tab.component.html',
+  styleUrl: './pricing-tab.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PricingTabComponent {

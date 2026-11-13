@@ -14,39 +14,8 @@ import {
 @Component({
   selector: 'app-dossiers-container',
   imports: [DossiersListComponent],
-  template: `
-    @if (store.error()) {
-      <p class="error" role="alert">{{ store.error() }}</p>
-    }
-    <app-dossiers-list
-      [rows]="rows()"
-      [total]="store.total()"
-      [filter]="store.filter()"
-      [products]="productOptions()"
-      [courtiers]="courtierOptions()"
-      [hasMore]="store.canLoadMore()"
-      [loadingMore]="store.loadingMore()"
-      [searching]="store.searching()"
-      [searchUnavailable]="store.searchUnavailable()"
-      [loadedCount]="store.dossiers().length + (store.searchResults()?.length ?? 0)"
-      [loaded]="store.loaded()"
-      [createUrl]="createUrl"
-      [baseUrl]="baseUrl"
-      (filterChanged)="store.setFilter($event)"
-      (filterReset)="store.resetFilter()"
-      (loadMore)="store.loadMore()"
-    />
-  `,
-  styles: `
-    .error {
-      margin: 0 0 16px;
-      padding: 12px 14px;
-      border-left: 3px solid var(--ci-danger);
-      border-radius: 8px;
-      color: var(--ci-danger);
-      background: var(--ci-danger-soft);
-    }
-  `,
+  templateUrl: './dossiers-container.component.html',
+  styleUrl: './dossiers-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DossiersContainerComponent {

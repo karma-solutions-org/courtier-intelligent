@@ -1,0 +1,11 @@
+<app-create-cabinet-presentation
+  [isPending]="authStore.isPending()"
+  [error]="authStore.error()"
+  [email]="authStore.user()?.email ?? ''"
+  [emailVerified]="emailVerified()"
+  [verificationEmailSent]="authStore.verificationEmailSent()"
+  [initialCabinetName]="initialCabinetName"
+  (submitted)="authStore.createCabinet($event)"
+  (resend)="authStore.resendEmailVerification()"
+  (signOut)="authStore.signOut()"
+/>

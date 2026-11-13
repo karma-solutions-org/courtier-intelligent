@@ -20,7 +20,7 @@ import { FORGET_PASSWORD_PAGE_STRUCTURE } from './forget-password-page.structure
     MatProgressSpinnerModule,
   ],
   templateUrl: './forget-password-presentation.component.html',
-  styleUrl: '../../auth-layout.scss',
+  styleUrls: ['../../auth-layout.scss', './forget-password-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ForgetPasswordPresentationComponent {

@@ -7,16 +7,8 @@ import { SigninPresentationComponent } from '../signin-presentation/signin-prese
 @Component({
   selector: 'app-signin-container',
   imports: [SigninPresentationComponent],
-  template: `
-    <app-signin-presentation
-      [isPending]="authStore.isPending()"
-      [error]="authStore.error()"
-      [notice]="authStore.sessionNotice()"
-      [forgotPasswordUrl]="forgotPasswordUrl"
-      [signupUrl]="signupUrl"
-      (submitted)="signIn($event)"
-    />
-  `,
+  templateUrl: './signin-container.component.html',
+  styleUrl: './signin-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SigninContainerComponent implements OnInit {

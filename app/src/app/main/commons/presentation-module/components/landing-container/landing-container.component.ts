@@ -6,14 +6,8 @@ import { LandingPresentationComponent } from '../landing-presentation/landing-pr
 @Component({
   selector: 'app-landing-container',
   imports: [LandingPresentationComponent],
-  template: `
-    <app-landing-presentation
-      [isAuthenticated]="authStore.isAuthenticated()"
-      [signinUrl]="signinUrl"
-      [signupUrl]="signupUrl"
-      [homeUrl]="homeUrl"
-    />
-  `,
+  templateUrl: './landing-container.component.html',
+  styleUrl: './landing-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LandingContainerComponent {

@@ -23,7 +23,7 @@ import { SIGNIN_PAGE_STRUCTURE } from './signin-page.structure';
     MatProgressSpinnerModule,
   ],
   templateUrl: './signin-presentation.component.html',
-  styleUrl: '../../auth-layout.scss',
+  styleUrls: ['../../auth-layout.scss', './signin-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SigninPresentationComponent {
