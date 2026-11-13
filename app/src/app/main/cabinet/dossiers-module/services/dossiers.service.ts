@@ -2,7 +2,14 @@ import { inject, Injectable } from '@angular/core';
 import { Assure, CanonicalPath, NeedInput, CanonicalValue, Dossier, DossierEvent, DossierStatus, Insurer, Member, Product } from '@shared';
 import { combineLatest, map, Observable, of } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
+import { DatabaseQueryBuilder, OrderByDirection } from '../../../../core/providers/database-query.builder';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
+import { AssureModel } from '../../../../core/entities/assure.model';
+import { InsurerModel } from '../../../../core/entities/insurer.model';
+import { MemberModel } from '../../../../core/entities/member.model';
+import { ProductModel } from '../../../../core/entities/product.model';
+import { DossierEventModel } from '../models/entities/dossier-event.model';
+import { DossierModel } from '../../../../core/entities/dossier.model';
 
 /** Réponse de `dossiers-sauvegarder` : statut (peut repasser en brouillon) et complétude recalculée par le serveur. */
 export interface SaveResult {
@@ -20,18 +27,16 @@ export class DossiersService {
 
   /** Tous les dossiers du cabinet, corbeille comprise, du plus récent au plus ancien (statistiques). */
   watchAllDossiers(cabinetId: string): Observable<Dossier[]> {
-    return this._database.watchCollection<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers`, {
-      orderBy: [{ field: 'createdAt', direction: 'desc' }],
-    });
+    return this._database.list(
+      DossierModel.entity(cabinetId),
+      new DatabaseQueryBuilder().orderBy('createdAt', OrderByDirection.desc).build(),
+    );
   }
 
   /** Une tranche de la liste : les `limit` dossiers les plus récents (défilement infini). */
   watchDossiersPage(cabinetId: string, limit: number): Observable<{ dossiers: Dossier[]; hasMore: boolean }> {
     return this._database
-      .watchCollection<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers`, {
-        orderBy: [{ field: 'createdAt', direction: 'desc' }],
-        limit,
-      })
+      .list(DossierModel.entity(cabinetId), new DatabaseQueryBuilder().orderBy('createdAt', OrderByDirection.desc).limit(limit).build())
       .pipe(map((dossiers) => ({ dossiers: dossiers.filter((dossier) => !dossier.deletedAt), hasMore: dossiers.length >= limit })));
   }
 
@@ -47,7 +52,7 @@ export class DossiersService {
   /** Dossiers trouvés, en direct et dans l'ordre donné (dossiers dans la corbeille ou disparus écartés). */
   watchDossiersByIds(cabinetId: string, ids: string[]): Observable<Dossier[]> {
     return this._database
-      .watchByIds<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers`, ids)
+      .listByIds(DossierModel.entity(cabinetId), ids)
       .pipe(map((dossiers) => dossiers.filter((dossier) => !dossier.deletedAt)));
   }
 
@@ -62,20 +67,17 @@ export class DossiersService {
   }
 
   watchDossier(cabinetId: string, dossierId: string): Observable<Dossier | null> {
-    return this._database.watchDocument<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}`);
+    return this._database.watchById(DossierModel.entity(cabinetId), dossierId);
   }
 
   watchAssure(cabinetId: string, assureId: string): Observable<Assure | null> {
-    return this._database.watchDocument<Assure>(`ci_cabinets/${cabinetId}/ci_assures/${assureId}`);
+    return this._database.watchById(AssureModel.entity(cabinetId), assureId);
   }
 
   /** Historique du dossier, du plus récent au plus ancien : les `limit` derniers événements (défilement infini). */
   watchEvents(cabinetId: string, dossierId: string, limit: number): Observable<{ events: DossierEvent[]; hasMore: boolean }> {
     return this._database
-      .watchCollection<DossierEvent>(`ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_events`, {
-        orderBy: [{ field: 'at', direction: 'desc' }],
-        limit,
-      })
+      .list(DossierEventModel.entity(cabinetId, dossierId), new DatabaseQueryBuilder().orderBy('at', OrderByDirection.desc).limit(limit).build())
       .pipe(map((events) => ({ events, hasMore: events.length >= limit })));
   }
 
@@ -85,8 +87,8 @@ export class DossiersService {
    */
   watchProducts(cabinetId: string): Observable<Product[]> {
     return combineLatest([
-      this._database.watchCollection<Product>('ci_products'),
-      this._database.watchCollection<Product>(`ci_cabinets/${cabinetId}/ci_products`),
+      this._database.list(ProductModel.entity),
+      this._database.list(ProductModel.cabinetEntity(cabinetId)),
     ]).pipe(map(([global, cabinet]) => [...global, ...cabinet]));
   }
 
@@ -96,13 +98,13 @@ export class DossiersService {
    */
   watchInsurers(cabinetId: string): Observable<Insurer[]> {
     return combineLatest([
-      this._database.watchCollection<Insurer>('ci_insurers'),
-      this._database.watchCollection<Insurer>(`ci_cabinets/${cabinetId}/ci_insurers`),
+      this._database.list(InsurerModel.entity),
+      this._database.list(InsurerModel.cabinetEntity(cabinetId)),
     ]).pipe(map(([global, cabinet]) => [...global, ...cabinet]));
   }
 
   watchMembers(cabinetId: string): Observable<Member[]> {
-    return this._database.watchCollection<Member>(`ci_cabinets/${cabinetId}/ci_members`);
+    return this._database.list(MemberModel.entity(cabinetId));
   }
 
   /** Crée le dossier en brouillon : la référence est attribuée par le serveur. */

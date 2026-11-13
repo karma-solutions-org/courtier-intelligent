@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import type { WhereFilterOp } from 'firebase/firestore';
 import { catchError, combineLatest, defer, map, Observable, of } from 'rxjs';
+import type { DocumentData, EntityDescriptor } from './database-entity';
 import { FIRESTORE } from './firebase';
 
 export interface QueryFilter {
@@ -15,16 +16,43 @@ export interface QueryModel {
   limit?: number;
 }
 
-/** Port base de données : les services ne connaissent que cette classe. */
+/**
+ * Port base de données : les services ne connaissent que cette classe.
+ *
+ * Les services l'appellent toujours par entité (`watchById`, `list`, `listByIds`, `updateById`) : le modèle donne le
+ * chemin et reconstruit chaque document avec son `fromMap`.
+ */
 export abstract class DatabaseProvider {
-  abstract watchDocument<T>(path: string): Observable<T | null>;
-  abstract watchCollection<T>(path: string, queryModel?: QueryModel): Observable<T[]>;
+  /** Un document de la collection de l'entité, en direct (null s'il n'existe pas). */
+  watchById<T>(entity: EntityDescriptor<T>, id: string): Observable<T | null> {
+    return this.watchDocument<DocumentData>(`${entity.path}/${id}`).pipe(map((document) => (document ? entity.fromMap(document) : null)));
+  }
+
+  /** Les documents de la collection de l'entité qui répondent à la requête, en direct. */
+  list<T>(entity: EntityDescriptor<T>, query?: QueryModel): Observable<T[]> {
+    return this.watchCollection<DocumentData>(entity.path, query).pipe(map((documents) => documents.map(entity.fromMap)));
+  }
+
   /** Documents dont l'identifiant figure dans `ids`, en direct et dans l'ordre donné (absents écartés). */
-  abstract watchByIds<T extends { id: string }>(path: string, ids: string[]): Observable<T[]>;
-  abstract add<T extends object>(path: string, data: T): Observable<string>;
-  abstract set<T extends object>(path: string, data: T, merge?: boolean): Observable<void>;
-  abstract update(path: string, data: Record<string, unknown>): Observable<void>;
-  abstract delete(path: string): Observable<void>;
+  listByIds<T>(entity: EntityDescriptor<T>, ids: string[]): Observable<T[]> {
+    return this.watchByIds<DocumentData>(entity.path, ids).pipe(map((documents) => documents.map(entity.fromMap)));
+  }
+
+  /** Met à jour des champs d'un document de la collection de l'entité (chemins pointés acceptés : `'session.lastSeen'`). */
+  updateById<T>(entity: EntityDescriptor<T>, id: string, data: Record<string, unknown>): Observable<void> {
+    return this.update(`${entity.path}/${id}`, data);
+  }
+
+  // Accès par chemin : réservé à l'implémentation. Les services passent toujours par une entité (méthodes ci-dessus),
+  // le compilateur refuse donc un chemin écrit à la main en dehors des providers.
+  protected abstract watchDocument<T>(path: string): Observable<T | null>;
+  protected abstract watchCollection<T>(path: string, queryModel?: QueryModel): Observable<T[]>;
+  /** Documents dont l'identifiant figure dans `ids`, en direct et dans l'ordre donné (absents écartés). */
+  protected abstract watchByIds<T extends { id: string }>(path: string, ids: string[]): Observable<T[]>;
+  protected abstract add<T extends object>(path: string, data: T): Observable<string>;
+  protected abstract set<T extends object>(path: string, data: T, merge?: boolean): Observable<void>;
+  protected abstract update(path: string, data: Record<string, unknown>): Observable<void>;
+  protected abstract delete(path: string): Observable<void>;
   /** Valeur à utiliser pour les champs createdAt / updatedAt. */
   abstract serverTimestamp(): unknown;
 }
@@ -86,7 +114,7 @@ export class FirestoreProvider extends DatabaseProvider {
     return replace(data) as T;
   }
 
-  watchDocument<T>(path: string): Observable<T | null> {
+  protected watchDocument<T>(path: string): Observable<T | null> {
     return this._listen<T | null>(async (next, error) => {
       const { sdk, firestore } = await this._sdk();
       return sdk.onSnapshot(
@@ -101,7 +129,7 @@ export class FirestoreProvider extends DatabaseProvider {
    * Requêtes `documentId() in` par lots de 30 (limite Firestore) au lieu d'un écouteur par document. Un lot en échec
    * (ex. droits) est ignoré pour ne pas vider tout le résultat.
    */
-  watchByIds<T extends { id: string }>(path: string, ids: string[]): Observable<T[]> {
+  protected watchByIds<T extends { id: string }>(path: string, ids: string[]): Observable<T[]> {
     const unique = [...new Set(ids)];
     if (!unique.length) return of([]);
     const chunks: string[][] = [];
@@ -123,7 +151,7 @@ export class FirestoreProvider extends DatabaseProvider {
     );
   }
 
-  watchCollection<T>(path: string, queryModel: QueryModel = {}): Observable<T[]> {
+  protected watchCollection<T>(path: string, queryModel: QueryModel = {}): Observable<T[]> {
     return this._listen<T[]>(async (next, error) => {
       const { sdk, firestore } = await this._sdk();
       const constraints = [
@@ -139,28 +167,28 @@ export class FirestoreProvider extends DatabaseProvider {
     });
   }
 
-  add<T extends object>(path: string, data: T): Observable<string> {
+  protected add<T extends object>(path: string, data: T): Observable<string> {
     return defer(async () => {
       const { sdk, firestore } = await this._sdk();
       return (await sdk.addDoc(sdk.collection(firestore, path), this._withTimestamps(data, sdk.serverTimestamp))).id;
     });
   }
 
-  set<T extends object>(path: string, data: T, merge = false): Observable<void> {
+  protected set<T extends object>(path: string, data: T, merge = false): Observable<void> {
     return defer(async () => {
       const { sdk, firestore } = await this._sdk();
       await sdk.setDoc(sdk.doc(firestore, path), this._withTimestamps(data, sdk.serverTimestamp), { merge });
     });
   }
 
-  update(path: string, data: Record<string, unknown>): Observable<void> {
+  protected update(path: string, data: Record<string, unknown>): Observable<void> {
     return defer(async () => {
       const { sdk, firestore } = await this._sdk();
       await sdk.updateDoc(sdk.doc(firestore, path), this._withTimestamps(data, sdk.serverTimestamp));
     });
   }
 
-  delete(path: string): Observable<void> {
+  protected delete(path: string): Observable<void> {
     return defer(async () => {
       const { sdk, firestore } = await this._sdk();
       await sdk.deleteDoc(sdk.doc(firestore, path));

@@ -183,11 +183,26 @@ export const DossiersStore = signalStore(
 | `provideState` / `provideEffects` dans les routes | store dans les `providers` de la route |
 | router-store + `CustomRouterSerializer` | `withComponentInputBinding()` |
 
+**Rôle de chaque couche (vérifié : aucun chemin Firestore ni appel de function hors des services) :**
+
+| Couche | Fait | Ne fait jamais |
+|---|---|---|
+| Provider (`core/providers`) | parle au SDK Firebase | connaître un chemin métier |
+| Service | chemins `ci_cabinets/{id}/…`, requêtes, appels de functions, conversion des documents | garder un état, afficher un message |
+| Store | état, orchestration (file d'écritures, temps réel, pagination), messages | construire un chemin Firestore |
+| Container / presentation | lier le store à l'écran / afficher | appeler un service |
+
+**Taille d'un store :** au-delà de ~250 lignes, découper en `signalStoreFeature` dans `store/<nom>/` (une feature par
+responsabilité, état commun dans `<nom>.state.ts`), comme `DossierStore` : `withDossierDerived`, `withDossierWrites`,
+`withDossierSync`, `withDossierEvents`, `withDossierClosing`, `withClientPieces`. Le fichier `<nom>.store.ts` ne fait
+plus que composer les features.
+
 **Conventions ajoutées (refactor des stores) :**
 - Un widget autonome a son propre store fourni par le composant (`providers: [XxxStore]`) : `TrashStore`,
   `DocumentImportStore`, `AssureDocumentImportStore`. Il peut injecter un store plus large (`DossierStore`, `AuthStore`).
-- Message ponctuel (snackbar) : le store pose `notice: { text, duration }`, le container l'affiche dans un `effect`
-  puis appelle `clearNotice()`. Le store ne connaît pas `MatSnackBar`.
+- Message ponctuel (snackbar) : `withNotice()` (`core/store-features/with-notice.ts`) ; le store pose
+  `setNotice(texte, durée)`, le container l'affiche dans un `effect` puis appelle `clearNotice()`. Le store ne connaît
+  pas `MatSnackBar`.
 - Résultat d'une boîte de dialogue : `await firstValueFrom(dialog.afterClosed())` dans une méthode `async` du container,
   jamais `.subscribe()`.
 - Lectures réactives complexes reprises telles quelles d'un composant : `withProps` (membres préfixés `_`, privés au store).
@@ -222,7 +237,28 @@ Le SDK est initialisé une seule fois dans `core/providers/firebase.ts`. `enviro
 
 Aucun `provideStore`, `provideState` ni `provideEffects`.
 
-- Un service par module (`xxx.service.ts`, `providedIn: 'root'`). Il construit ses requêtes avec un `QueryModel` (filtres, tri, limite) et ne retourne que des `Observable` typés.
+- Un service par module (`xxx.service.ts`, `providedIn: 'root'`). Il ne retourne que des `Observable` typés.
+- **Modèle entité** (même principe que `ReclamationModel` d'aibs-partenaire) : chaque collection a un modèle avec
+  `fromMap` (reconstruit le document lu) et `entity` (chemin de la collection ; une fonction des parents pour une
+  sous-collection). Entité utilisée par plusieurs modules (cabinet, membre, client, dossier, produit, assureur) :
+  `core/entities/` ; entité propre à un module (historique, documents, offres, invitations…) :
+  `<module>/models/entities/` :
+
+  ```ts
+  export const DossierModel = {
+    fromMap,
+    entity: (cabinetId: string) => databaseEntity(`ci_cabinets/${cabinetId}/ci_dossiers`, fromMap),
+  };
+  ```
+- Le service passe l'entité et une requête construite, jamais un chemin écrit à la main :
+
+  ```ts
+  this._database.list(DossierModel.entity(cabinetId),
+    new DatabaseQueryBuilder().orderBy('createdAt', OrderByDirection.desc).limit(20).build());
+  this._database.watchById(DossierModel.entity(cabinetId), dossierId);
+  ```
+  (`DatabaseProvider` : `watchById`, `list`, `listByIds`, `updateById`. Les méthodes par chemin sont `protected` : un
+  chemin écrit à la main hors des providers ne compile pas.)
 - Les chemins Firestore sont **toujours** préfixés par `cabinets/{cabinetId}/…`, sauf pour le catalogue global.
 - Les appels aux Cloud Functions passent par `BackendProvider`.
 

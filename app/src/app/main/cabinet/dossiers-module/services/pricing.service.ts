@@ -3,6 +3,8 @@ import { CanonicalData, DossierStatus, Offer, QuoteJob } from '@shared';
 import { Observable } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
+import { OfferModel } from '../models/entities/offer.model';
+import { QuoteJobModel } from '../models/entities/quote-job.model';
 
 /** Tarification d'un dossier : jobs suivis en temps réel, écritures via les functions `tarification-*`. */
 @Injectable({ providedIn: 'root' })
@@ -12,15 +14,11 @@ export class PricingService {
 
   /** Jobs du dossier, un par assureur (statut écrit par l'extension, en temps réel). */
   watchJobs(cabinetId: string, dossierId: string): Observable<QuoteJob[]> {
-    return this._database.watchCollection<QuoteJob>(
-      `ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_quoteJobs`,
-    );
+    return this._database.list(QuoteJobModel.entity(cabinetId, dossierId));
   }
 
   watchOffers(cabinetId: string, dossierId: string): Observable<Offer[]> {
-    return this._database.watchCollection<Offer>(
-      `ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_offers`,
-    );
+    return this._database.list(OfferModel.entity(cabinetId, dossierId));
   }
 
   /** Annule une tarification en cours (bloquée, ou devenue inutile) : elle pourra être relancée. */
