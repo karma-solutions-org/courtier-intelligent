@@ -11,28 +11,21 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { CanonicalPath, isAnalyzableDocumentType, OcrField, Question } from '@shared';
 import { catchError, concatMap, EMPTY, finalize, from, map, of, switchMap, take, tap } from 'rxjs';
 import { HasUnsavedChanges } from '../../../../../../core/routing/guards/unsaved-changes.guard';
 import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
-import { displayName } from '../../../../assures-module/util/assures.utils';
 import { AuthStore } from '../../../../../commons/authentication-module/store/auth.store';
 import { DocumentsService } from '../../../services/documents.service';
 import { DossierStore } from '../../../store/dossier.store';
 import { mergeOcrFields, needsConfirmation } from '../../../util/documents.utils';
 import { sectionIndexOf } from '../../../util/dossiers.utils';
-import { DocumentImportContainerComponent } from '../../document-import/document-import-container/document-import-container.component';
-import { QuestionFieldPresentationComponent } from '../../question-field/question-field-presentation/question-field-presentation.component';
-import { DossierStepperHeaderPresentationComponent } from '../../dossier-stepper-header/dossier-stepper-header-presentation/dossier-stepper-header-presentation.component';
 import { DOSSIERS_STRUCTURE } from '../../dossiers.structure';
-import {
-  AnswerChange,
-  QuestionnaireFormPresentationComponent,
-} from '../../questionnaire-form/questionnaire-form-presentation/questionnaire-form-presentation.component';
+import { DraftView } from '../../../models/dossier-draft.model';
+import { AnswerChange } from '../../questionnaire-form/questionnaire-form-presentation/questionnaire-form-presentation.component';
+import { DossierDraftPresentationComponent } from '../dossier-draft-presentation/dossier-draft-presentation.component';
 
 /**
  * « Nouveau dossier », étapes 3 et 4 : questionnaire section par section (enregistré automatiquement, reprise exacte
@@ -41,14 +34,7 @@ import {
  */
 @Component({
   selector: 'app-dossier-draft-container',
-  imports: [
-    MatButtonModule,
-    MatIconModule,
-    DocumentImportContainerComponent,
-    DossierStepperHeaderPresentationComponent,
-    QuestionnaireFormPresentationComponent,
-    QuestionFieldPresentationComponent,
-  ],
+  imports: [DossierDraftPresentationComponent],
   templateUrl: './dossier-draft-container.component.html',
   styleUrl: './dossier-draft-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -65,11 +51,8 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
   /** Dossier dont les pièces du client ont déjà été reprises pendant cette visite. */
   private _clientPiecesTakenFor: string | null = null;
   protected readonly structure = DOSSIERS_STRUCTURE.draft;
-  protected readonly nameOf = displayName;
 
-  protected readonly view = signal<'documents' | 'questionnaire' | 'summary' | 'missing'>('documents');
-  /** Position de chaque vue dans les étapes de « Nouveau dossier ». */
-  protected readonly stepOf = { documents: 3, questionnaire: 4, summary: 5, missing: 5 } as const;
+  protected readonly view = signal<DraftView>('documents');
   protected readonly showMissing = signal(false);
   protected readonly validating = signal(false);
   /** Champs manquants figés à l'ouverture : une question remplie reste affichée pendant la saisie. */
@@ -235,10 +218,6 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
       return;
     }
     this.goTo(this.sectionIndex() + 1);
-  }
-
-  protected backToQuestionnaire(): void {
-    this.view.set('questionnaire');
   }
 
   /** Depuis le récapitulatif : retourne à la section du champ manquant, en le signalant. */

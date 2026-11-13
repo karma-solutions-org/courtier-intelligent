@@ -1,18 +1,9 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatIconModule } from '@angular/material/icon';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatSelectModule } from '@angular/material/select';
 import {
   CanonicalPath,
   DOSSIER_DOCUMENT_MAX_BYTES,
   DOSSIER_DOCUMENT_MIME_TYPES,
-  DOSSIER_DOCUMENT_TYPES,
   DossierDocument,
   DossierDocumentType,
   dossierDocumentsFolder,
@@ -25,7 +16,9 @@ import { toBackendErrorMessage } from '../../../../../../core/utils/backend-erro
 import { AuthStore } from '../../../../../commons/authentication-module/store/auth.store';
 import { DocumentsService } from '../../../services/documents.service';
 import { DossierStore } from '../../../store/dossier.store';
-import { defaultOcrSelection, formatOcrValue, mergeOcrFields, needsConfirmation, selectedOcrAnswers } from '../../../util/documents.utils';
+import { PickedDocumentFile } from '../../../models/document-import.model';
+import { defaultOcrSelection, mergeOcrFields, selectedOcrAnswers } from '../../../util/documents.utils';
+import { DocumentImportPresentationComponent } from '../document-import-presentation/document-import-presentation.component';
 import { DOCUMENT_IMPORT_STRUCTURE } from '../document-import.structure';
 
 /**
@@ -36,17 +29,7 @@ import { DOCUMENT_IMPORT_STRUCTURE } from '../document-import.structure';
  */
 @Component({
   selector: 'app-document-import-container',
-  imports: [
-    DatePipe,
-    DecimalPipe,
-    FormsModule,
-    MatButtonModule,
-    MatCheckboxModule,
-    MatFormFieldModule,
-    MatIconModule,
-    MatProgressBarModule,
-    MatSelectModule,
-  ],
+  imports: [DocumentImportPresentationComponent],
   templateUrl: './document-import-container.component.html',
   styleUrl: './document-import-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,15 +43,10 @@ export class DocumentImportContainerComponent {
   private readonly _service = inject(DocumentsService);
 
   protected readonly text = DOCUMENT_IMPORT_STRUCTURE;
-  protected readonly types = DOSSIER_DOCUMENT_TYPES;
-  protected readonly acceptedTypes = DOSSIER_DOCUMENT_MIME_TYPES.join(',');
-  protected readonly format = formatOcrValue;
-  protected readonly toConfirm = needsConfirmation;
-  protected readonly canAnalyze = (document: DossierDocument) => isAnalyzableDocumentType(document.type);
 
   protected readonly type = signal<DossierDocumentType>('carte_grise');
   /** Fichiers choisis, chacun avec son type (pré-rempli avec le type du menu au moment du choix). */
-  protected readonly files = signal<PickedFile[]>([]);
+  protected readonly files = signal<PickedDocumentFile[]>([]);
   protected readonly busy = signal<'upload' | 'analyze' | null>(null);
   /** Import de plusieurs fichiers : position dans la file (affichée « 2/5 »). */
   protected readonly progress = signal<{ done: number; total: number } | null>(null);
@@ -206,12 +184,6 @@ export class DocumentImportContainerComponent {
     this.selection.update(selection => ({ ...selection, [path]: checked }));
   }
 
-  /** Valeur actuelle du dossier pour ce champ (pour comparer avant d'appliquer). */
-  protected currentValue(path: CanonicalPath): string | null {
-    const value = this.store.answers()[path];
-    return value === undefined || value === null || value === '' ? null : formatOcrValue(value);
-  }
-
   /** Seules les valeurs cochées sont écrites, par la sauvegarde habituelle du dossier (dossiers-sauvegarder). */
   protected apply(): void {
     const answers = selectedOcrAnswers(this.proposal()?.fields ?? [], this.selection());
@@ -244,10 +216,4 @@ export class DocumentImportContainerComponent {
     this.proposal.set({ documentId, fields });
     this.selection.set(defaultOcrSelection(fields));
   }
-}
-
-interface PickedFile {
-  id: number;
-  file: File;
-  type: DossierDocumentType;
 }

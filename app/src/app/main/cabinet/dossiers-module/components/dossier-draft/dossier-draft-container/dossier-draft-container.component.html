@@ -1,140 +1,29 @@
-@if (store.dossier(); as dossier) {
-  <header>
-    <h1>{{ dossier.reference }}</h1>
-    <span class="save" [class.error]="store.saveStatus() === 'error'" role="status">{{
-      saveLabel()
-    }}</span>
-  </header>
-  <app-dossier-stepper-header [current]="stepOf[view()]" />
-
-  @if (store.error()) {
-    <p class="error" role="alert">{{ store.error() }}</p>
-  }
-
-  @if (view() === 'documents') {
-    <section class="intro">
-      <h2>{{ structure.documentsTitle }}</h2>
-      <p>{{ structure.documentsHint }}</p>
-    </section>
-    <app-document-import-container class="documents" />
-    <div class="actions">
-      <span class="spacer"></span>
-      <button mat-button type="button" (click)="saveAndQuit()">
-        {{ structure.saveAndQuit }}
-      </button>
-      <button mat-flat-button type="button" (click)="view.set('questionnaire')">
-        {{ structure.toQuestionnaire }}
-      </button>
-    </div>
-  } @else if (view() === 'questionnaire') {
-    <div class="progress-row">
-      <p class="progress">
-        {{ structure.section }} {{ sectionIndex() + 1 }} {{ structure.of }}
-        {{ store.schema().length }}
-      </p>
-      <!-- Toujours visible : on peut importer un document à tout moment du questionnaire. -->
-      <button mat-stroked-button type="button" (click)="view.set('documents')">
-        <mat-icon>upload_file</mat-icon>{{ structure.importDocument }}
-      </button>
-    </div>
-    <app-questionnaire-form
-      [sections]="currentSection()"
-      [data]="store.answers()"
-      [showMissing]="showMissing()"
-      (answerChanged)="onAnswer($event)"
-    />
-    <div class="actions">
-      <button
-        mat-button
-        type="button"
-        (click)="sectionIndex() === 0 ? view.set('documents') : goTo(sectionIndex() - 1)"
-      >
-        {{ sectionIndex() === 0 ? structure.toDocuments : structure.previous }}
-      </button>
-      <span class="spacer"></span>
-      <button mat-button type="button" (click)="saveAndQuit()">
-        {{ structure.saveAndQuit }}
-      </button>
-      <button mat-flat-button type="button" (click)="next()">
-        {{ isLastSection() ? structure.toSummary : structure.next }}
-      </button>
-    </div>
-  } @else if (view() === 'missing') {
-    <section class="card">
-      <h2>{{ structure.fillMissingTitle }}</h2>
-      <p class="hint">{{ structure.fillMissingHint }}</p>
-      <div class="fields">
-        @for (question of missingQuestions(); track question.canonicalPath) {
-          <app-question-field
-            [question]="question"
-            [value]="store.answers()[question.canonicalPath]"
-            [showMissing]="true"
-            (changed)="onAnswer({ path: question.canonicalPath, value: $event })"
-          />
-        }
-      </div>
-    </section>
-    <div class="actions">
-      <button mat-button type="button" (click)="view.set('summary')">
-        {{ structure.cancel }}
-      </button>
-      <span class="spacer"></span>
-      <button mat-flat-button type="button" (click)="saveMissing()">
-        {{ structure.saveMissing }}
-      </button>
-    </div>
-  } @else {
-    <section class="card">
-      <h2>{{ structure.summaryTitle }}</h2>
-      <dl>
-        <dt>{{ structure.assure }}</dt>
-        <dd>{{ store.assure() ? nameOf(store.assure()!) : '—' }}</dd>
-        <dt>{{ structure.product }}</dt>
-        <dd>{{ store.product()?.name ?? dossier.productId }}</dd>
-      </dl>
-
-      @if (store.missing().length) {
-        <div class="missing" role="alert">
-          <h3>{{ structure.missingTitle }} ({{ store.missing().length }})</h3>
-          <p>{{ structure.missingHint }}</p>
-          <ul>
-            @for (path of store.missing(); track path) {
-              <li>
-                {{ store.labels().get(path) ?? 'Champ sans libellé' }}
-                <button mat-button type="button" (click)="fill(path)">
-                  {{ structure.goTo }}
-                </button>
-              </li>
-            }
-          </ul>
-          <button mat-flat-button type="button" class="fill-all" (click)="openMissing()">
-            {{ structure.fillMissing }}
-          </button>
-        </div>
-      } @else {
-        <p class="complete"><mat-icon>check_circle</mat-icon>{{ structure.complete }}</p>
-      }
-    </section>
-    <div class="actions">
-      <button mat-button type="button" (click)="backToQuestionnaire()">
-        {{ structure.backToQuestionnaire }}
-      </button>
-      <span class="spacer"></span>
-      <button mat-button type="button" (click)="saveAndQuit()">
-        {{ structure.saveAndQuit }}
-      </button>
-      <button
-        mat-flat-button
-        type="button"
-        [disabled]="store.missing().length > 0 || validating()"
-        (click)="validate()"
-      >
-        {{ structure.validate }}
-      </button>
-    </div>
-  }
-} @else if (store.error()) {
-  <p class="error" role="alert">{{ store.error() }}</p>
-} @else if (store.loaded()) {
-  <p>{{ structure.notFound }}</p>
-}
+<app-dossier-draft-presentation
+  [dossier]="store.dossier()"
+  [saveStatus]="store.saveStatus()"
+  [saveLabel]="saveLabel()"
+  [view]="view()"
+  [error]="store.error()"
+  [loaded]="store.loaded()"
+  [sectionIndex]="sectionIndex()"
+  [sectionCount]="store.schema().length"
+  [currentSection]="currentSection()"
+  [isLastSection]="isLastSection()"
+  [answers]="store.answers()"
+  [showMissing]="showMissing()"
+  [missingQuestions]="missingQuestions()"
+  [assure]="store.assure()"
+  [product]="store.product()"
+  [missing]="store.missing()"
+  [labels]="store.labels()"
+  [validating]="validating()"
+  (viewChanged)="view.set($event)"
+  (saveAndQuitRequested)="saveAndQuit()"
+  (answerChanged)="onAnswer($event)"
+  (sectionRequested)="goTo($event)"
+  (nextRequested)="next()"
+  (fillRequested)="fill($event)"
+  (missingRequested)="openMissing()"
+  (saveMissingRequested)="saveMissing()"
+  (validateRequested)="validate()"
+/>

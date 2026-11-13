@@ -1,130 +1,27 @@
-<section class="card">
-  <h2><mat-icon aria-hidden="true">upload_file</mat-icon>{{ text.title }}</h2>
-
-  @if (editable()) {
-    <div class="dropzone">
-    <mat-icon class="dz-icon" aria-hidden="true">cloud_upload</mat-icon>
-    <p class="hint">{{ text.importHint }}</p>
-    <div class="import">
-      <mat-form-field appearance="outline" subscriptSizing="dynamic">
-        <mat-label>{{ text.type }}</mat-label>
-        <mat-select [ngModel]="type()" (ngModelChange)="type.set($event)">
-          @for (t of types; track t) {
-            <mat-option [value]="t">{{ text.types[t] }}</mat-option>
-          }
-        </mat-select>
-      </mat-form-field>
-      <input #picker type="file" multiple hidden [accept]="acceptedTypes" (change)="pickFiles(picker.files); picker.value = ''" />
-      <button mat-stroked-button type="button" [disabled]="!!busy()" (click)="picker.click()">
-        <mat-icon>attach_file</mat-icon>{{ text.chooseFile }}
-      </button>
-      <button mat-flat-button type="button" [disabled]="!files().length || busy()" (click)="importFiles()">
-        {{ anyAnalyzable() ? text.upload : text.uploadOnly }}
-      </button>
-    </div>
-    @if (files().length) {
-      <ul class="picked">
-        @for (picked of files(); track picked.id) {
-          <li>
-            <span class="name">{{ picked.file.name }}</span>
-            <mat-form-field appearance="outline" subscriptSizing="dynamic">
-              <mat-select [ngModel]="picked.type" (ngModelChange)="setFileType(picked.id, $event)" [disabled]="!!busy()">
-                @for (t of types; track t) {
-                  <mat-option [value]="t">{{ text.types[t] }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-            <button mat-icon-button type="button" [attr.aria-label]="text.removeFile" [disabled]="!!busy()" (click)="removeFile(picked.id)">
-              <mat-icon>close</mat-icon>
-            </button>
-          </li>
-        }
-      </ul>
-    }
-    </div>
-    @if (busy()) {
-      <p class="status" role="status">
-        {{ busy() === 'analyze' ? text.analyzing : text.uploading }}
-        @if (progress(); as p) {
-          ({{ p.done + 1 }}/{{ p.total }})
-        }
-      </p>
-      <mat-progress-bar mode="indeterminate" />
-    }
-  }
-
-  @if (error()) {
-    <p class="error" role="alert">{{ error() }}</p>
-  }
-  @if (message()) {
-    <p class="success" role="status">{{ message() }}</p>
-  }
-
-  @if (proposal(); as current) {
-    <div class="proposal">
-      <h3>{{ text.proposalTitle }}</h3>
-      @if (current.fields.length) {
-        <p class="hint">{{ text.proposalHint }}</p>
-        <ul>
-          @for (field of current.fields; track field.canonicalPath) {
-            <li>
-              <mat-checkbox [checked]="!!selection()[field.canonicalPath]" (change)="toggle(field.canonicalPath, $event.checked)">
-                <strong>{{ store.labels().get(field.canonicalPath) ?? field.canonicalPath }}</strong> :
-                {{ format(field.value) }}
-              </mat-checkbox>
-              <span class="meta">
-                <span class="conf-bar" aria-hidden="true"
-                  ><span [class.low]="field.confidence < 0.8" [style.width.%]="field.confidence * 100"></span
-                ></span>
-                {{ text.confidence }} {{ field.confidence * 100 | number: '1.0-0' }} %
-                @if (toConfirm(field)) {
-                  <span class="flag">{{ text.toConfirm }}</span>
-                }
-                @if (currentValue(field.canonicalPath); as value) {
-                  · {{ text.current }} : {{ value }}
-                }
-              </span>
-            </li>
-          }
-        </ul>
-        <div class="actions">
-          <button mat-button type="button" (click)="proposal.set(null)">{{ text.cancel }}</button>
-          <button mat-flat-button type="button" [disabled]="!selectedCount() || !editable()" (click)="apply()">
-            {{ text.apply }} ({{ selectedCount() }})
-          </button>
-        </div>
-      } @else {
-        <p class="hint">{{ text.noProposal }}</p>
-        <div class="actions">
-          <button mat-button type="button" (click)="proposal.set(null)">{{ text.cancel }}</button>
-        </div>
-      }
-    </div>
-  }
-
-  @if (documents().length) {
-    <ul class="documents">
-      @for (document of documents(); track document.id) {
-        <li>
-          <mat-icon class="doc-icon">description</mat-icon>
-          <span class="name">
-            {{ text.types[document.type] ?? document.type }} · {{ document.fileName ?? '—' }}
-            <small>{{ text.statuses[document.status] ?? document.status }} · {{ document.createdAt?.toMillis() | date: 'd MMM y, HH:mm' }}</small>
-          </span>
-          @if (editable() && canAnalyze(document)) {
-            @if (document.status === 'analyzed') {
-              <button mat-button type="button" (click)="review(document)">{{ text.review }}</button>
-            } @else {
-              <button mat-button type="button" [disabled]="busy()" (click)="analyze(document.id)">{{ text.analyze }}</button>
-            }
-          }
-          <button mat-icon-button type="button" [attr.aria-label]="text.download" (click)="download(document)">
-            <mat-icon>download</mat-icon>
-          </button>
-        </li>
-      }
-    </ul>
-  } @else {
-    <p class="hint">{{ text.none }}</p>
-  }
-</section>
+<app-document-import-presentation
+  [editable]="editable()"
+  [documents]="documents()"
+  [type]="type()"
+  [files]="files()"
+  [busy]="busy()"
+  [progress]="progress()"
+  [error]="error()"
+  [message]="message()"
+  [proposal]="proposal()"
+  [selection]="selection()"
+  [selectedCount]="selectedCount()"
+  [anyAnalyzable]="anyAnalyzable()"
+  [labels]="store.labels()"
+  [answers]="store.answers()"
+  (typeChanged)="type.set($event)"
+  (filesPicked)="pickFiles($event)"
+  (fileTypeChanged)="setFileType($event.id, $event.type)"
+  (fileRemoved)="removeFile($event)"
+  (importRequested)="importFiles()"
+  (analyzeRequested)="analyze($event)"
+  (reviewRequested)="review($event)"
+  (selectionToggled)="toggle($event.path, $event.checked)"
+  (applyRequested)="apply()"
+  (proposalDismissed)="proposal.set(null)"
+  (downloadRequested)="download($event)"
+/>
