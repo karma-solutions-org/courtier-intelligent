@@ -12,9 +12,12 @@
       </thead>
       <tbody>
         @for (row of rows(); track trackBy()(row); let index = $index) {
+          @let link = linkOf(row);
           <tr
-            [class.clickable]="clickable()"
+            [class]="classOf(row)"
+            [class.clickable]="clickable() || !!link"
             [attr.tabindex]="clickable() ? 0 : null"
+            [routerLink]="link"
             (click)="onRowClick(row)"
             (keydown.enter)="onRowClick(row)"
           >

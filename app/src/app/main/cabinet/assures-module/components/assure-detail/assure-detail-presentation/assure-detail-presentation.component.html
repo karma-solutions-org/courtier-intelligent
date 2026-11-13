@@ -133,32 +133,16 @@
         <mat-tab [label]="structure.dossiersTitle + ' (' + dossiers().length + ')'">
           <div class="tab card">
             @if (dossiers().length) {
-              <table>
-                <thead>
-                  <tr>
-                    <th>{{ structure.columns.reference }}</th>
-                    <th>{{ structure.columns.product }}</th>
-                    <th>{{ structure.columns.status }}</th>
-                    <th>{{ structure.columns.createdAt }}</th>
-                    <th>{{ structure.columns.action }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (dossier of dossiers(); track dossier.id) {
-                    <tr class="row" [routerLink]="dossierLink(dossier)">
-                      <td>{{ dossier.reference || structure.draftReference }}</td>
-                      <td>{{ dossier.productId }}</td>
-                      <td><app-status-chip [status]="dossier.status" /></td>
-                      <td>{{ dossier.createdAt?.toMillis() | date: 'd MMM y' }}</td>
-                      <td class="action">
-                        <a mat-button [routerLink]="dossierLink(dossier)" (click)="$event.stopPropagation()">
-                          {{ dossier.status === 'brouillon' ? structure.resume : structure.open }}
-                        </a>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+              <app-table [columns]="dossierColumns" [rows]="dossiers()" [trackBy]="dossierId" [rowLink]="dossierLinkFn">
+                <ng-template appTableCell="reference" let-dossier>{{ dossier.reference || structure.draftReference }}</ng-template>
+                <ng-template appTableCell="status" let-dossier><app-status-chip [status]="dossier.status" /></ng-template>
+                <ng-template appTableCell="createdAt" let-dossier>{{ dossier.createdAt?.toMillis() | date: 'd MMM y' }}</ng-template>
+                <ng-template appTableCell="action" let-dossier>
+                  <a mat-button [routerLink]="dossierLink(dossier)" (click)="$event.stopPropagation()">
+                    {{ dossier.status === 'brouillon' ? structure.resume : structure.open }}
+                  </a>
+                </ng-template>
+              </app-table>
             } @else {
               <p class="empty">{{ structure.noDossiers }}</p>
             }

@@ -61,42 +61,23 @@
   @if (!loaded()) {
     <p class="empty">{{ structure.loading }}</p>
   } @else if (assures().length) {
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>{{ structure.columns.name }}</th>
-            <th>{{ structure.columns.type }}</th>
-            <th>{{ structure.columns.identifier }}</th>
-            <th>{{ structure.columns.phone }}</th>
-            <th>{{ structure.columns.city }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (assure of assures(); track assure.id) {
-            <tr [routerLink]="[detailBaseUrl(), assure.id]">
-              <td>
-                <div class="who">
-                  <span class="avatar" aria-hidden="true">
-                    <mat-icon>{{ assure.type === 'pro' ? 'apartment' : 'person' }}</mat-icon>
-                  </span>
-                  <span class="who-text">
-                    <a [routerLink]="[detailBaseUrl(), assure.id]" (click)="$event.stopPropagation()">{{
-                      nameOf(assure)
-                    }}</a>
-                    <span class="sub">{{ assure.email || '—' }}</span>
-                  </span>
-                </div>
-              </td>
-              <td class="type">{{ typeLabels[assure.type] }}</td>
-              <td class="mono">{{ assure.siret || '—' }}</td>
-              <td>{{ assure.phone || '—' }}</td>
-              <td>{{ assure.address?.city || '—' }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+    <app-table [columns]="columns" [rows]="assures()" [trackBy]="byId" [rowLink]="rowLink">
+      <ng-template appTableCell="name" let-assure>
+        <div class="who">
+          <span class="avatar" aria-hidden="true">
+            <mat-icon>{{ assure.type === 'pro' ? 'apartment' : 'person' }}</mat-icon>
+          </span>
+          <span class="who-text">
+            <a [routerLink]="[detailBaseUrl(), assure.id]" (click)="$event.stopPropagation()">{{ nameOf(assure) }}</a>
+            <span class="sub">{{ assure.email || '—' }}</span>
+          </span>
+        </div>
+      </ng-template>
+      <ng-template appTableCell="type" let-assure><span class="type">{{ typeLabel(assure) }}</span></ng-template>
+      <ng-template appTableCell="identifier" let-assure><span class="mono">{{ assure.siret || '—' }}</span></ng-template>
+      <ng-template appTableCell="phone" let-assure>{{ assure.phone || '—' }}</ng-template>
+      <ng-template appTableCell="city" let-assure>{{ assure.address?.city || '—' }}</ng-template>
+    </app-table>
   } @else {
     <p class="empty">{{ hasFilters() ? structure.noResult : structure.empty }}</p>
   }

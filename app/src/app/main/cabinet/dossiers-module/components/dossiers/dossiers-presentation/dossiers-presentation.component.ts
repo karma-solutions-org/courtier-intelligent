@@ -8,6 +8,9 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { RouterLink } from '@angular/router';
 import { Dossier, DOSSIER_STATUS_LABELS, DossierStatus } from '@shared';
+import { TableCellDirective } from '../../../../../../core/components/table/directives/table-cell.directive';
+import { TableColumn } from '../../../../../../core/components/table/models/table-column.model';
+import { TablePresentationComponent } from '../../../../../../core/components/table/table-presentation/table-presentation.component';
 import { InfiniteScrollDirective } from '../../../../../../core/directives/infinite-scroll.directive';
 import { DossierFilter, isDefaultFilter, STATUS_ORDER } from '../../../util/dossiers.utils';
 import { DOSSIERS_STRUCTURE } from '../../dossiers.structure';
@@ -30,6 +33,8 @@ export interface Option {
 @Component({
   selector: 'app-dossiers-list',
   imports: [
+    TablePresentationComponent,
+    TableCellDirective,
     DatePipe,
     RouterLink,
     MatButtonModule,
@@ -68,6 +73,15 @@ export class DossiersPresentationComponent {
   readonly loadMore = output<void>();
 
   protected readonly structure = DOSSIERS_STRUCTURE.list;
+  protected readonly columns: TableColumn[] = [
+    { key: 'reference', label: this.structure.columns.reference },
+    { key: 'assureName', label: this.structure.columns.assure },
+    { key: 'productName', label: this.structure.columns.product },
+    { key: 'status', label: this.structure.columns.status },
+    { key: 'courtierName', label: this.structure.columns.courtier },
+    { key: 'createdAt', label: this.structure.columns.createdAt },
+  ];
+  protected readonly byId = (row: DossierRow) => row.dossier.id;
   protected readonly statuses: DossierStatus[] = STATUS_ORDER;
   protected readonly statusLabels = DOSSIER_STATUS_LABELS;
 

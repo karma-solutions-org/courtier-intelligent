@@ -37,30 +37,6 @@ h1 {
   }
 }
 
-.table-scroll {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  padding: 12px 8px;
-  text-align: left;
-  border-bottom: 1px solid var(--ci-border);
-}
-
-th {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ci-text-muted);
-}
-
 .resume {
   margin-left: 10px;
   font-size: 13px;
@@ -104,33 +80,7 @@ header {
   background: var(--ci-surface-2);
 }
 
-th {
-  color: var(--ci-navy-800);
-  background: var(--ci-navy-50);
-
-  &:first-child {
-    border-radius: 10px 0 0 10px;
-  }
-
-  &:last-child {
-    border-radius: 0 10px 10px 0;
-  }
-}
-
-th,
-td {
-  border-bottom-color: var(--ci-border);
-}
-
-tbody tr {
-  transition: background 0.15s;
-
-  &:hover {
-    background: var(--ci-navy-50);
-  }
-}
-
-td a:first-child {
+.ref {
   font-weight: 600;
   color: var(--ci-navy-700);
   text-decoration: none;

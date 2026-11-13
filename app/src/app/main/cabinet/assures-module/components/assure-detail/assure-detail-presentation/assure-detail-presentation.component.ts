@@ -5,6 +5,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink } from '@angular/router';
 import { Assure, AssureDocument, Dossier } from '@shared';
+import { TableCellDirective } from '../../../../../../core/components/table/directives/table-cell.directive';
+import { TableColumn } from '../../../../../../core/components/table/models/table-column.model';
+import { TablePresentationComponent } from '../../../../../../core/components/table/table-presentation/table-presentation.component';
 import { TabQueryParamDirective } from '../../../../../../core/directives/tab-query-param.directive';
 import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { StatusChipPresentationComponent } from '../../../../dossiers-module/components/status-chip/status-chip-presentation/status-chip-presentation.component';
@@ -22,7 +25,7 @@ const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
  */
 @Component({
   selector: 'app-assure-detail-presentation',
-  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, MatTabsModule, TabQueryParamDirective, AssureFormPresentationComponent, StatusChipPresentationComponent],
+  imports: [DatePipe, RouterLink, MatButtonModule, MatIconModule, MatTabsModule, TabQueryParamDirective, AssureFormPresentationComponent, StatusChipPresentationComponent, TablePresentationComponent, TableCellDirective],
   templateUrl: './assure-detail-presentation.component.html',
   styleUrl: './assure-detail-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -58,6 +61,17 @@ export class AssureDetailPresentationComponent {
   protected readonly listUrl = CabinetRouteContainerModel.CLIENTS_ROUTE.url;
   protected readonly newDossierUrl = CabinetRouteContainerModel.DOSSIER_NEW_ROUTE.url;
   protected readonly nameOf = displayName;
+
+  protected readonly dossierColumns: TableColumn[] = [
+    { key: 'reference', label: this.structure.columns.reference },
+    { key: 'productId', label: this.structure.columns.product },
+    { key: 'status', label: this.structure.columns.status },
+    { key: 'createdAt', label: this.structure.columns.createdAt },
+    { key: 'action', label: this.structure.columns.action, align: 'end' },
+  ];
+  protected readonly dossierId = (dossier: Dossier) => dossier.id;
+  /** Une ligne ouvre le dossier (son questionnaire si c'est un brouillon). */
+  protected readonly dossierLinkFn = (dossier: Dossier) => this.dossierLink(dossier);
 
   protected readonly inProgress = computed(() => this.dossiers().filter((dossier) => !CLOSED_STATUSES.includes(dossier.status)).length);
   protected readonly won = computed(() => this.dossiers().filter((dossier) => dossier.status === 'souscrit').length);

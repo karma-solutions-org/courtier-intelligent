@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, contentChildren, input, output, TemplateRef } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { TableCellContext, TableCellDirective } from '../directives/table-cell.directive';
 import { TableColumn } from '../models/table-column.model';
 
@@ -18,7 +19,7 @@ import { TableColumn } from '../models/table-column.model';
  */
 @Component({
   selector: 'app-table',
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, RouterLink],
   templateUrl: './table-presentation.component.html',
   styleUrl: './table-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -35,6 +36,10 @@ export class TablePresentationComponent<T = unknown> {
   readonly emptyMessage = input('Aucun élément.');
   /** Lignes cliquables (curseur, focus clavier) : émettent `rowClick`. */
   readonly clickable = input(false);
+  /** Lien ouvert au clic sur une ligne (commandes de `routerLink`) ; null : ligne sans lien. */
+  readonly rowLink = input<((row: T) => readonly unknown[] | string | null) | null>(null);
+  /** Classe CSS ajoutée à une ligne (ex. ligne en erreur) ; à styler par le parent avec `:host ::ng-deep tr.<classe>`. */
+  readonly rowClass = input<((row: T) => string | null) | null>(null);
 
   readonly rowClick = output<T>();
 
@@ -50,6 +55,14 @@ export class TablePresentationComponent<T = unknown> {
   protected valueOf(row: T, key: string): unknown {
     const value = (row as Record<string, unknown> | null)?.[key];
     return value === null || value === undefined || value === '' ? '—' : value;
+  }
+
+  protected linkOf(row: T): readonly unknown[] | string | null {
+    return this.rowLink()?.(row) ?? null;
+  }
+
+  protected classOf(row: T): string | null {
+    return this.rowClass()?.(row) ?? null;
   }
 
   protected onRowClick(row: T): void {

@@ -67,37 +67,16 @@
   @if (!loaded()) {
     <p class="empty">{{ structure.loading }}</p>
   } @else if (rows().length) {
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>{{ structure.columns.reference }}</th>
-            <th>{{ structure.columns.assure }}</th>
-            <th>{{ structure.columns.product }}</th>
-            <th>{{ structure.columns.status }}</th>
-            <th>{{ structure.columns.courtier }}</th>
-            <th>{{ structure.columns.createdAt }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (row of rows(); track row.dossier.id) {
-            <tr>
-              <td>
-                <a [routerLink]="[baseUrl(), row.dossier.id]">{{ row.dossier.reference || '—' }}</a>
-                @if (row.dossier.status === 'brouillon') {
-                  <a class="resume" [routerLink]="[baseUrl(), row.dossier.id, 'brouillon']">{{ structure.resume }}</a>
-                }
-              </td>
-              <td>{{ row.assureName }}</td>
-              <td>{{ row.productName }}</td>
-              <td><app-status-chip [status]="row.dossier.status" /></td>
-              <td>{{ row.courtierName }}</td>
-              <td>{{ row.dossier.createdAt?.toMillis() | date: 'd MMM y' }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+    <app-table [columns]="columns" [rows]="rows()" [trackBy]="byId">
+      <ng-template appTableCell="reference" let-row>
+        <a class="ref" [routerLink]="[baseUrl(), row.dossier.id]">{{ row.dossier.reference || '—' }}</a>
+        @if (row.dossier.status === 'brouillon') {
+          <a class="resume" [routerLink]="[baseUrl(), row.dossier.id, 'brouillon']">{{ structure.resume }}</a>
+        }
+      </ng-template>
+      <ng-template appTableCell="status" let-row><app-status-chip [status]="row.dossier.status" /></ng-template>
+      <ng-template appTableCell="createdAt" let-row>{{ row.dossier.createdAt?.toMillis() | date: 'd MMM y' }}</ng-template>
+    </app-table>
   } @else {
     <div class="empty-wrap"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="empty">{{ hasFilter() ? structure.noResult : structure.empty }}</p></div>
   }
