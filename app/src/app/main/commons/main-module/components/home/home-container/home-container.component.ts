@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { DashboardContainerComponent } from '../../../../../cabinet/dashboard-module/components/dashboard-container/dashboard-container.component';
+import { DashboardContainerComponent } from '../../../../../cabinet/dashboard-module/components/dashboard/dashboard-container/dashboard-container.component';
 import { AuthStore } from '../../../../authentication-module/store/auth.store';
 
 /** Tableau de bord : salutation, puis les indicateurs du cabinet (Epic E15) dès qu'un cabinet est rattaché. */

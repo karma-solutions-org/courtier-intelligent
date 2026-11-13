@@ -14,15 +14,15 @@
       matInput
       type="search"
       [value]="query()"
-      (input)="setQuery($any($event.target).value)"
-      (keydown.escape)="setQuery('')"
+      (input)="queryChanged.emit($any($event.target).value)"
+      (keydown.escape)="queryChanged.emit('')"
     />
     <mat-hint>Nom du client ou référence du dossier</mat-hint>
   </mat-form-field>
 
   <mat-form-field appearance="outline" subscriptSizing="dynamic">
     <mat-label>Afficher</mat-label>
-    <mat-select [value]="kind()" (selectionChange)="setKind($event.value)">
+    <mat-select [value]="kind()" (selectionChange)="kindChanged.emit($event.value)">
       <mat-option value="all">Tout</mat-option>
       <mat-option value="assure">Clients</mat-option>
       <mat-option value="dossier">Dossiers</mat-option>
@@ -31,7 +31,7 @@
 
   <mat-form-field appearance="outline" subscriptSizing="dynamic">
     <mat-label>Supprimé</mat-label>
-    <mat-select [value]="period()" (selectionChange)="setPeriod($event.value)">
+    <mat-select [value]="period()" (selectionChange)="periodChanged.emit($event.value)">
       <mat-option [value]="0">À tout moment</mat-option>
       <mat-option [value]="1">Aujourd'hui</mat-option>
       <mat-option [value]="7">Ces 7 derniers jours</mat-option>
@@ -40,7 +40,7 @@
   </mat-form-field>
 
   @if (hasFilters()) {
-    <button mat-button type="button" class="clear" (click)="clearFilters()">
+    <button mat-button type="button" class="clear" (click)="filtersCleared.emit()">
       <mat-icon>filter_alt_off</mat-icon>Effacer les filtres
     </button>
   }
@@ -57,7 +57,7 @@
   </p>
 }
 
-@for (group of visibleGroups(); track group.title) {
+@for (group of groups(); track group.title) {
   <section class="card">
     <h2>{{ group.title }} ({{ group.rows.length }}{{ group.hasMore ? '+' : '' }})</h2>
     @if (group.rows.length) {
@@ -84,7 +84,7 @@
                   mat-button
                   type="button"
                   [attr.aria-label]="'Annuler la suppression définitive de ' + row.title"
-                  (click)="confirming.set(null)"
+                  (click)="confirmingChanged.emit(null)"
                 >
                   Annuler
                 </button>
@@ -94,7 +94,7 @@
                   type="button"
                   [disabled]="busy()"
                   [attr.aria-label]="'Confirmer la suppression définitive de ' + row.title"
-                  (click)="deleteForever(row)"
+                  (click)="deleteRequested.emit(row)"
                 >
                   Confirmer la suppression
                 </button>
@@ -106,7 +106,7 @@
                   type="button"
                   [disabled]="busy() || !!row.blocked"
                   [attr.aria-label]="'Restaurer ' + row.title"
-                  (click)="restore(row)"
+                  (click)="restoreRequested.emit(row)"
                 >
                   <mat-icon>restore_from_trash</mat-icon>Restaurer
                 </button>
@@ -117,7 +117,7 @@
                     class="danger-text"
                     [disabled]="busy()"
                     [attr.aria-label]="'Supprimer définitivement ' + row.title"
-                    (click)="confirming.set(row.id)"
+                    (click)="confirmingChanged.emit(row.id)"
                   >
                     <mat-icon>delete_forever</mat-icon>Supprimer définitivement
                   </button>
@@ -137,7 +137,7 @@
       appInfiniteScroll
       [appInfiniteScrollDisabled]="!group.hasMore || group.loadingMore"
       [appInfiniteScrollCount]="group.loadedCount"
-      (reached)="loadMore(group.kind)"
+      (reached)="loadMore.emit(group.kind)"
     >
       @if (group.hasMore) {
         <span>Chargement de la suite…</span>

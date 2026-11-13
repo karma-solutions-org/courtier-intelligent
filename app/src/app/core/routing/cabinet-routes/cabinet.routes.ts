@@ -116,7 +116,7 @@ export const CABINET_ROUTES: Routes = [
     canMatch: [roleGuard('admin')],
     title: 'Corbeille — Courtier Intelligent',
     loadComponent: () =>
-      import('../../../main/cabinet/trash-module/components/trash-container/trash-container.component').then(
+      import('../../../main/cabinet/trash-module/components/trash/trash-container/trash-container.component').then(
         (c) => c.TrashContainerComponent,
       ),
   },

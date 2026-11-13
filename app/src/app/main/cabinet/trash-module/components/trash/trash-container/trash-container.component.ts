@@ -1,35 +1,17 @@
-import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Assure, Dossier, PROTECTED_DOSSIER_STATUSES } from '@shared';
 import { catchError, combineLatest, debounceTime, distinctUntilChanged, map, Observable, of, switchMap, tap } from 'rxjs';
-import { InfiniteScrollDirective } from '../../../../../core/directives/infinite-scroll.directive';
-import { toBackendErrorMessage } from '../../../../../core/utils/backend-error.utils';
-import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
-import { displayName } from '../../../assures-module/util/assures.utils';
-import { TrashKind, TrashService } from '../../services/trash.service';
+import { toBackendErrorMessage } from '../../../../../../core/utils/backend-error.utils';
+import { AuthStore } from '../../../../../commons/authentication-module/store/auth.store';
+import { displayName } from '../../../../assures-module/util/assures.utils';
+import { TrashGroup, TrashKindFilter, TrashRow } from '../../../models/trash.model';
+import { TrashKind, TrashService } from '../../../services/trash.service';
+import { TrashPresentationComponent } from '../trash-presentation/trash-presentation.component';
 
 /** Taille d'une tranche du défilement infini. */
 const PAGE_SIZE = 20;
-
-interface TrashRow {
-  kind: TrashKind;
-  id: string;
-  title: string;
-  detail: string;
-  deletedAt: Dossier['deletedAt'];
-  /** Raison pour laquelle l'élément ne peut pas être restauré seul (son client est dans la corbeille). */
-  blocked: string | null;
-  /** Proposition envoyée à l'assuré : jamais supprimé définitivement (seule la restauration reste possible). */
-  protected: boolean;
-}
 
 /** Tranche Firestore d'un groupe (`loaded` : première réponse reçue). */
 interface TrashPage<T> {
@@ -51,7 +33,7 @@ const NOT_LOADING: Record<TrashKind, boolean> = { assure: false, dossier: false 
 /** Corbeille (admin) : clients et dossiers supprimés, à restaurer ou à supprimer définitivement. */
 @Component({
   selector: 'app-trash-container',
-  imports: [DatePipe, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule, MatProgressSpinnerModule, InfiniteScrollDirective],
+  imports: [TrashPresentationComponent],
   templateUrl: './trash-container.component.html',
   styleUrl: './trash-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -65,7 +47,7 @@ export class TrashContainerComponent {
 
   /** Filtres : texte (nom, référence, client), type d'élément, période de suppression en jours (0 = toutes). */
   protected readonly query = signal('');
-  protected readonly kind = signal<TrashKind | 'all'>('all');
+  protected readonly kind = signal<TrashKindFilter>('all');
   protected readonly period = signal(0);
   protected readonly hasFilters = computed(() => !!this.query().trim() || this.kind() !== 'all' || this.period() > 0);
 
@@ -167,13 +149,6 @@ export class TrashContainerComponent {
     { initialValue: [] as Assure[] },
   );
 
-  /** Bouton « Annuler » de la confirmation en ligne : reçoit le focus à l'ouverture (Entrée ne supprime pas par mégarde). */
-  private readonly _cancelDelete = viewChild<ElementRef<HTMLButtonElement>>('cancelDelete');
-
-  constructor() {
-    effect(() => this._cancelDelete()?.nativeElement.focus());
-  }
-
   /** Lecture Firestore en échec : bandeau d'erreur et groupe vide (au lieu d'un écran figé). */
   private _orEmpty<T>() {
     return catchError<{ items: T[]; hasMore: boolean }, Observable<{ items: T[]; hasMore: boolean }>>((error) => {
@@ -209,7 +184,7 @@ export class TrashContainerComponent {
     this._searchLimits.set(EMPTY_LIMITS);
   }
 
-  protected setKind(kind: TrashKind | 'all'): void {
+  protected setKind(kind: TrashKindFilter): void {
     this.kind.set(kind);
     this._searchLimits.set(EMPTY_LIMITS);
   }
@@ -233,7 +208,7 @@ export class TrashContainerComponent {
     this._limits.update((limits) => ({ ...limits, [kind]: limits[kind] + PAGE_SIZE }));
   }
 
-  protected readonly groups = computed(() => {
+  protected readonly groups = computed((): TrashGroup[] => {
     const search = this._search();
     const deletedAssures = search ? search.assures : this._deletedAssures().items;
     const byId = new Map([...this._dossierAssures(), ...deletedAssures].map((assure) => [assure.id, assure]));

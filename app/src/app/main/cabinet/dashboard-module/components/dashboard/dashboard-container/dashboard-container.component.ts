@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Dossier } from '@shared';
-import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
-import { displayName } from '../../../assures-module/util/assures.utils';
-import { DashboardStore } from '../../store/dashboard.store';
-import { ConversionRate } from '../../util/dashboard.utils';
+import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
+import { displayName } from '../../../../assures-module/util/assures.utils';
+import { DashboardStore } from '../../../store/dashboard.store';
+import { ConversionRate } from '../../../util/dashboard.utils';
 import {
   ConversionRow,
   DashboardDossierRow,
