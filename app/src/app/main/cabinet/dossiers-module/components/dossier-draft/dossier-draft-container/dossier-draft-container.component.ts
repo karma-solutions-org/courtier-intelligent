@@ -13,14 +13,10 @@ import {
 } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
-import { CanonicalPath, isAnalyzableDocumentType, OcrField, Question } from '@shared';
-import { catchError, concatMap, EMPTY, finalize, from, map, of, switchMap, take, tap } from 'rxjs';
+import { CanonicalPath, Question } from '@shared';
 import { HasUnsavedChanges } from '../../../../../../core/routing/guards/unsaved-changes.guard';
 import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
-import { AuthStore } from '../../../../../commons/authentication-module/store/auth.store';
-import { DocumentsService } from '../../../services/documents.service';
 import { DossierStore } from '../../../store/dossier.store';
-import { mergeOcrFields, needsConfirmation } from '../../../util/documents.utils';
 import { sectionIndexOf } from '../../../util/dossiers.utils';
 import { DOSSIERS_STRUCTURE } from '../../dossiers.structure';
 import { DraftView } from '../../../models/dossier-draft.model';
@@ -45,8 +41,6 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
 
   protected readonly store = inject(DossierStore);
   private readonly _router = inject(Router);
-  private readonly _documents = inject(DocumentsService);
-  private readonly _authStore = inject(AuthStore);
   private readonly _snackBar = inject(MatSnackBar);
   /** Dossier dont les pièces du client ont déjà été reprises pendant cette visite. */
   private _clientPiecesTakenFor: string | null = null;
@@ -122,7 +116,15 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
       const dossier = this.store.dossier();
       if (!dossier || !this.store.editable() || !this.store.product() || this._clientPiecesTakenFor === dossier.id) return;
       this._clientPiecesTakenFor = dossier.id;
-      untracked(() => this.takeClientPieces(dossier.id));
+      untracked(() => this.store.takeClientPieces(dossier.id));
+    });
+    // Messages ponctuels du store (reprise des pièces du client).
+    effect(() => {
+      const notice = this.store.notice();
+      if (notice) {
+        this._snackBar.open(notice.text, undefined, { duration: notice.duration });
+        untracked(() => this.store.clearNotice());
+      }
     });
     effect(() => {
       // Une erreur de validation rend la main au courtier.
@@ -154,52 +156,6 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
     if (this.store.saveStatus() === 'dirty') {
       this.store.saveNow({ sectionIndex: this.sectionIndex() });
     }
-  }
-
-  /**
-   * Reprend les pièces du client (une seule fois chacune, côté serveur), lit celles qui ne l'ont pas encore été, puis
-   * écrit les valeurs sûres (confiance suffisante) dans les champs encore VIDES : rien de ce que le courtier a saisi
-   * n'est écrasé. Une lecture coupée (page rechargée) reprend à l'ouverture suivante : les pièces non lues sont lues
-   * et toutes les valeurs du client sont appliquées. Rien à lire : rien n'est réappliqué (un champ vidé reste vide).
-   */
-  private takeClientPieces(dossierId: string): void {
-    const cabinetId = this._authStore.cabinetId();
-    if (!cabinetId) return;
-    const fields: OcrField[] = [];
-    this._documents
-      .takeClientPieces(dossierId)
-      .pipe(
-        switchMap(() => this._documents.watchDocuments(cabinetId, dossierId).pipe(take(1))),
-        map(documents => documents.filter(document => !!document.sourceAssureDocumentId && isAnalyzableDocumentType(document.type))),
-        switchMap(documents => {
-          const toRead = documents.filter(document => document.status === 'uploaded');
-          if (!toRead.length) return EMPTY;
-          for (const document of documents) if (document.status === 'analyzed') fields.push(...document.ocrFields);
-          this._snackBar.open(this.structure.clientPiecesReading, undefined, { duration: 4000 });
-          return from(toRead).pipe(
-            concatMap(document =>
-              this._documents.analyze(dossierId, document.id).pipe(
-                tap(({ status, ocrFields }) => {
-                  if (status === 'analyzed') fields.push(...ocrFields);
-                }),
-                catchError(() => of(null)),
-              ),
-            ),
-          );
-        }),
-        catchError(() => EMPTY),
-        finalize(() => {
-          if (this.store.selectedId() !== dossierId || !fields.length) return;
-          const answers = this.store.answers();
-          const isEmpty = (path: CanonicalPath) => answers[path] === undefined || answers[path] === null || answers[path] === '';
-          const toFill = mergeOcrFields(fields).filter(field => !needsConfirmation(field) && isEmpty(field.canonicalPath));
-          if (!toFill.length) return;
-          for (const field of toFill) this.store.edit(field.canonicalPath, field.value);
-          this.store.saveNow({ event: true, sectionIndex: this.sectionIndex() });
-          this._snackBar.open(`${toFill.length} ${this.structure.clientPiecesApplied}`, undefined, { duration: 6000 });
-        }),
-      )
-      .subscribe();
   }
 
   protected onAnswer({ path, value }: AnswerChange): void {
