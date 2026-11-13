@@ -3,13 +3,13 @@ import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { provideRouter } from '@angular/router';
 import { Assure } from '@shared';
 import { page } from 'vitest/browser';
-import { AssureFormModel } from '../../models/assure-form.model';
-import { DuplicateCandidate, DuplicateMatch } from '../../util/assures.utils';
-import { AssureFormComponent } from './assure-form.component';
+import { AssureFormModel } from '../../../models/assure-form.model';
+import { DuplicateCandidate, DuplicateMatch } from '../../../util/assures.utils';
+import { AssureFormPresentationComponent } from './assure-form-presentation.component';
 
 /** Le formulaire assuré, tel que le courtier le remplit. */
 class AssureFormTester {
-  readonly fixture = TestBed.createComponent(AssureFormComponent);
+  readonly fixture = TestBed.createComponent(AssureFormPresentationComponent);
   readonly root = page.elementLocator(this.fixture.nativeElement);
 
   readonly firstName = this.root.getByRole('textbox', { name: 'Prénom' });
@@ -49,7 +49,7 @@ const existing: Assure = {
   createdBy: 'uid',
 };
 
-describe('AssureFormComponent', () => {
+describe('AssureFormPresentationComponent', () => {
   let tester: AssureFormTester;
 
   beforeEach(() => {

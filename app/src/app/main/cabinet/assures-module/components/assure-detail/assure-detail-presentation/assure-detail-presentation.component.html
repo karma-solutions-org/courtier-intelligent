@@ -3,7 +3,7 @@
   {{ structure.back }}
 </a>
 
-@if (store.selected(); as assure) {
+@if (assure(); as assure) {
   <div class="layout">
     <aside class="card identity">
       <div class="avatar" aria-hidden="true">{{ initials(assure) }}</div>
@@ -30,7 +30,7 @@
           <mat-icon>create_new_folder</mat-icon>
           {{ structure.newDossier }}
         </a>
-        <button mat-stroked-button type="button" (click)="startEdit()" [disabled]="editing()">
+        <button mat-stroked-button type="button" (click)="editStarted.emit()" [disabled]="editing()">
           <mat-icon>edit</mat-icon>
           {{ structure.edit }}
         </button>
@@ -39,21 +39,21 @@
             <div class="confirm" role="alert">
               <p>
                 {{
-                  store.dossiers().length
-                    ? structure.deleteConfirmWithDossiers(store.dossiers().length)
+                  dossiers().length
+                    ? structure.deleteConfirmWithDossiers(dossiers().length)
                     : structure.deleteConfirm
                 }}
               </p>
               <div class="confirm-actions">
-                <button mat-button type="button" (click)="confirmingDelete.set(false)">
+                <button mat-button type="button" (click)="confirmingDeleteChanged.emit(false)">
                   {{ structure.deleteNo }}
                 </button>
                 <button
                   mat-flat-button
                   class="danger"
                   type="button"
-                  [disabled]="store.isPending()"
-                  (click)="store.remove(assure.id)"
+                  [disabled]="isPending()"
+                  (click)="deleteRequested.emit(assure.id)"
                 >
                   {{ structure.deleteYes }}
                 </button>
@@ -64,15 +64,15 @@
               mat-stroked-button
               class="danger-outline"
               type="button"
-              (click)="confirmingDelete.set(true)"
+              (click)="confirmingDeleteChanged.emit(true)"
             >
               <mat-icon>delete</mat-icon>
               {{ structure.delete }}
             </button>
           }
         }
-        @if (store.error() && !editing()) {
-          <p class="error" role="alert">{{ store.error() }}</p>
+        @if (error() && !editing()) {
+          <p class="error" role="alert">{{ error() }}</p>
         }
       </div>
     </aside>
@@ -84,7 +84,7 @@
             <div class="card stats">
               <div class="stat">
                 <span class="label">{{ structure.stats.total }}</span>
-                <span class="value">{{ store.dossiers().length }}</span>
+                <span class="value">{{ dossiers().length }}</span>
               </div>
               <div class="stat">
                 <span class="label">{{ structure.stats.inProgress }}</span>
@@ -106,12 +106,12 @@
                 <app-assure-form
                   mode="edit"
                   [assure]="assure"
-                  [isPending]="store.isPending()"
-                  [error]="store.error()"
+                  [isPending]="isPending()"
+                  [error]="error()"
                   [duplicates]="duplicates()"
-                  (candidateChanged)="checkDuplicates($event)"
-                  (submitted)="store.update({ id: assure.id, form: $event })"
-                  (cancelled)="editing.set(false)"
+                  (candidateChanged)="candidateChanged.emit($event)"
+                  (submitted)="updateRequested.emit({ id: assure.id, form: $event })"
+                  (cancelled)="editCancelled.emit()"
                 />
               </div>
             } @else {
@@ -130,9 +130,9 @@
           </div>
         </mat-tab>
 
-        <mat-tab [label]="structure.dossiersTitle + ' (' + store.dossiers().length + ')'">
+        <mat-tab [label]="structure.dossiersTitle + ' (' + dossiers().length + ')'">
           <div class="tab card">
-            @if (store.dossiers().length) {
+            @if (dossiers().length) {
               <table>
                 <thead>
                   <tr>
@@ -144,7 +144,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (dossier of store.dossiers(); track dossier.id) {
+                  @for (dossier of dossiers(); track dossier.id) {
                     <tr class="row" [routerLink]="dossierLink(dossier)">
                       <td>{{ dossier.reference || structure.draftReference }}</td>
                       <td>{{ dossier.productId }}</td>
@@ -174,7 +174,7 @@
                     <mat-icon aria-hidden="true">description</mat-icon>
                     <span class="piece-name">{{ pieceText.types[document.type] }} · {{ document.fileName }}</span>
                     <span class="piece-date">{{ document.createdAt?.toMillis() | date: 'd MMM y' }}</span>
-                    <button mat-button type="button" (click)="openDocument(document)">{{ pieceText.open }}</button>
+                    <button mat-button type="button" (click)="documentOpened.emit(document)">{{ pieceText.open }}</button>
                   </li>
                 }
               </ul>
@@ -186,6 +186,6 @@
       </mat-tab-group>
     </section>
   </div>
-} @else if (store.loaded()) {
+} @else if (loaded()) {
   <p class="empty">{{ structure.notFound }}</p>
 }

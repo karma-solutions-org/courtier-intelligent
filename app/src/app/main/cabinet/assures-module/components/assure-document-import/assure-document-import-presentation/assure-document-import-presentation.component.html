@@ -8,11 +8,11 @@
   </div>
 
   <div class="row">
-    <input #picker type="file" multiple hidden accept="application/pdf,image/jpeg,image/png" (change)="pick(picker.files); picker.value = ''" />
+    <input #picker type="file" multiple hidden accept="application/pdf,image/jpeg,image/png" (change)="filesPicked.emit(picker.files); picker.value = ''" />
     <button mat-stroked-button type="button" [disabled]="busy()" (click)="picker.click()">
       <mat-icon>attach_file</mat-icon>{{ text.choose }}
     </button>
-    <button mat-flat-button type="button" [disabled]="busy() || !canImport()" (click)="read()">
+    <button mat-flat-button type="button" [disabled]="busy() || !canImport()" (click)="importRequested.emit()">
       <mat-icon>upload_file</mat-icon>{{ text.import }}
     </button>
   </div>
@@ -28,13 +28,13 @@
             <span class="hint error">{{ text.uploadFailed }}</span>
           }
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
-            <mat-select [ngModel]="picked.type" (ngModelChange)="setType(picked.id, $event)" [disabled]="busy() || picked.status !== 'ready'" [attr.aria-label]="text.type">
+            <mat-select [ngModel]="picked.type" (ngModelChange)="typeChanged.emit({ id: picked.id, type: $event })" [disabled]="busy() || picked.status !== 'ready'" [attr.aria-label]="text.type">
               @for (t of types; track t) {
                 <mat-option [value]="t">{{ text.types[t] }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
-          <button mat-icon-button type="button" [attr.aria-label]="text.removeFile" [disabled]="busy()" (click)="remove(picked.id)">
+          <button mat-icon-button type="button" [attr.aria-label]="text.removeFile" [disabled]="busy()" (click)="removed.emit(picked.id)">
             <mat-icon>close</mat-icon>
           </button>
         </li>

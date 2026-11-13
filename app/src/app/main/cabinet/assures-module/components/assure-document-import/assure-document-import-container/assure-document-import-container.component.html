@@ -1,0 +1,12 @@
+<app-assure-document-import-presentation
+  [files]="files()"
+  [busy]="busy()"
+  [canImport]="canImport()"
+  [done]="done()"
+  [notice]="notice()"
+  [error]="error()"
+  (filesPicked)="pick($event)"
+  (typeChanged)="setType($event.id, $event.type)"
+  (removed)="remove($event)"
+  (importRequested)="read()"
+/>

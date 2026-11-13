@@ -3,10 +3,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { Assure } from '@shared';
-import { InfiniteScrollDirective } from '../../../../../core/directives/infinite-scroll.directive';
-import { AssureFilters, DEFAULT_ASSURE_FILTERS } from '../../store/assures.store';
-import { displayName } from '../../util/assures.utils';
-import { ASSURES_STRUCTURE } from '../assures.structure';
+import { InfiniteScrollDirective } from '../../../../../../core/directives/infinite-scroll.directive';
+import { AssureFilters, DEFAULT_ASSURE_FILTERS } from '../../../store/assures.store';
+import { displayName } from '../../../util/assures.utils';
+import { ASSURES_STRUCTURE } from '../../assures.structure';
 
 /**
  * Liste des assurés (présentation CompliScan) : en-tête « Portefeuille », barre de filtres compacte,
@@ -15,11 +15,11 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
 @Component({
   selector: 'app-assures-list',
   imports: [RouterLink, MatButtonModule, MatIconModule, InfiniteScrollDirective],
-  templateUrl: './assures-list.component.html',
-  styleUrl: './assures-list.component.scss',
+  templateUrl: './assures-presentation.component.html',
+  styleUrl: './assures-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AssuresListComponent {
+export class AssuresPresentationComponent {
   /** Assurés chargés, filtrés. */
   readonly assures = input<Assure[]>([]);
   readonly total = input(0);

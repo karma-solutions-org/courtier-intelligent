@@ -1,27 +1,28 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, OnInit, signal, untracked, viewChild } from '@angular/core';
-import { HasUnsavedChanges } from '../../../../../core/routing/guards/unsaved-changes.guard';
+import { HasUnsavedChanges } from '../../../../../../core/routing/guards/unsaved-changes.guard';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
-import { CabinetRouteContainerModel } from '../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
-import { AssureFormModel } from '../../models/assure-form.model';
-import { AssuresService } from '../../services/assures.service';
-import { AssuresStore } from '../../store/assures.store';
-import { AssureDocumentImportComponent, ReadPiece } from '../assure-document-import/assure-document-import.component';
-import { DuplicateCandidate } from '../../util/assures.utils';
-import { AssureFormComponent } from '../assure-form/assure-form.component';
-import { ASSURES_STRUCTURE } from '../assures.structure';
+import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
+import { AssureFormModel } from '../../../models/assure-form.model';
+import { AssuresService } from '../../../services/assures.service';
+import { AssuresStore } from '../../../store/assures.store';
+import { ReadPiece } from '../../../models/assure-document-import.model';
+import { AssureDocumentImportContainerComponent } from '../../assure-document-import/assure-document-import-container/assure-document-import-container.component';
+import { DuplicateCandidate } from '../../../util/assures.utils';
+import { AssureFormPresentationComponent } from '../../assure-form/assure-form-presentation/assure-form-presentation.component';
+import { ASSURES_STRUCTURE } from '../../assures.structure';
 
 /** Création d'un assuré : à la réussite, ouvre sa fiche. */
 @Component({
   selector: 'app-new-assure-container',
-  imports: [AssureFormComponent, AssureDocumentImportComponent],
+  imports: [AssureFormPresentationComponent, AssureDocumentImportContainerComponent],
   templateUrl: './new-assure-container.component.html',
   styleUrl: './new-assure-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NewAssureContainerComponent implements OnInit, HasUnsavedChanges {
-  private readonly _form = viewChild(AssureFormComponent);
+  private readonly _form = viewChild(AssureFormPresentationComponent);
 
   /** Garde de sortie : formulaire commencé mais pas enregistré. */
   hasUnsavedChanges(): boolean {

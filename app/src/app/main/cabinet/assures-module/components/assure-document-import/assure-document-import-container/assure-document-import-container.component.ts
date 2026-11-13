@@ -1,14 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, output, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatIconModule } from '@angular/material/icon';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatSelectModule } from '@angular/material/select';
 import {
   ASSURE_DOCUMENT_MAX_BYTES,
   ASSURE_DOCUMENT_MIME_TYPES,
-  ASSURE_DOCUMENT_TYPES,
   assureImportsFolder,
   AssureDocumentType,
   AssureOcrValues,
@@ -16,27 +9,12 @@ import {
   safeDocumentFileName,
 } from '@shared';
 import { catchError, concatMap, finalize, from, map, mergeMap, Observable, of, switchMap } from 'rxjs';
-import { toBackendErrorMessage } from '../../../../../core/utils/backend-error.utils';
-import { AuthStore } from '../../../../commons/authentication-module/store/auth.store';
-import { AssuresService } from '../../services/assures.service';
-import { ASSURES_STRUCTURE } from '../assures.structure';
-
-/** Pièce envoyée (et lue si c'est une CIN ou un Kbis), à ranger avec le client à sa création. */
-export interface ReadPiece {
-  type: AssureDocumentType;
-  storagePath: string;
-  fileName: string;
-  values: AssureOcrValues;
-}
-
-interface PickedFile {
-  id: number;
-  file: File;
-  type: AssureDocumentType;
-  /** Envoyé dès le choix, pour que l'IA reconnaisse son type. */
-  storagePath: string;
-  status: 'recognizing' | 'ready' | 'failed';
-}
+import { toBackendErrorMessage } from '../../../../../../core/utils/backend-error.utils';
+import { AuthStore } from '../../../../../commons/authentication-module/store/auth.store';
+import { PickedFile, ReadPiece } from '../../../models/assure-document-import.model';
+import { AssuresService } from '../../../services/assures.service';
+import { AssureDocumentImportPresentationComponent } from '../assure-document-import-presentation/assure-document-import-presentation.component';
+import { ASSURES_STRUCTURE } from '../../assures.structure';
 
 /**
  * « Pré-remplir depuis une pièce » : le courtier choisit ses fichiers ; l'IA reconnaît le type de chacun (modifiable). La CIN (ou le Kbis) est lue
@@ -44,20 +22,19 @@ interface PickedFile {
  * le client et reprises dans ses dossiers.
  */
 @Component({
-  selector: 'app-assure-document-import',
-  imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatProgressBarModule, MatSelectModule],
-  templateUrl: './assure-document-import.component.html',
-  styleUrl: './assure-document-import.component.scss',
+  selector: 'app-assure-document-import-container',
+  imports: [AssureDocumentImportPresentationComponent],
+  templateUrl: './assure-document-import-container.component.html',
+  styleUrl: './assure-document-import-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AssureDocumentImportComponent {
+export class AssureDocumentImportContainerComponent {
   /** Pièce envoyée : le conteneur remplit le formulaire (CIN, Kbis) et la range avec le client à sa création. */
   readonly pieceRead = output<ReadPiece>();
 
   private readonly _service = inject(AssuresService);
   private readonly _auth = inject(AuthStore);
   protected readonly text = ASSURES_STRUCTURE.piece;
-  protected readonly types = ASSURE_DOCUMENT_TYPES;
 
   protected readonly files = signal<PickedFile[]>([]);
   protected readonly busy = signal(false);

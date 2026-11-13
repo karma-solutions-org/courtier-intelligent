@@ -77,7 +77,7 @@ export const CABINET_ROUTES: Routes = [
         pathMatch: 'full',
         title: 'Clients — Courtier Intelligent',
         loadComponent: () =>
-          import('../../../main/cabinet/assures-module/components/assures-container/assures-container.component').then(
+          import('../../../main/cabinet/assures-module/components/assures/assures-container/assures-container.component').then(
             (c) => c.AssuresContainerComponent,
           ),
       },
@@ -86,7 +86,7 @@ export const CABINET_ROUTES: Routes = [
         title: 'Nouveau client — Courtier Intelligent',
         canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
-          import('../../../main/cabinet/assures-module/components/new-assure-container/new-assure-container.component').then(
+          import('../../../main/cabinet/assures-module/components/new-assure/new-assure-container/new-assure-container.component').then(
             (c) => c.NewAssureContainerComponent,
           ),
       },
@@ -95,7 +95,7 @@ export const CABINET_ROUTES: Routes = [
         title: 'Espace client — Courtier Intelligent',
         canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
-          import('../../../main/cabinet/assures-module/components/assure-detail-container/assure-detail-container.component').then(
+          import('../../../main/cabinet/assures-module/components/assure-detail/assure-detail-container/assure-detail-container.component').then(
             (c) => c.AssureDetailContainerComponent,
           ),
       },

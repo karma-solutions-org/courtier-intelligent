@@ -1,5 +1,5 @@
 <h1>{{ structure.createTitle }}</h1>
-<app-assure-document-import (pieceRead)="pieces.update(list => [...list, $event])" />
+<app-assure-document-import-container (pieceRead)="pieces.update(list => [...list, $event])" />
 <app-assure-form
   [prefill]="prefill()"
   mode="create"

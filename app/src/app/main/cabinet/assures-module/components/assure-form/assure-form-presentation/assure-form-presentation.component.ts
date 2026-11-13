@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { RouterLink } from '@angular/router';
 import { Assure, ASSURE_MAX_LENGTHS } from '@shared';
-import { AssureFormModel } from '../../models/assure-form.model';
+import { AssureFormModel } from '../../../models/assure-form.model';
 import {
   birthDateValidator,
   displayName,
@@ -19,8 +19,8 @@ import {
   phoneValidator,
   POSTAL_CODE_PATTERN,
   siretValidator,
-} from '../../util/assures.utils';
-import { ASSURES_STRUCTURE } from '../assures.structure';
+} from '../../../util/assures.utils';
+import { ASSURES_STRUCTURE } from '../../assures.structure';
 
 /** Formulaire de création / modification d'un assuré, avec validation des formats et alerte de doublon. */
 @Component({
@@ -35,11 +35,11 @@ import { ASSURES_STRUCTURE } from '../assures.structure';
     MatInputModule,
     MatSelectModule,
   ],
-  templateUrl: './assure-form.component.html',
-  styleUrl: './assure-form.component.scss',
+  templateUrl: './assure-form-presentation.component.html',
+  styleUrl: './assure-form-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AssureFormComponent {
+export class AssureFormPresentationComponent {
   /** Assuré à modifier (null : création). */
   readonly assure = input<Assure | null>(null);
   readonly mode = input<'create' | 'edit'>('create');
