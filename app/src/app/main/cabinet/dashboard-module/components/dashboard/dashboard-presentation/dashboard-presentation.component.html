@@ -24,7 +24,7 @@
       <h2><mat-icon aria-hidden="true">assignment</mat-icon>{{ structure.toProcess.title }}</h2>
       @if (toProcess().length) {
         <ul class="rows">
-          @for (row of toProcess(); track row.dossier.id) {
+          @for (row of toProcessPreview(); track row.dossier.id) {
             <li>
               <a [routerLink]="dossierLink(row.dossier)">{{ row.dossier.reference || '—' }}</a>
               <span class="name">{{ row.assureName }} · {{ row.productName }}</span>
@@ -32,6 +32,9 @@
             </li>
           }
         </ul>
+        <a class="see-all" [routerLink]="toProcessUrl()">
+          {{ structure.toProcess.seeAll }} ({{ toProcess().length }})<mat-icon aria-hidden="true">arrow_forward</mat-icon>
+        </a>
       } @else {
         <div class="empty"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="muted">{{ structure.toProcess.empty }}</p></div>
       }

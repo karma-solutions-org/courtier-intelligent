@@ -22,6 +22,7 @@ export const NAVIGATION: NavSection[] = [
     items: [
       { label: 'Tableau de bord', icon: 'space_dashboard', url: CabinetRouteContainerModel.DASHBOARD_ROUTE.url, roles: ALL },
       { label: 'Clients', icon: 'group', url: CabinetRouteContainerModel.CLIENTS_ROUTE.url, roles: ALL },
+      { label: 'Mes dossiers à traiter', icon: 'assignment', url: CabinetRouteContainerModel.DOSSIERS_TO_PROCESS_ROUTE.url, roles: ALL },
     ],
   },
   {

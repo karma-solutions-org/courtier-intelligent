@@ -1,0 +1,34 @@
+<header class="page-head">
+  <p class="eyebrow">{{ structure.eyebrow }}</p>
+  <h1>
+    {{ structure.title }}
+    @if (loaded()) {
+      <span class="count">({{ rows().length }})</span>
+    }
+  </h1>
+  <p class="hint">{{ structure.hint }}</p>
+</header>
+
+@if (error()) {
+  <p class="error" role="alert">{{ error() }}</p>
+}
+
+<app-card [padded]="false">
+  <app-table
+    [columns]="columns"
+    [rows]="rows()"
+    [trackBy]="byId"
+    [rowLink]="rowLink"
+    [loading]="!loaded()"
+    [loadingMessage]="structure.loading"
+    [emptyMessage]="emptyText"
+  >
+    <ng-template appTableCell="reference" let-row>
+      <span class="ref">{{ row.dossier.reference || '—' }}</span>
+    </ng-template>
+    <ng-template appTableCell="status" let-row><app-status-chip [status]="row.dossier.status" /></ng-template>
+    <ng-template appTableCell="updatedAt" let-row>
+      {{ (row.dossier.updatedAt ?? row.dossier.createdAt)?.toMillis() | date: 'd MMM y' }}
+    </ng-template>
+  </app-table>
+</app-card>

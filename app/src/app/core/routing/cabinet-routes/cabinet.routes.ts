@@ -42,6 +42,15 @@ export const CABINET_ROUTES: Routes = [
           ),
       },
       {
+        // « Mes dossiers à traiter » en pleine page (la carte du tableau de bord n'en montre que les premiers).
+        path: CabinetRouteContainerModel.DOSSIERS_TO_PROCESS_ROUTE.path,
+        title: 'Mes dossiers à traiter — Courtier Intelligent',
+        loadComponent: () =>
+          import('../../../main/cabinet/dashboard-module/components/dossiers-to-process/dossiers-to-process-container/dossiers-to-process-container.component').then(
+            (c) => c.DossiersToProcessContainerComponent,
+          ),
+      },
+      {
         // Étapes 3 et 4 de « Nouveau dossier » : questionnaire et récapitulatif (reprise d'un brouillon).
         path: ':id/brouillon',
         title: 'Brouillon — Courtier Intelligent',
