@@ -1,28 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CanonicalData, questionsOf } from '@shared';
 import { openConfirmDialog } from '../../../../../../core/components/confirm-dialog/util/confirm-dialog.util';
 import { ExtensionStore } from '../../../../../commons/extension-module/store/extension.store';
 import { DossierStore } from '../../../store/dossier.store';
 import { PricingCard, PricingStore } from '../../../store/pricing.store';
-import { QuoteCardPresentationComponent } from '../../quote-card/quote-card-presentation/quote-card-presentation.component';
-
-const TEXT = {
-  needNotValidated: 'Validez la couverture souhaitée (étape Couverture) pour lancer les tarifications.',
-  closed: 'La tarification est terminée pour ce dossier : les offres reçues restent consultables.',
-  noExtension:
-    'Extension Chrome non détectée : installez-la et connectez-vous pour remplir les extranets automatiquement.',
-  loading: 'Chargement des tarifications…',
-  noInsurer:
-    'Aucun assureur ne tarifie ce produit pour votre cabinet. Un administrateur peut en activer dans Paramètres.',
-} as const;
+import { PricingTabPresentationComponent } from '../pricing-tab-presentation/pricing-tab-presentation.component';
 
 /** Onglet Tarification : une carte par assureur, avec le statut de son job en temps réel. */
 @Component({
-  selector: 'app-pricing-tab',
-  imports: [MatIconModule, QuoteCardPresentationComponent],
+  selector: 'app-pricing-tab-container',
+  imports: [PricingTabPresentationComponent],
   providers: [PricingStore],
   templateUrl: './pricing-tab-container.component.html',
   styleUrl: './pricing-tab-container.component.scss',
@@ -48,7 +37,6 @@ export class PricingTabContainerComponent {
     });
   }
 
-  protected readonly text = TEXT;
   protected readonly questions = computed(() => questionsOf(this.dossierStore.schema()));
   /** La couverture n'est pas encore validée : la tarification attend. */
   protected readonly awaitingCoverage = computed(() =>

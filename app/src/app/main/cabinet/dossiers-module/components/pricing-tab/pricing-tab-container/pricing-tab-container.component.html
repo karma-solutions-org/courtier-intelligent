@@ -1,35 +1,16 @@
-@if (!store.canPrice()) {
-  <!-- Avant la validation : ce qu'il reste à faire. Après (décision, proposition, sans suite…) : simple lecture. -->
-  @if (awaitingCoverage()) {
-    <p class="banner" role="status"><mat-icon>lock</mat-icon>{{ text.needNotValidated }}</p>
-  } @else {
-    <p class="banner" role="status"><mat-icon>info</mat-icon>{{ text.closed }}</p>
-  }
-} @else if (extensionMissing()) {
-  <p class="banner" role="status"><mat-icon>extension_off</mat-icon>{{ text.noExtension }}</p>
-}
-@if (store.error()) {
-  <p class="error" role="alert">{{ store.error() }}</p>
-}
-
-@if (!store.loaded() && !store.error()) {
-  <p class="hint" role="status">{{ text.loading }}</p>
-} @else if (store.cards().length) {
-  <div class="cards">
-    @for (card of store.cards(); track card.insurer.id) {
-      <app-quote-card
-        [card]="card"
-        [canPrice]="store.canPrice()"
-        [busy]="store.busy().includes(card.insurer.id)"
-        [schemaQuestions]="questions()"
-        [answers]="dossierStore.answers()"
-        (launch)="launch(card)"
-        (cancel)="cancel(card)"
-        (openExtranet)="openExtranet(card)"
-        (answered)="complete(card, $event)"
-      />
-    }
-  </div>
-} @else if (dossierStore.insurers().length) {
-  <p class="hint">{{ text.noInsurer }}</p>
-}
+<app-pricing-tab-presentation
+  [canPrice]="store.canPrice()"
+  [awaitingCoverage]="awaitingCoverage()"
+  [extensionMissing]="extensionMissing()"
+  [error]="store.error()"
+  [loaded]="store.loaded()"
+  [cards]="store.cards()"
+  [busyIds]="store.busy()"
+  [questions]="questions()"
+  [answers]="dossierStore.answers()"
+  [hasInsurers]="dossierStore.insurers().length > 0"
+  (launch)="launch($event)"
+  (cancel)="cancel($event)"
+  (openExtranet)="openExtranet($event)"
+  (answered)="complete($event.card, $event.answers)"
+/>

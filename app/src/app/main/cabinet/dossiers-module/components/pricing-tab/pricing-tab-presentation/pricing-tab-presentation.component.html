@@ -1,0 +1,35 @@
+@if (!canPrice()) {
+  <!-- Avant la validation : ce qu'il reste à faire. Après (décision, proposition, sans suite…) : simple lecture. -->
+  @if (awaitingCoverage()) {
+    <p class="banner" role="status"><mat-icon>lock</mat-icon>{{ text.needNotValidated }}</p>
+  } @else {
+    <p class="banner" role="status"><mat-icon>info</mat-icon>{{ text.closed }}</p>
+  }
+} @else if (extensionMissing()) {
+  <p class="banner" role="status"><mat-icon>extension_off</mat-icon>{{ text.noExtension }}</p>
+}
+@if (error()) {
+  <p class="error" role="alert">{{ error() }}</p>
+}
+
+@if (!loaded() && !error()) {
+  <p class="hint" role="status">{{ text.loading }}</p>
+} @else if (cards().length) {
+  <div class="cards">
+    @for (card of cards(); track card.insurer.id) {
+      <app-quote-card
+        [card]="card"
+        [canPrice]="canPrice()"
+        [busy]="busyIds().includes(card.insurer.id)"
+        [schemaQuestions]="questions()"
+        [answers]="answers()"
+        (launch)="launch.emit(card)"
+        (cancel)="cancel.emit(card)"
+        (openExtranet)="openExtranet.emit(card)"
+        (answered)="answered.emit({ card, answers: $event })"
+      />
+    }
+  </div>
+} @else if (hasInsurers()) {
+  <p class="hint">{{ text.noInsurer }}</p>
+}
