@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ComparisonStore } from '../../../store/comparison.store';
 import { DossierStore } from '../../../store/dossier.store';
@@ -37,21 +38,18 @@ export class ComparisonTabContainerComponent {
     });
   }
 
-  protected choose(column: ComparisonColumn): void {
+  protected async choose(column: ComparisonColumn): Promise<void> {
     const current = this.decision();
-    this._dialog
-      .open<DecisionDialogPresentationComponent, DecisionDialogData, string>(DecisionDialogPresentationComponent, {
+    const dialog = this._dialog.open<DecisionDialogPresentationComponent, DecisionDialogData, string>(DecisionDialogPresentationComponent, {
         data: {
           insurerName: column.insurerName,
           justification: current?.insurerId === column.insurerId ? current.justification : null,
         },
         maxWidth: '95vw',
-      })
-      .afterClosed()
-      .subscribe((justification) => {
-        if (justification) {
-          this.store.decide({ insurerId: column.insurerId, justification });
-        }
       });
+    const justification = await firstValueFrom(dialog.afterClosed());
+    if (justification) {
+      this.store.decide({ insurerId: column.insurerId, justification });
+    }
   }
 }

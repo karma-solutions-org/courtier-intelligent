@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DossierOutcomeResult } from '@shared';
 import { openConfirmDialog } from '../../../../../../core/components/confirm-dialog/util/confirm-dialog.util';
@@ -53,29 +54,25 @@ export class ProposalTabContainerComponent {
     });
   }
 
-  protected answer(result: Exclude<DossierOutcomeResult, 'souscrit'>): void {
+  protected async answer(result: Exclude<DossierOutcomeResult, 'souscrit'>): Promise<void> {
     const refused = result === 'refuse';
-    openConfirmDialog(this._dialog, {
+    const confirmed = await firstValueFrom(openConfirmDialog(this._dialog, {
       title: refused ? this.text.refusedTitle : this.text.noFollowUpTitle,
       message: refused ? this.text.confirmRefused : this.text.confirmNoFollowUp,
       confirm: this.text.confirmAnswer,
       destructive: true,
-    }).subscribe((confirmed) => {
-      if (confirmed) this.store.recordAnswer({ result });
-    });
+    }));
+    if (confirmed) this.store.recordAnswer({ result });
   }
 
-  protected subscribe(): void {
-    this._dialog
-      .open<SubscriptionDialogPresentationComponent, void, SubscriptionDialogResult>(
-        SubscriptionDialogPresentationComponent,
-        { maxWidth: '95vw' },
-      )
-      .afterClosed()
-      .subscribe((result) => {
-        if (result) {
-          this.store.recordAnswer({ result: 'souscrit', ...result });
-        }
-      });
+  protected async subscribe(): Promise<void> {
+    const dialog = this._dialog.open<SubscriptionDialogPresentationComponent, void, SubscriptionDialogResult>(
+      SubscriptionDialogPresentationComponent,
+      { maxWidth: '95vw' },
+    );
+    const result = await firstValueFrom(dialog.afterClosed());
+    if (result) {
+      this.store.recordAnswer({ result: 'souscrit', ...result });
+    }
   }
 }

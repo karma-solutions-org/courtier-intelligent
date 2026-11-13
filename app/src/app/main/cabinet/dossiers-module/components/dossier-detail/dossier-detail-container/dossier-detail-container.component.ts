@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject, input, OnInit, signal, untracked } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
@@ -37,13 +38,12 @@ export class DossierDetailContainerComponent implements OnInit, HasUnsavedChange
   private readonly _dialog = inject(MatDialog);
 
   /** Demande le motif, puis classe le dossier sans suite (les tarifications en cours sont annulées par le serveur). */
-  protected classerSansSuite(dossierId: string, reference: string | null): void {
-    this._dialog
-      .open<SansSuiteDialogPresentationComponent, SansSuiteDialogData, string>(SansSuiteDialogPresentationComponent, { data: { reference } })
-      .afterClosed()
-      .subscribe((motif) => {
-        if (motif) this.store.classerSansSuite({ dossierId, motif });
-      });
+  protected async classerSansSuite(dossierId: string, reference: string | null): Promise<void> {
+    const dialog = this._dialog.open<SansSuiteDialogPresentationComponent, SansSuiteDialogData, string>(SansSuiteDialogPresentationComponent, {
+      data: { reference },
+    });
+    const motif = await firstValueFrom(dialog.afterClosed());
+    if (motif) this.store.classerSansSuite({ dossierId, motif });
   }
 
   /** Met le dossier dans la corbeille ; la fiche revient ensuite à l'espace du client (voir le constructeur). */

@@ -183,6 +183,15 @@ export const DossiersStore = signalStore(
 | `provideState` / `provideEffects` dans les routes | store dans les `providers` de la route |
 | router-store + `CustomRouterSerializer` | `withComponentInputBinding()` |
 
+**Conventions ajoutées (refactor des stores) :**
+- Un widget autonome a son propre store fourni par le composant (`providers: [XxxStore]`) : `TrashStore`,
+  `DocumentImportStore`, `AssureDocumentImportStore`. Il peut injecter un store plus large (`DossierStore`, `AuthStore`).
+- Message ponctuel (snackbar) : le store pose `notice: { text, duration }`, le container l'affiche dans un `effect`
+  puis appelle `clearNotice()`. Le store ne connaît pas `MatSnackBar`.
+- Résultat d'une boîte de dialogue : `await firstValueFrom(dialog.afterClosed())` dans une méthode `async` du container,
+  jamais `.subscribe()`.
+- Lectures réactives complexes reprises telles quelles d'un composant : `withProps` (membres préfixés `_`, privés au store).
+
 ## 6. Composants
 
 - Utiliser `input()`, `output()`, `model()`, `viewChild()` et `inject()`.

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CanonicalData, questionsOf } from '@shared';
 import { openConfirmDialog } from '../../../../../../core/components/confirm-dialog/util/confirm-dialog.util';
@@ -25,16 +26,15 @@ export class PricingTabContainerComponent {
   private readonly _dialog = inject(MatDialog);
 
   /** Annuler une tarification en cours arrête l'extension : confirmation d'abord. */
-  protected cancel(card: PricingCard): void {
-    openConfirmDialog(this._dialog, {
+  protected async cancel(card: PricingCard): Promise<void> {
+    const confirmed = await firstValueFrom(openConfirmDialog(this._dialog, {
       title: 'Annuler la tarification',
       message: `Arrêter la tarification en cours chez ${card.insurer.name} ? Vous pourrez la relancer.`,
       confirm: 'Annuler la tarification',
       cancel: 'Continuer',
       destructive: true,
-    }).subscribe((confirmed) => {
-      if (confirmed) this.store.cancel(card.insurer.id);
-    });
+    }));
+    if (confirmed) this.store.cancel(card.insurer.id);
   }
 
   protected readonly questions = computed(() => questionsOf(this.dossierStore.schema()));
