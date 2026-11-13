@@ -3,8 +3,8 @@ import { guestGuard, noCabinetGuard } from '../guards/auth.guards';
 import { CommonRouteContainerModel } from './common-route-container.model';
 
 const sessionIssue = () =>
-  import('../../../main/commons/authentication-module/components/session-issue/session-issue.component').then(
-    c => c.SessionIssueComponent,
+  import('../../../main/commons/authentication-module/components/session-issue/session-issue-container/session-issue-container.component').then(
+    c => c.SessionIssueContainerComponent,
   );
 
 /** Pages publiques : accessibles uniquement sans être connecté. */

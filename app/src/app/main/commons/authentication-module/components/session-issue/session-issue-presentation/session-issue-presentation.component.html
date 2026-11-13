@@ -7,8 +7,8 @@
       <li>{{ step }}</li>
     }
   </ul>
-  @if (authStore.sessionNotice(); as notice) {
+  @if (notice(); as notice) {
     <p class="detail">{{ notice }}</p>
   }
-  <a mat-flat-button [routerLink]="signinUrl">{{ actions.backToSignin }}</a>
+  <a mat-flat-button [routerLink]="signinUrl()">{{ actions.backToSignin }}</a>
 </div>
