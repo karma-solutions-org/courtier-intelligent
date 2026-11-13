@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
-import { AuthService } from '../../../services/auth.service';
 import { AuthStore } from '../../../store/auth.store';
 import { CreateCabinetPresentationComponent } from '../create-cabinet-presentation/create-cabinet-presentation.component';
 
@@ -14,7 +13,7 @@ import { CreateCabinetPresentationComponent } from '../create-cabinet-presentati
 export class CreateCabinetContainerComponent implements OnInit {
   protected readonly authStore = inject(AuthStore);
   protected readonly emailVerified = computed(() => this.authStore.user()?.emailVerified === true);
-  protected readonly initialCabinetName = inject(AuthService).pendingCabinetName();
+  protected readonly initialCabinetName = this.authStore.pendingCabinetName();
 
   ngOnInit(): void {
     this.authStore.resetStatus();

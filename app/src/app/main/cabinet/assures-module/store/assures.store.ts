@@ -9,8 +9,8 @@ import {
   withState,
 } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
-import { Assure, Dossier } from '@shared';
-import { catchError, combineLatest, debounceTime, EMPTY, exhaustMap, map, of, pipe, switchMap, take, tap } from 'rxjs';
+import { Assure, AssureDocument, Dossier } from '@shared';
+import { catchError, combineLatest, debounceTime, EMPTY, exhaustMap, forkJoin, map, of, pipe, switchMap, take, tap } from 'rxjs';
 import {
   resetRequestStatus,
   setError,
@@ -20,6 +20,7 @@ import {
 } from '../../../../core/store-features/with-request-status';
 import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
+import { ReadPiece } from '../models/assure-document-import.model';
 import { AssureFormModel, toAssureData } from '../models/assure-form.model';
 import { AssuresService } from '../services/assures.service';
 import { displayName, DuplicateCandidate, DuplicateMatch, hasDuplicateCriteria, localDuplicates, matchesSearch } from '../util/assures.utils';
@@ -65,6 +66,10 @@ interface AssuresState {
   successMessage: string | null;
   /** Doublons possibles de la saisie en cours (création ou modification). */
   duplicates: DuplicateMatch[];
+  /** Pièces rangées avec le client ouvert (CIN, Kbis importés à sa création). */
+  documents: AssureDocument[];
+  /** Pièces lues à la création, rangées avec le nouveau client : toutes (`ok`) ou certaines en échec (`partial`). */
+  piecesAttachResult: 'ok' | 'partial' | null;
 }
 
 /** Store des assurés (fourni par la route) : liste, recherche, pagination, création et modification. */
@@ -86,6 +91,8 @@ export const AssuresStore = signalStore(
     deleted: false,
     successMessage: null,
     duplicates: [],
+    documents: [],
+    piecesAttachResult: null,
   }),
   withRequestStatus(),
   withComputed(({ assures, query, filters, searchResults }) => {
@@ -141,7 +148,42 @@ export const AssuresStore = signalStore(
         if (selectedId !== store.selectedId()) patchState(store, { selectedId, selected: null, dossiers: [] });
       },
       clearMessage: () => patchState(store, { successMessage: null }),
-      resetStatus: () => patchState(store, resetRequestStatus(), { createdId: null, deleted: false }),
+      resetStatus: () => patchState(store, resetRequestStatus(), { createdId: null, deleted: false, piecesAttachResult: null }),
+      /** Écoute les pièces du client (ou les vide sans client). */
+      listenDocuments: rxMethod<{ cabinetId: string | null; assureId: string | null }>(
+        pipe(
+          switchMap(({ cabinetId, assureId }) =>
+            cabinetId && assureId ? service.watchDocuments(cabinetId, assureId) : of([] as AssureDocument[]),
+          ),
+          tap((documents) => patchState(store, { documents })),
+        ),
+      ),
+      /** Ouvre la pièce dans un nouvel onglet (lien de téléchargement signé). */
+      openDocument: rxMethod<AssureDocument>(
+        pipe(
+          exhaustMap((document) =>
+            service.downloadUrl(document.storagePath).pipe(
+              tap((url) => window.open(url, '_blank', 'noopener')),
+              catchError(() => EMPTY),
+            ),
+          ),
+        ),
+      ),
+      /** Range chaque pièce lue avec le client qui vient d'être créé ; un échec n'empêche pas les autres. */
+      attachPieces: rxMethod<{ assureId: string; pieces: ReadPiece[] }>(
+        pipe(
+          exhaustMap(({ assureId, pieces }) =>
+            forkJoin(
+              pieces.map((piece) =>
+                service.attachPiece({ assureId, ...piece }).pipe(
+                  map(() => true),
+                  catchError(() => of(false)),
+                ),
+              ),
+            ).pipe(tap((results) => patchState(store, { piecesAttachResult: results.includes(false) ? 'partial' : 'ok' }))),
+          ),
+        ),
+      ),
       remove: rxMethod<string>(
         pipe(
           exhaustMap((id) => {

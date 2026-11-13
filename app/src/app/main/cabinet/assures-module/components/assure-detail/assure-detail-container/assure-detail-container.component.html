@@ -2,7 +2,7 @@
   [assure]="store.selected()"
   [loaded]="store.loaded()"
   [dossiers]="store.dossiers()"
-  [documents]="documents()"
+  [documents]="store.documents()"
   [isAdmin]="isAdmin()"
   [editing]="editing()"
   [confirmingDelete]="confirmingDelete()"
@@ -15,5 +15,5 @@
   (deleteRequested)="store.remove($event)"
   (updateRequested)="store.update($event)"
   (candidateChanged)="checkDuplicates($event)"
-  (documentOpened)="openDocument($event)"
+  (documentOpened)="store.openDocument($event)"
 />

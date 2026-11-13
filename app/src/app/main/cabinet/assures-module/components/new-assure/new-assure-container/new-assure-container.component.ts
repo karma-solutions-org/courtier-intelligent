@@ -2,10 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, OnInit, s
 import { HasUnsavedChanges } from '../../../../../../core/routing/guards/unsaved-changes.guard';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
-import { catchError, forkJoin, map, of } from 'rxjs';
 import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { AssureFormModel } from '../../../models/assure-form.model';
-import { AssuresService } from '../../../services/assures.service';
 import { AssuresStore } from '../../../store/assures.store';
 import { ReadPiece } from '../../../models/assure-document-import.model';
 import { AssureDocumentImportContainerComponent } from '../../assure-document-import/assure-document-import-container/assure-document-import-container.component';
@@ -33,7 +31,6 @@ export class NewAssureContainerComponent implements OnInit, HasUnsavedChanges {
   private readonly _router = inject(Router);
   protected readonly structure = ASSURES_STRUCTURE.form;
   protected readonly duplicates = this.store.duplicates;
-  private readonly _service = inject(AssuresService);
   private readonly _snackBar = inject(MatSnackBar);
 
   /** Pièces lues (recto, verso…) : elles pré-remplissent le formulaire et seront rangées avec le client. */
@@ -56,27 +53,30 @@ export class NewAssureContainerComponent implements OnInit, HasUnsavedChanges {
     effect(() => {
       const createdId = this.store.createdId();
       if (!createdId) return;
-      const open = () => this._router.navigate([CabinetRouteContainerModel.CLIENTS_ROUTE.url, createdId]);
-      // Lu sans dépendance : remettre la pièce à null ne doit pas relancer l'effet (double navigation).
+      // Lu sans dépendance : remettre les pièces à zéro ne doit pas relancer l'effet (double navigation).
       const pieces = untracked(() => this.pieces());
       if (!pieces.length) {
-        open();
+        untracked(() => this._open(createdId));
         return;
       }
-      this.pieces.set([]);
-      // Chaque pièce est rangée avec le client ; un échec n'empêche pas les autres.
-      forkJoin(
-        pieces.map(piece =>
-          this._service.attachPiece({ assureId: createdId, ...piece }).pipe(
-            map(() => true),
-            catchError(() => of(false)),
-          ),
-        ),
-      ).subscribe(results => {
-        if (results.includes(false)) this._snackBar.open(ASSURES_STRUCTURE.piece.attachFailed, undefined, { duration: 5000 });
-        open();
+      untracked(() => {
+        this.pieces.set([]);
+        // Chaque pièce est rangée avec le client ; un échec n'empêche pas les autres.
+        this.store.attachPieces({ assureId: createdId, pieces });
       });
     });
+    // Pièces rangées : message si l'une a échoué, puis ouverture de la fiche du client.
+    effect(() => {
+      const result = this.store.piecesAttachResult();
+      const createdId = untracked(() => this.store.createdId());
+      if (!result || !createdId) return;
+      if (result === 'partial') this._snackBar.open(ASSURES_STRUCTURE.piece.attachFailed, undefined, { duration: 5000 });
+      untracked(() => this._open(createdId));
+    });
+  }
+
+  private _open(assureId: string): void {
+    this._router.navigate([CabinetRouteContainerModel.CLIENTS_ROUTE.url, assureId]);
   }
 
   ngOnInit(): void {

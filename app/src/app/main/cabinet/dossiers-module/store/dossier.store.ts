@@ -97,6 +97,12 @@ interface DossierState {
   saveStatus: SaveStatus;
   error: string | null;
   successMessage: string | null;
+  /** Classement sans suite en cours. */
+  closing: boolean;
+  /** Mise à la corbeille : en cours, faite (la fiche revient à l'espace du client) ou en échec. */
+  removeStatus: 'idle' | 'pending' | 'done' | 'failed';
+  /** Message ponctuel à afficher (snackbar) avec sa durée. */
+  notice: { text: string; duration: number } | null;
 }
 
 /** Store d'un dossier (fourni par la route) : données, questionnaire, saisie avec sauvegarde automatique, statut, assignation. */
@@ -123,6 +129,9 @@ export const DossierStore = signalStore(
     saveStatus: 'idle',
     error: null,
     successMessage: null,
+    closing: false,
+    removeStatus: 'idle',
+    notice: null,
   }),
   withComputed((store, cabinetStatus = inject(CabinetStatusStore)) => {
     const product = computed(
@@ -289,6 +298,43 @@ export const DossierStore = signalStore(
     };
 
     return {
+      clearNotice: () => patchState(store, { notice: null }),
+      resetRemoveStatus: () => patchState(store, { removeStatus: 'idle' }),
+      /** Classe le dossier sans suite avec son motif (les tarifications en cours sont annulées par le serveur). */
+      classerSansSuite: rxMethod<{ dossierId: string; motif: string }>(
+        pipe(
+          tap(() => patchState(store, { closing: true })),
+          concatMap(({ dossierId, motif }) =>
+            service.classerSansSuite(dossierId, motif).pipe(
+              tap(({ cancelledJobs }) => {
+                const jobs = cancelledJobs ? ` ${cancelledJobs} tarification(s) annulée(s).` : '';
+                patchState(store, { closing: false, notice: { text: `Dossier classé sans suite.${jobs}`, duration: 4000 } });
+              }),
+              catchError((error) => {
+                patchState(store, { closing: false, notice: { text: toBackendErrorMessage(error), duration: 5000 } });
+                return EMPTY;
+              }),
+            ),
+          ),
+        ),
+      ),
+      /** Met le dossier dans la corbeille. */
+      remove: rxMethod<string>(
+        pipe(
+          tap(() => patchState(store, { removeStatus: 'pending' })),
+          concatMap((dossierId) =>
+            service.remove(dossierId).pipe(
+              tap(() =>
+                patchState(store, { removeStatus: 'done', notice: { text: 'Dossier placé dans la corbeille.', duration: 3000 } }),
+              ),
+              catchError((error) => {
+                patchState(store, { removeStatus: 'failed', notice: { text: toBackendErrorMessage(error), duration: 5000 } });
+                return EMPTY;
+              }),
+            ),
+          ),
+        ),
+      ),
       // Le store survit à la navigation (fourni par la route) : resélectionner le même dossier ne doit pas
       // vider l'état, car l'écoute Firestore déjà active ne réémettrait pas et la page resterait vide.
       _reset: (selectedId: string | null) =>

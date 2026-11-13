@@ -1,13 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, OnInit, signal, untracked, viewChild } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
-import { AssureDocument } from '@shared';
-import { combineLatest, of, switchMap } from 'rxjs';
 import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { HasUnsavedChanges } from '../../../../../../core/routing/guards/unsaved-changes.guard';
 import { AuthStore } from '../../../../../commons/authentication-module/store/auth.store';
-import { AssuresService } from '../../../services/assures.service';
 import { AssuresStore } from '../../../store/assures.store';
 import { DuplicateCandidate } from '../../../util/assures.utils';
 import { AssureDetailPresentationComponent } from '../assure-detail-presentation/assure-detail-presentation.component';
@@ -34,7 +30,6 @@ export class AssureDetailContainerComponent implements OnInit, HasUnsavedChanges
   protected readonly store = inject(AssuresStore);
   private readonly _router = inject(Router);
   private readonly _snackBar = inject(MatSnackBar);
-  private readonly _service = inject(AssuresService);
   private readonly _auth = inject(AuthStore);
   private readonly _listUrl = CabinetRouteContainerModel.CLIENTS_ROUTE.url;
   protected readonly duplicates = this.store.duplicates;
@@ -43,19 +38,9 @@ export class AssureDetailContainerComponent implements OnInit, HasUnsavedChanges
   protected readonly editing = signal(false);
   protected readonly confirmingDelete = signal(false);
 
-  /** Pièces rangées avec le client (CIN, Kbis importés à sa création). */
-  protected readonly documents = toSignal(
-    combineLatest([toObservable(this._auth.cabinetId), toObservable(this.id)]).pipe(
-      switchMap(([cabinetId, id]) => (cabinetId && id ? this._service.watchDocuments(cabinetId, id) : of([]))),
-    ),
-    { initialValue: [] as AssureDocument[] },
-  );
-
-  protected openDocument(document: AssureDocument): void {
-    this._service.downloadUrl(document.storagePath).subscribe((url) => window.open(url, '_blank', 'noopener'));
-  }
-
   constructor() {
+    // Pièces rangées avec le client (CIN, Kbis importés à sa création).
+    this.store.listenDocuments(computed(() => ({ cabinetId: this._auth.cabinetId(), assureId: this.id() })));
     effect(() => {
       this.store.select(this.id());
       untracked(() => {
