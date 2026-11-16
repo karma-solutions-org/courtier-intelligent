@@ -88,11 +88,11 @@
               </div>
               <div class="stat">
                 <span class="label">{{ structure.stats.inProgress }}</span>
-                <span class="value">{{ inProgress() }}</span>
+                <span class="value">{{ stats().inProgress }}</span>
               </div>
               <div class="stat">
                 <span class="label">{{ structure.stats.won }}</span>
-                <span class="value">{{ won() }}</span>
+                <span class="value">{{ stats().won }}</span>
               </div>
               <div class="stat">
                 <span class="label">{{ structure.stats.since }}</span>
@@ -133,7 +133,7 @@
         <mat-tab [label]="structure.dossiersTitle + ' (' + dossiers().length + ')'">
           <div class="tab card">
             @if (dossiers().length) {
-              <app-table [columns]="dossierColumns" [rows]="dossiers()" [trackBy]="dossierId" [rowLink]="dossierLinkFn">
+              <app-table [columns]="dossierColumns" [rows]="dossiers()" [trackBy]="dossierId" [rowLink]="dossierLink">
                 <ng-template appTableCell="reference" let-dossier>{{ dossier.reference || structure.draftReference }}</ng-template>
                 <ng-template appTableCell="status" let-dossier><app-status-chip [status]="dossier.status" /></ng-template>
                 <ng-template appTableCell="createdAt" let-dossier>{{ dossier.createdAt?.toMillis() | date: 'd MMM y' }}</ng-template>

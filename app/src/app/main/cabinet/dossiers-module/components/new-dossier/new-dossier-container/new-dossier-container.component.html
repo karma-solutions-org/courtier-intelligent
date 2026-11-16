@@ -28,7 +28,7 @@
     <a mat-button [routerLink]="newAssureUrl"><mat-icon>person_add</mat-icon>{{ structure.createAssure }}</a>
   } @else {
     <h2>{{ structure.productTitle }}</h2>
-    <mat-radio-group class="choices" [value]="productId()" (change)="productId.set($event.value)" [attr.aria-label]="structure.productTitle">
+    <mat-radio-group class="choices products" [value]="productId()" (change)="productId.set($event.value)" [attr.aria-label]="structure.productTitle">
       @for (product of store.availableProducts(); track product.id) {
         <mat-radio-button [value]="product.id">{{ product.name }}</mat-radio-button>
       } @empty {

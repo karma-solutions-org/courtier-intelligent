@@ -1,2 +1,2 @@
-/** Vue du brouillon : documents (étape 3), questionnaire (étape 4), récapitulatif ou champs manquants (étape 5). */
-export type DraftView = 'documents' | 'questionnaire' | 'summary' | 'missing';
+/** Vue du brouillon : extranets (étape 3), documents (étape 4), questionnaire (étape 5). */
+export type DraftView = 'extranets' | 'documents' | 'questionnaire';

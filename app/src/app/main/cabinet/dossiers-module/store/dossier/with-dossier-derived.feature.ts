@@ -4,9 +4,11 @@ import {
   buildQuoteData,
   CanonicalPath,
   computeMissing,
+  ANSWERS_EDITABLE_DOSSIER_STATUSES,
   EDITABLE_DOSSIER_STATUSES,
+  insurersForProduct,
   NeedAnalysis,
-  schemaForCabinet,
+  schemaForInsurers,
   suggestNeed,
 } from '@shared';
 import { CabinetStatusStore } from '../../../../commons/main-module/store/cabinet-status.store';
@@ -19,13 +21,28 @@ export function withDossierDerived() {
     { state: type<DossierStoreState>() },
     withComputed((store, cabinetStatus = inject(CabinetStatusStore)) => {
       const product = computed(() => store.products().find((p) => p.id === store.dossier()?.productId) ?? null);
-      /** Sans les questions découvertes sur l'extranet d'un assureur que le cabinet n'utilise pas. */
-      const schema = computed(() =>
-        schemaForCabinet(product()?.questionnaireSchema ?? [], cabinetStatus.cabinet()?.enabledInsurers ?? []),
+      /** Assureurs du cabinet qui proposent le produit du dossier : extranets proposés à l'étape « Extranets ». */
+      const availableInsurers = computed(() =>
+        insurersForProduct(store.insurers(), store.dossier()?.productId ?? '', cabinetStatus.cabinet()?.enabledInsurers ?? []),
       );
+      /**
+       * Seulement les questions des extranets choisis pour le dossier (leur liste de questions connues et celles
+       * découvertes chez eux), à défaut de ceux du cabinet qui proposent le produit.
+       */
+      const schema = computed(() => {
+        const selected = store.selectedInsurers();
+        const insurers = selected.length ? store.insurers().filter((insurer) => selected.includes(insurer.id)) : availableInsurers();
+        return schemaForInsurers(
+          product()?.questionnaireSchema ?? [],
+          insurers,
+          store.dossier()?.productId ?? '',
+          product()?.insurerQuestions ?? {},
+        );
+      });
       const missing = computed<CanonicalPath[]>(() => computeMissing(schema(), store.answers()));
       return {
         product,
+        availableInsurers,
         schema,
         /** Champs obligatoires manquants, calculés à chaque frappe (le serveur refait le calcul à l'enregistrement). */
         missing,
@@ -45,6 +62,10 @@ export function withDossierDerived() {
           ),
         ),
         editable: computed(() => EDITABLE_DOSSIER_STATUSES.includes(store.dossier()?.status ?? 'souscrit')),
+        /** Réponses du questionnaire modifiables : avant la tarification, et pendant (voir ANSWERS_EDITABLE_DOSSIER_STATUSES). */
+        answersEditable: computed(() => ANSWERS_EDITABLE_DOSSIER_STATUSES.includes(store.dossier()?.status ?? 'souscrit')),
+        /** Modification pendant la tarification : les tarifs déjà obtenus deviendront périmés. */
+        editingDuringPricing: computed(() => store.dossier()?.status === 'tarification'),
         transitions: computed(() => {
           const status = store.dossier()?.status;
           return status ? manualTransitionsFrom(status) : [];

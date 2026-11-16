@@ -17,6 +17,4 @@ export const InsurerModel = {
   fromMap,
   /** Catalogue global (écrit par les Cloud Functions). */
   entity: databaseEntity('ci_insurers', fromMap),
-  /** Assureurs ajoutés par le cabinet. */
-  cabinetEntity: (cabinetId: string) => databaseEntity(`ci_cabinets/${cabinetId}/ci_insurers`, fromMap),
 };

@@ -2,7 +2,7 @@ import { DashboardDossierRow } from '../models/dashboard-row.model';
 import { conversionOutcome, Dossier, DOSSIER_STATUSES, DossierStatus } from '@shared';
 
 /** Statuts où le dossier attend une action du courtier en charge. */
-export const TO_PROCESS_STATUSES: DossierStatus[] = [
+const TO_PROCESS_STATUSES: DossierStatus[] = [
   'brouillon',
   'complet',
   'besoin_valide',
@@ -70,7 +70,7 @@ export function conversionRates(dossiers: Dossier[], keyOf: (dossier: Dossier) =
 }
 
 /** Date Firestore en millisecondes (0 si absente ou mal formée). */
-export function millis(value: { toMillis(): number } | null | undefined): number {
+function millis(value: { toMillis(): number } | null | undefined): number {
   return typeof value?.toMillis === 'function' ? value.toMillis() : 0;
 }
 

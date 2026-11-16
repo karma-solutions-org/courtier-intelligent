@@ -1,0 +1,20 @@
+@if (insurers().length) {
+  <ul class="extranets">
+    @for (insurer of insurers(); track insurer.id) {
+      <li>
+        <mat-checkbox [checked]="checked().includes(insurer.id)" (change)="toggled.emit({ insurerId: insurer.id, checked: $event.checked })">
+          <span class="insurer">
+            @if (insurer.logo) {
+              <img class="logo" [src]="insurer.logo" alt="" loading="lazy" />
+            } @else {
+              <span class="logo initial" aria-hidden="true">{{ insurer.name.charAt(0) }}</span>
+            }
+            {{ insurer.name }}
+          </span>
+        </mat-checkbox>
+      </li>
+    }
+  </ul>
+} @else {
+  <p class="progress">{{ structure.noExtranet }}</p>
+}

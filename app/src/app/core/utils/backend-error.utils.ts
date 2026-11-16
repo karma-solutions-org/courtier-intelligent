@@ -3,7 +3,7 @@
  * rédige déjà ses messages en français pour l'utilisateur.
  */
 /** Messages des raisons métier récentes : toujours en français, même si le serveur n'en donne pas. */
-export const BACKEND_REASON_MESSAGES: Record<string, string> = {
+const BACKEND_REASON_MESSAGES: Record<string, string> = {
   email_not_verified: "Votre adresse email n'est pas encore vérifiée : ouvrez le lien reçu par email, puis réessayez.",
   already_member: 'Ce compte est déjà rattaché à un cabinet.',
   wrong_email: "Cette invitation a été envoyée à une autre adresse email. Connectez-vous avec l'adresse invitée.",

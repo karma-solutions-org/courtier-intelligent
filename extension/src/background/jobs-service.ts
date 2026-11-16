@@ -17,9 +17,9 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getFirebase } from '../shared/firebase';
-import { productDocPath, questionsOf, type ExtensionReportIssue, type ExtensionReportStep, type QuestionnaireSection } from '@shared';
-import type { CapturedOffer, ExtensionUser, JobContext, JobUpdate } from '../shared/messages';
-import { insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin, PickOptions } from './origin-match';
+import { isExtraPath, questionsOf, type BlockedStepSnapshot, type ExtensionReportIssue, type ExtensionReportStep, type QuestionnaireSection } from '@shared';
+import type { CapturedOffer, ExtensionUser, JobContext, JobUpdate, ProductQuestion } from '../shared/messages';
+import { catalogEntryPaths, insurerForOrigin, InsurerInfo, JobRecord, pickJobForOrigin, PickOptions } from './origin-match';
 
 /** Les assureurs changent rarement : on les relit au plus toutes les 10 minutes. */
 const INSURERS_TTL_MS = 10 * 60 * 1000;
@@ -32,44 +32,42 @@ export const RECENT_JOBS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 const INSURERS_CACHE_KEY = 'insurers';
 
-/** Cabinet du compte connecté (claim `ci_cabinet_id`), ou null sans connexion. */
-async function currentCabinetId(): Promise<string | null> {
-  const user = getFirebase().auth.currentUser;
-  if (!user) return null;
-  const claim = (await user.getIdTokenResult()).claims['ci_cabinet_id'];
-  return typeof claim === 'string' ? claim : null;
-}
-
 const toInsurerInfo = (d: DocumentSnapshot): InsurerInfo => ({
   id: d.id,
   name: String(d.get('name') ?? d.id),
   extranetDomains: (d.get('extranetDomains') as string[] | undefined) ?? [],
+  entryPaths: catalogEntryPaths(d.get('entryPaths')),
 });
 
 /**
- * Assureurs reconnus : catalogue global et assureurs ajoutés par le cabinet (hors archivés).
+ * Assureurs reconnus : le catalogue, le même pour tous les cabinets.
  * Gardés en mémoire de session : le service worker redémarre souvent et chaque page web ouverte lui demande
- * « est-ce un extranet ? » — on ne relit pas Firestore à chaque fois. Le cache est propre au cabinet connecté.
+ * « est-ce un extranet ? » — on ne relit pas Firestore à chaque fois.
  */
-export async function loadInsurers(): Promise<InsurerInfo[]> {
-  const cabinetId = await currentCabinetId();
+export async function loadInsurers({ fresh = false }: { fresh?: boolean } = {}): Promise<InsurerInfo[]> {
   const cached = (await chrome.storage.session.get(INSURERS_CACHE_KEY))[INSURERS_CACHE_KEY] as
-    | { at: number; cabinetId: string | null; value: InsurerInfo[] }
+    | { at: number; value: InsurerInfo[] }
     | undefined;
-  if (cached && cached.cabinetId === cabinetId && Date.now() - cached.at < INSURERS_TTL_MS) return cached.value;
-  const { firestore } = getFirebase();
-  const [global, cabinet] = await Promise.all([
-    getDocs(collection(firestore, 'ci_insurers')),
-    cabinetId ? getDocs(collection(firestore, `ci_cabinets/${cabinetId}/ci_insurers`)).catch(() => null) : Promise.resolve(null),
-  ]);
-  // Assureurs du catalogue modifiés ou retirés par le cabinet : remplacés par sa fiche (champ `replaces`).
-  const replaced = new Set(cabinet?.docs.map(d => d.get('replaces') as string | undefined).filter(Boolean) ?? []);
-  const value = [
-    ...global.docs.filter(d => !replaced.has(d.id)).map(toInsurerInfo),
-    ...(cabinet?.docs.filter(d => d.get('archived') !== true).map(toInsurerInfo) ?? []),
-  ];
-  await chrome.storage.session.set({ [INSURERS_CACHE_KEY]: { at: Date.now(), cabinetId, value } });
+  if (!fresh && cached && Date.now() - cached.at < INSURERS_TTL_MS) return cached.value;
+  const snapshot = await getDocs(collection(getFirebase().firestore, 'ci_insurers'));
+  const value = snapshot.docs.map(toInsurerInfo);
+  await chrome.storage.session.set({ [INSURERS_CACHE_KEY]: { at: Date.now(), value } });
   return value;
+}
+
+/** Délai minimal entre deux relectures forcées du catalogue (une page inconnue ne relit pas Firestore à chaque chargement). */
+const INSURERS_REFRESH_MIN_MS = 30 * 1000;
+let lastForcedRefresh = 0;
+
+/**
+ * Assureurs, avec celui de `origin` s'il existe : un extranet publié au catalogue depuis la dernière lecture est
+ * reconnu tout de suite, sans attendre la fin du cache (relecture forcée au plus toutes les 30 s).
+ */
+export async function loadInsurersFor(origin: string): Promise<InsurerInfo[]> {
+  const insurers = await loadInsurers();
+  if (insurerForOrigin(origin, insurers) || Date.now() - lastForcedRefresh < INSURERS_REFRESH_MIN_MS) return insurers;
+  lastForcedRefresh = Date.now();
+  return loadInsurers({ fresh: true });
 }
 
 /**
@@ -109,38 +107,78 @@ const toRecord = (d: DocumentSnapshot): JobRecord => ({
 
 /** Le job à exécuter sur la page d'un extranet (ou `null` : rien à faire ici). `pick` : job épinglé à l'onglet, jobs des autres onglets. */
 export async function findJobForOrigin(user: ExtensionUser, origin: string, pick: Pick<PickOptions, 'pinned' | 'exclude'> = {}): Promise<JobContext | null> {
-  const insurers = await loadInsurers();
+  const insurers = await loadInsurersFor(origin);
   // Une page qui n'est l'extranet d'aucun assureur ne déclenche aucune requête de jobs.
   if (!insurerForOrigin(origin, insurers)) return null;
   const job = pickJobForOrigin(await loadRecentJobs(user), insurers, origin, pick);
   if (!job) return null;
-  // Chemins du produit copiés dans le job par `tarification-lancer` ; à défaut (ancien job), lecture du produit.
-  if (job.productPaths?.length) return job;
-  const productPaths = await loadProductPaths(user, job.dossierId);
-  return productPaths ? { ...job, productPaths } : job;
+  // Produit du dossier : il choisit le profil d'extranet (chemin d'accès au formulaire).
+  const productId = await loadProductId(user, job.dossierId);
+  if (!productId) return { ...job, productId };
+  // Questions du produit (lues une fois, en cache) : chemins (si `tarification-lancer` ne les a pas copiés dans le job)
+  // et libellés des questions ajoutées depuis les extranets.
+  const product = await loadProductQuestions(productId);
+  if (!product) return { ...job, productId };
+  return {
+    ...job,
+    productId,
+    productPaths: job.productPaths?.length ? job.productPaths : product.paths,
+    productQuestions: product.extras,
+  };
 }
 
-/** Questions du produit par dossier : un produit change rarement pendant un remplissage. */
-const productPathsCache = new Map<string, string[]>();
+/** Produit de chaque dossier : il ne change pas une fois le dossier créé. */
+const productIdCache = new Map<string, string>();
+
+/** Produit du dossier, ou null s'il est illisible (règles, réseau). */
+async function loadProductId(user: ExtensionUser, dossierId: string): Promise<string | null> {
+  const path = `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}`;
+  const cached = productIdCache.get(path);
+  if (cached) return cached;
+  try {
+    const dossier = await getDoc(doc(getFirebase().firestore, path));
+    const productId = dossier.get('productId');
+    if (typeof productId !== 'string' || !productId) return null;
+    productIdCache.set(path, productId);
+    return productId;
+  } catch {
+    return null;
+  }
+}
+
+/** Questions de chaque produit : un produit change rarement pendant un remplissage. */
+const productCache = new Map<string, { paths: string[]; extras: ProductQuestion[] }>();
 
 /**
- * Chemins de toutes les questions du produit du dossier (questionnaire complet, conditions comprises), ou null si le
- * dossier ou le produit est illisible (règles, réseau) : l'appelant se rabat alors sur les clés de quoteData.
+ * Questions du produit : chemins de TOUTES ses questions (conditions comprises) et questions ajoutées depuis les
+ * extranets avec leur libellé, ou null si le produit est illisible (règles, réseau) : l'appelant se rabat alors sur
+ * les clés de quoteData.
  */
-async function loadProductPaths(user: ExtensionUser, dossierId: string): Promise<string[] | null> {
-  const cached = productPathsCache.get(dossierId);
+async function loadProductQuestions(productId: string): Promise<{ paths: string[]; extras: ProductQuestion[] } | null> {
+  const cached = productCache.get(productId);
   if (cached) return cached;
   try {
     const { firestore } = getFirebase();
-    const dossier = await getDoc(doc(firestore, `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}`));
-    const productId = dossier.get('productId');
-    if (typeof productId !== 'string' || !productId) return null;
-    const product = await getDoc(doc(firestore, productDocPath(user.cabinetId, productId)));
+    const product = await getDoc(doc(firestore, `ci_products/${productId}`));
     const schema = product.get('questionnaireSchema') as QuestionnaireSection[] | undefined;
     if (!Array.isArray(schema)) return null;
-    const paths = [...new Set(questionsOf(schema).map(question => question.canonicalPath as string))];
-    productPathsCache.set(dossierId, paths);
-    return paths;
+    const questions = questionsOf(schema);
+    const extras = questions
+      .filter(question => isExtraPath(question.canonicalPath))
+      .map(question => ({
+        path: question.canonicalPath as string,
+        label: question.label,
+        type: question.type,
+        ...(question.choices
+          ? {
+              choices: question.choices.map(choice => choice.label),
+              choiceLabels: Object.fromEntries(question.choices.map(choice => [choice.value, choice.label])),
+            }
+          : {}),
+      }));
+    const loaded = { paths: [...new Set(questions.map(question => question.canonicalPath as string))], extras };
+    productCache.set(productId, loaded);
+    return loaded;
   } catch {
     return null;
   }
@@ -224,8 +262,13 @@ export function watchJob(user: ExtensionUser, dossierId: string, insurerId: stri
  * Enregistre l'offre capturée et passe le job à `captured`, en une seule écriture (tout ou rien). Les règles Firestore
  * n'acceptent qu'une offre `source: auto` aux champs attendus, sur un job du courtier. Le code de chaque garantie
  * (référentiel du produit) est posé ensuite côté serveur : l'extension écrit le libellé lu sur la page.
+ * L'offre arrive « à vérifier » (`review: pending`) : le courtier la valide ou la corrige dans l'onglet Tarification.
  */
-export async function writeCapturedOffer(user: ExtensionUser, dossierId: string, insurerId: string, offer: CapturedOffer): Promise<void> {
+/**
+ * Écrit le tarif lu. `again` : un tarif de cet onglet est déjà enregistré (le courtier sauvegarde une autre formule,
+ * annuel ↔ mensuel) ; seule l'offre est réécrite, le job est déjà `captured` (règles : ciExtOfferRewrite).
+ */
+export async function writeCapturedOffer(user: ExtensionUser, dossierId: string, insurerId: string, offer: CapturedOffer, again = false): Promise<void> {
   const { firestore } = getFirebase();
   const base = `ci_cabinets/${user.cabinetId}/ci_dossiers/${dossierId}`;
   const batch = writeBatch(firestore);
@@ -238,8 +281,9 @@ export async function writeCapturedOffer(user: ExtensionUser, dossierId: string,
     exclusions: offer.exclusions,
     source: 'auto',
     capturedAt: serverTimestamp(),
+    review: 'pending',
   });
-  batch.update(doc(firestore, `${base}/ci_quoteJobs/${insurerId}`), {
+  if (!again) batch.update(doc(firestore, `${base}/ci_quoteJobs/${insurerId}`), {
     status: 'captured',
     missingFields: [],
     error: null,
@@ -249,12 +293,13 @@ export async function writeCapturedOffer(user: ExtensionUser, dossierId: string,
 }
 
 /** Signalement d'un échec (E10-4) : assureur, origine de l'extranet, étape et code. AUCUNE donnée client. */
-export async function addExtensionReport(report: { insurerId: string; origin: string; step: ExtensionReportStep; issue: ExtensionReportIssue }): Promise<void> {
+export async function addExtensionReport(report: { insurerId: string; origin: string; step: ExtensionReportStep; issue: ExtensionReportIssue; snapshot?: BlockedStepSnapshot }): Promise<void> {
   await addDoc(collection(getFirebase().firestore, 'ci_extensionReports'), { ...report, at: serverTimestamp() });
 }
 
-/** Appel à `ia-proxy` : la clé d'IA reste côté serveur. */
-export async function askAi(request: { system: string; messages: { role: 'user'; content: string }[]; maxTokens: number }): Promise<string> {
-  const result = await httpsCallable<typeof request, { text: string }>(getFirebase().functions, 'ia-proxy')(request);
+/** Appel à `ia-proxy` : la clé d'IA et le prompt système (choisi d'après `purpose`) restent côté serveur. */
+export async function askAi(request: { purpose: string; messages: { role: 'user'; content: string }[]; maxTokens: number }): Promise<string> {
+  const body = { purpose: request.purpose, messages: request.messages, maxTokens: request.maxTokens };
+  const result = await httpsCallable<typeof body, { text: string }>(getFirebase().functions, 'ia-proxy')(body);
   return result.data.text;
 }

@@ -12,12 +12,10 @@ import { TabQueryParamDirective } from '../../../../../../core/directives/tab-qu
 import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { StatusChipPresentationComponent } from '../../../../dossiers-module/components/status-chip/status-chip-presentation/status-chip-presentation.component';
 import { AssureFormModel } from '../../../models/assure-form.model';
+import { assureDetails, dossierLink, dossierStats, initialsOf } from '../../../util/assure-detail.utils';
 import { DuplicateCandidate, DuplicateMatch, displayName } from '../../../util/assures.utils';
 import { AssureFormPresentationComponent } from '../../assure-form/assure-form-presentation/assure-form-presentation.component';
 import { ASSURES_STRUCTURE } from '../../assures.structure';
-
-/** Statuts où le dossier n'avance plus. */
-const CLOSED_STATUSES: Dossier['status'][] = ['souscrit', 'refuse'];
 
 /**
  * Espace client : carte d'identité et actions à gauche (nouveau dossier, modifier, supprimer), onglets à droite
@@ -71,54 +69,16 @@ export class AssureDetailPresentationComponent {
   ];
   protected readonly dossierId = (dossier: Dossier) => dossier.id;
   /** Une ligne ouvre le dossier (son questionnaire si c'est un brouillon). */
-  protected readonly dossierLinkFn = (dossier: Dossier) => this.dossierLink(dossier);
+  protected readonly dossierLink = dossierLink;
+  protected readonly initials = initialsOf;
+  /** Détails affichés en lecture : la société d'abord pour un professionnel. */
+  protected readonly detailsOf = assureDetails;
 
-  protected readonly inProgress = computed(() => this.dossiers().filter((dossier) => !CLOSED_STATUSES.includes(dossier.status)).length);
-  protected readonly won = computed(() => this.dossiers().filter((dossier) => dossier.status === 'souscrit').length);
+  /** Compteurs : dossiers en cours et souscrits. */
+  protected readonly stats = computed(() => dossierStats(this.dossiers()));
 
   /** Formulaire de modification ouvert et modifié, pas encore enregistré (garde de sortie du container). */
   hasUnsavedChanges(): boolean {
     return this.editing() && !!this._form()?.hasUnsavedChanges();
   }
-
-  /** Un brouillon se reprend dans son questionnaire, les autres s'ouvrent sur leur fiche. */
-  protected dossierLink(dossier: Dossier): string[] {
-    const base = [CabinetRouteContainerModel.DOSSIERS_ROUTE.url, dossier.id];
-    return dossier.status === 'brouillon' ? [...base, 'brouillon'] : base;
-  }
-
-  protected initials(assure: Assure): string {
-    const words = displayName(assure).trim().split(/\s+/).filter(Boolean);
-    return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase() || '?';
-  }
-
-  /** Détails affichés en lecture : la société d'abord pour un professionnel. */
-  protected detailsOf(assure: Assure): { label: string; value: string | null | undefined }[] {
-    const fields = this.structure.fields;
-    const company =
-      assure.type === 'pro'
-        ? [
-            { label: fields.companyName, value: assure.companyName },
-            { label: fields.siret, value: assure.siret },
-          ]
-        : [];
-    return [
-      ...company,
-      { label: fields.civilite, value: assure.civilite },
-      { label: fields.lastName, value: assure.lastName },
-      { label: fields.firstName, value: assure.firstName },
-      { label: fields.birthDate, value: formatDate(assure.birthDate) },
-      { label: fields.email, value: assure.email },
-      { label: fields.phone, value: assure.phone },
-      { label: fields.street, value: assure.address?.street },
-      { label: fields.postalCode, value: assure.address?.postalCode },
-      { label: fields.city, value: assure.address?.city },
-    ];
-  }
-}
-
-/** « 1985-04-12 » → « 12/04/1985 ». */
-function formatDate(iso: string | null | undefined): string | null {
-  const match = iso?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : (iso ?? null);
 }

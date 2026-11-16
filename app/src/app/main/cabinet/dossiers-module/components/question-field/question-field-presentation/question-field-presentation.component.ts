@@ -4,7 +4,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { CanonicalValue, isAnswered, isKnownValue, Knowledge, Question } from '@shared';
+import { answerConstraintError, CanonicalValue, constraintFor, isAnswered, isKnownValue, Knowledge, latestPastDate, Question } from '@shared';
 
 type KnowledgeMode = 'known' | 'declared' | 'unknown';
 
@@ -46,6 +46,20 @@ export class QuestionFieldPresentationComponent {
   protected readonly invalid = computed(
     () => this.showMissing() && this.question().required && !isAnswered(this.value()),
   );
+  /** Bornes métier du champ (bonus-malus, nombre de sinistres, date passée…) : guident la saisie. */
+  protected readonly constraint = computed(() => constraintFor(this.question().canonicalPath));
+  /** Date maximale du calendrier : aujourd'hui pour une date qui ne peut pas être future. */
+  protected readonly maxDate = computed(() => (this.constraint()?.notInFuture ? latestPastDate() : null));
+  /** Valeur saisie hors bornes : signalée tout de suite (le serveur la refuserait à l'enregistrement). */
+  /** Maximum d'un nombre simple : la borne métier, ou à défaut la longueur imposée par l'extranet (3 chiffres → 999). */
+  protected readonly numberMax = computed(() => {
+    const max = this.constraint()?.max;
+    const maxLength = this.question().maxLength;
+    const lengthMax = maxLength ? 10 ** maxLength - 1 : undefined;
+    if (max === undefined) return lengthMax ?? null;
+    return lengthMax === undefined ? max : Math.min(max, lengthMax);
+  });
+  protected readonly constraintError = computed(() => answerConstraintError(this.question(), this.value()));
 
   /**
    * Mode choisi pour un champ avec niveau de connaissance. Il peut précéder la valeur : « Valeur connue » sélectionné

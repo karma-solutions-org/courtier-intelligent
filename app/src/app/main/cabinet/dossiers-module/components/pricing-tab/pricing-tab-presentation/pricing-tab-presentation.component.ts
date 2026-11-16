@@ -33,6 +33,10 @@ export class PricingTabPresentationComponent {
   readonly cancel = output<PricingCard>();
   readonly openExtranet = output<PricingCard>();
   readonly answered = output<{ card: PricingCard; answers: CanonicalData }>();
+  /** Saisie (ou correction) de l'offre à la main. */
+  readonly manualEntry = output<PricingCard>();
+  /** Validation du tarif lu par l'extension. */
+  readonly validate = output<PricingCard>();
 
   protected readonly text = PRICING_TAB_STRUCTURE;
 }

@@ -27,6 +27,8 @@
         (cancel)="cancel.emit(card)"
         (openExtranet)="openExtranet.emit(card)"
         (answered)="answered.emit({ card, answers: $event })"
+        (manualEntry)="manualEntry.emit(card)"
+        (validate)="validate.emit(card)"
       />
     }
   </div>

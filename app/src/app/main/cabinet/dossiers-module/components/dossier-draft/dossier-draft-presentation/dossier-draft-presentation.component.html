@@ -1,3 +1,7 @@
+@if (readingClientPieces()) {
+  <!-- Lecture des pièces du client : écran bloqué jusqu'au remplissage des champs. -->
+  <app-reading-overlay [message]="structure.clientPiecesReading" />
+}
 @if (dossier(); as dossier) {
   <header>
     <h1>{{ dossier.reference }}</h1>
@@ -11,13 +15,38 @@
     <p class="error" role="alert">{{ error() }}</p>
   }
 
-  @if (view() === 'documents') {
+  @if (view() === 'extranets') {
+    <section class="intro">
+      <h2>{{ structure.extranetsTitle }}</h2>
+      <p>{{ structure.extranetsHint }}</p>
+    </section>
+    <app-extranet-picker
+      [insurers]="availableInsurers()"
+      [checked]="checkedInsurers()"
+      (toggled)="insurerToggled.emit($event)"
+    />
+    @if (showMissing() && !checkedInsurers().length) {
+      <p class="blocked" role="alert">{{ structure.extranetsRequired }}</p>
+    }
+    <div class="actions">
+      <span class="spacer"></span>
+      <button mat-button type="button" (click)="saveAndQuitRequested.emit()">
+        {{ structure.saveAndQuit }}
+      </button>
+      <button mat-flat-button type="button" (click)="insurersValidated.emit()">
+        {{ structure.validateExtranets }}
+      </button>
+    </div>
+  } @else if (view() === 'documents') {
     <section class="intro">
       <h2>{{ structure.documentsTitle }}</h2>
       <p>{{ structure.documentsHint }}</p>
     </section>
     <app-document-import-container class="documents" />
     <div class="actions">
+      <button mat-button type="button" (click)="viewChanged.emit('extranets')">
+        {{ structure.toExtranets }}
+      </button>
       <span class="spacer"></span>
       <button mat-button type="button" (click)="saveAndQuitRequested.emit()">
         {{ structure.saveAndQuit }}
@@ -26,7 +55,7 @@
         {{ structure.toQuestionnaire }}
       </button>
     </div>
-  } @else if (view() === 'questionnaire') {
+  } @else {
     <div class="progress-row">
       <p class="progress">
         {{ structure.section }} {{ sectionIndex() + 1 }} {{ structure.of }}
@@ -43,6 +72,9 @@
       [showMissing]="showMissing()"
       (answerChanged)="answerChanged.emit($event)"
     />
+    @if (showMissing() && sectionMissing().length) {
+      <p class="blocked" role="alert">{{ structure.sectionIncomplete }}</p>
+    }
     <div class="actions">
       <button
         mat-button
@@ -55,81 +87,8 @@
       <button mat-button type="button" (click)="saveAndQuitRequested.emit()">
         {{ structure.saveAndQuit }}
       </button>
-      <button mat-flat-button type="button" (click)="nextRequested.emit()">
-        {{ isLastSection() ? structure.toSummary : structure.next }}
-      </button>
-    </div>
-  } @else if (view() === 'missing') {
-    <section class="card">
-      <h2>{{ structure.fillMissingTitle }}</h2>
-      <p class="hint">{{ structure.fillMissingHint }}</p>
-      <div class="fields">
-        @for (question of missingQuestions(); track question.canonicalPath) {
-          <app-question-field
-            [question]="question"
-            [value]="answers()[question.canonicalPath]"
-            [showMissing]="true"
-            (changed)="answerChanged.emit({ path: question.canonicalPath, value: $event })"
-          />
-        }
-      </div>
-    </section>
-    <div class="actions">
-      <button mat-button type="button" (click)="viewChanged.emit('summary')">
-        {{ structure.cancel }}
-      </button>
-      <span class="spacer"></span>
-      <button mat-flat-button type="button" (click)="saveMissingRequested.emit()">
-        {{ structure.saveMissing }}
-      </button>
-    </div>
-  } @else {
-    <section class="card">
-      <h2>{{ structure.summaryTitle }}</h2>
-      <dl>
-        <dt>{{ structure.assure }}</dt>
-        <dd>{{ assure() ? nameOf(assure()!) : '—' }}</dd>
-        <dt>{{ structure.product }}</dt>
-        <dd>{{ product()?.name ?? dossier.productId }}</dd>
-      </dl>
-
-      @if (missing().length) {
-        <div class="missing" role="alert">
-          <h3>{{ structure.missingTitle }} ({{ missing().length }})</h3>
-          <p>{{ structure.missingHint }}</p>
-          <ul>
-            @for (path of missing(); track path) {
-              <li>
-                {{ labels().get(path) ?? 'Champ sans libellé' }}
-                <button mat-button type="button" (click)="fillRequested.emit(path)">
-                  {{ structure.goTo }}
-                </button>
-              </li>
-            }
-          </ul>
-          <button mat-flat-button type="button" class="fill-all" (click)="missingRequested.emit()">
-            {{ structure.fillMissing }}
-          </button>
-        </div>
-      } @else {
-        <p class="complete"><mat-icon>check_circle</mat-icon>{{ structure.complete }}</p>
-      }
-    </section>
-    <div class="actions">
-      <button mat-button type="button" (click)="viewChanged.emit('questionnaire')">
-        {{ structure.backToQuestionnaire }}
-      </button>
-      <span class="spacer"></span>
-      <button mat-button type="button" (click)="saveAndQuitRequested.emit()">
-        {{ structure.saveAndQuit }}
-      </button>
-      <button
-        mat-flat-button
-        type="button"
-        [disabled]="missing().length > 0 || validating()"
-        (click)="validateRequested.emit()"
-      >
-        {{ structure.validate }}
+      <button mat-flat-button type="button" [disabled]="validating()" (click)="nextRequested.emit()">
+        {{ isLastSection() ? structure.finish : structure.next }}
       </button>
     </div>
   }

@@ -17,6 +17,4 @@ export const ProductModel = {
   fromMap,
   /** Catalogue global (écrit par les Cloud Functions). */
   entity: databaseEntity('ci_products', fromMap),
-  /** Produits créés par le cabinet. */
-  cabinetEntity: (cabinetId: string) => databaseEntity(`ci_cabinets/${cabinetId}/ci_products`, fromMap),
 };

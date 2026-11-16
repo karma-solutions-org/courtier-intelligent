@@ -13,4 +13,6 @@
   (cancel)="cancel($event)"
   (openExtranet)="openExtranet($event)"
   (answered)="complete($event.card, $event.answers)"
+  (manualEntry)="openManualEntry($event)"
+  (validate)="store.validateOffer($event.insurer.id)"
 />

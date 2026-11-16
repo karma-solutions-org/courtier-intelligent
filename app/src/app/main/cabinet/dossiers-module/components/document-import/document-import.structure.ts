@@ -6,6 +6,7 @@ export const DOCUMENT_IMPORT_STRUCTURE = {
   importHint: "Importer un document (carte grise, permis, CIN, relevé d'information) : les valeurs lues vous sont proposées, rien n'est enregistré sans votre accord.",
   type: 'Type de document',
   types: {
+    auto: 'Détection automatique',
     carte_grise: 'Carte grise',
     permis: 'Permis de conduire',
     cin: "Carte d'identité (CIN)",

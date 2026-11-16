@@ -8,6 +8,7 @@ import {
   ACTIVE_QUOTE_JOB_STATUSES,
   canLaunchQuoteJob,
   CanonicalData,
+  isOfferToReview,
   QUOTE_JOB_STATUS_LABELS,
   Question,
 } from '@shared';
@@ -17,9 +18,16 @@ import { MissingFieldsFormPresentationComponent } from '../../missing-fields-for
 const TEXT = {
   notStarted: 'Non lancée',
   manual: 'Saisie manuelle',
+  toReview: 'À vérifier',
+  reviewHint:
+    "Tarif lu automatiquement sur l'extranet : comparez-le au devis affiché par l'assureur, puis validez-le ou corrigez-le.",
+  validate: 'Valider le tarif',
+  correct: 'Corriger',
   price: 'Tarifer',
   retry: 'Relancer',
   openExtranet: "Ouvrir l'extranet",
+  manualEntry: "Saisir l'offre",
+  editOffer: "Corriger l'offre",
   requested: "Ouvrez l'extranet de l'assureur : l'extension prend le relais.",
   resuming: "Informations enregistrées : l'extension reprend le remplissage.",
   awaitingSubmit: "Formulaire rempli : vérifiez-le et validez-le vous-même sur l'extranet.",
@@ -64,8 +72,13 @@ export class QuoteCardPresentationComponent {
   /** Annule le job en cours (bloqué, extension fermée…). */
   readonly cancel = output<void>();
   readonly answered = output<CanonicalData>();
+  /** Ouvre la saisie manuelle de l'offre (ou sa correction). */
+  readonly manualEntry = output<void>();
+  /** Valide le tarif lu par l'extension (« à vérifier »). */
+  readonly validate = output<void>();
 
   protected readonly text = TEXT;
+  protected readonly toReview = computed(() => isOfferToReview(this.card().offer));
 
   /** Pas encore lancée, échouée ou annulée ; ou tarif obtenu mais périmé (données du dossier modifiées depuis). */
   protected readonly canLaunch = computed(() => {
@@ -80,6 +93,7 @@ export class QuoteCardPresentationComponent {
 
   protected readonly statusLabel = computed(() => {
     const { job, offer } = this.card();
+    if (isOfferToReview(offer)) return TEXT.toReview;
     if (offer) return QUOTE_JOB_STATUS_LABELS.captured;
     return job ? QUOTE_JOB_STATUS_LABELS[job.status] : TEXT.notStarted;
   });
@@ -87,7 +101,7 @@ export class QuoteCardPresentationComponent {
   /** Couleur du statut : en cours, action du courtier attendue, obtenu, échec. */
   protected readonly tone = computed(() => {
     const { job, offer } = this.card();
-    if (offer?.stale) return 'action';
+    if (offer?.stale || isOfferToReview(offer)) return 'action';
     if (offer || job?.status === 'captured') return 'ok';
     switch (job?.status) {
       case 'failed':

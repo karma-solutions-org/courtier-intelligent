@@ -59,6 +59,7 @@ export function withDossierSync() {
                         answers: dossier.data ?? {},
                         answersFor: id,
                         sectionIndex: dossier.draft?.sectionIndex ?? 0,
+                        selectedInsurers: dossier.insurerIds ?? [],
                       });
                     } else {
                       // Écritures du serveur (OCR, collègue) : appliquées, sauf sur les champs en cours de saisie.
@@ -69,8 +70,8 @@ export function withDossierSync() {
                   }),
                 ),
               ),
-              guard(service.watchProducts(cabinet).pipe(tap((products) => patchState(store, { products })))),
-              guard(service.watchInsurers(cabinet).pipe(tap((insurers) => patchState(store, { insurers })))),
+              guard(service.watchProducts().pipe(tap((products) => patchState(store, { products })))),
+              guard(service.watchInsurers().pipe(tap((insurers) => patchState(store, { insurers })))),
               guard(service.watchMembers(cabinet).pipe(tap((members) => patchState(store, { members })))),
             );
           }),

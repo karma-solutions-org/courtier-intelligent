@@ -1,4 +1,4 @@
-import { Dossier } from '@shared';
+import { Assure, Dossier } from '@shared';
 import { TrashKind } from '../services/trash.service';
 
 /** Ligne de la corbeille : un client ou un dossier supprimé. */
@@ -28,3 +28,35 @@ export interface TrashGroup {
 
 /** Filtre « Afficher » : un type d'élément ou tout. */
 export type TrashKindFilter = TrashKind | 'all';
+
+/** Filtres de la corbeille : texte, type d'élément, période de suppression en jours (0 = toutes). */
+export interface TrashFilters {
+  query: string;
+  kind: TrashKindFilter;
+  period: number;
+}
+
+/** Tranche Firestore d'un groupe (`loaded` : première réponse reçue). */
+export interface TrashPage<T> {
+  items: T[];
+  hasMore: boolean;
+  loaded: boolean;
+}
+
+/** Résultats Elasticsearch de la corbeille (null : pas de filtre, ou service indisponible → filtrage local). */
+export interface TrashSearch {
+  assures: Assure[];
+  dossiers: Dossier[];
+  hasMore: Record<TrashKind, boolean>;
+}
+
+/** Ce qu'il faut pour construire les groupes : tranches Firestore, recherche éventuelle et état des chargements. */
+export interface TrashSources {
+  deletedAssures: TrashPage<Assure>;
+  deletedDossiers: TrashPage<Dossier>;
+  search: TrashSearch | null;
+  dossierAssures: Assure[];
+  loadingMore: Record<TrashKind, boolean>;
+  searchLoadingMore: Record<TrashKind, boolean>;
+  searching: boolean;
+}

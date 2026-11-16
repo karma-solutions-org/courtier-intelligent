@@ -6,6 +6,9 @@
 
 .card {
   display: grid;
+  /* Un contenu large (groupe de boutons, libellé long) ne fait jamais déborder la carte de sa colonne. */
+  min-width: 0;
+  overflow-wrap: anywhere;
   gap: 12px;
   align-content: start;
   padding: 20px;
@@ -17,6 +20,7 @@
 
 header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -26,6 +30,15 @@ h3 {
   margin: 0;
   font-size: 17px;
   font-weight: 600;
+}
+
+.insurer-logo {
+  flex-shrink: 0;
+  width: 64px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #fff;
 }
 
 .status {

@@ -31,7 +31,7 @@ import { toBackendErrorMessage } from '../../../../core/utils/backend-error.util
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
 import { CabinetInfoModel } from '../models/cabinet-info.model';
 import { CatalogChoicesModel } from '../models/catalog-choices.model';
-import { CabinetInsurerInput, CabinetProductInput, SettingsService } from '../services/settings.service';
+import { SettingsService } from '../services/settings.service';
 
 /** Taille d'une tranche du journal (défilement infini). */
 const AUDIT_LOG_PAGE_SIZE = 20;
@@ -141,18 +141,6 @@ export const SettingsStore = signalStore(
         (uid) => service.resetDevice(uid),
         'Appareil réinitialisé : le membre peut se connecter depuis son nouvel appareil.',
       ),
-      createProduct: runAction<{ name: string; baseProductId: string | null }>(
-        ({ name, baseProductId }) => service.createProduct(name, baseProductId),
-        'Produit créé : complétez son questionnaire.',
-      ),
-      updateProduct: runAction<CabinetProductInput>((product) => service.updateProduct(product), 'Produit enregistré.'),
-      archiveProduct: runAction<string>((id) => service.archiveProduct(id), 'Produit retiré.'),
-      addInsurer: runAction<CabinetInsurerInput>((insurer) => service.addInsurer(insurer), 'Assureur ajouté.'),
-      updateInsurer: runAction<{ id: string; insurer: CabinetInsurerInput }>(
-        ({ id, insurer }) => service.updateInsurer(id, insurer),
-        'Assureur modifié.',
-      ),
-      archiveInsurer: runAction<string>((id) => service.archiveInsurer(id), 'Assureur retiré.'),
       saveCatalogChoices: runAction<CatalogChoicesModel>(
         (choices) => onCabinet((id) => service.saveCatalogChoices(id, choices)),
         'Assureurs et produits enregistrés.',
@@ -201,8 +189,8 @@ export const SettingsStore = signalStore(
                       ),
                     ),
                   ),
-                  guarded('produits', service.watchProducts(id).pipe(tap((products) => patchState(store, { products })))),
-                  guarded('assureurs', service.watchInsurers(id).pipe(tap((insurers) => patchState(store, { insurers })))),
+                  guarded('produits', service.watchProducts().pipe(tap((products) => patchState(store, { products })))),
+                  guarded('assureurs', service.watchInsurers().pipe(tap((insurers) => patchState(store, { insurers })))),
                 )
               : EMPTY,
           ),

@@ -2,140 +2,42 @@
   <h2>{{ structure.title }}</h2>
   <p class="hint">{{ structure.hint }}</p>
 
-  <div class="insurers-head">
-    <h3>{{ structure.productsTitle }}</h3>
-    @if (!creatingProduct() && !editingProduct()) {
-      <button mat-stroked-button type="button" (click)="openProductForm()">
-        <mat-icon>add</mat-icon>{{ structure.addProduct }}
-      </button>
-    }
-  </div>
-
-  @if (creatingProduct()) {
-    <form class="insurer-form" (submit)="$event.preventDefault(); createProduct()" novalidate>
-      <p class="form-title">{{ structure.addProduct }}</p>
-      <label>
-        <span>{{ structure.productName }}</span>
-        <input type="text" maxlength="60" placeholder="Habitation, Santé, Multirisque pro…" [value]="productName()" (input)="productName.set($any($event.target).value)" />
-      </label>
-      <label>
-        <span>{{ structure.productBase }}</span>
-        <select class="select" [value]="productBase()" (change)="productBase.set($any($event.target).value)">
-          <option value="">{{ structure.productBlank }}</option>
-          @for (product of products(); track product.id) {
-            <option [value]="product.id">{{ structure.productCopyOf }} {{ product.name }}</option>
-          }
-        </select>
-        <small>{{ structure.productBaseHint }}</small>
-      </label>
-      @if (productSubmitted() && productName().trim().length < 2) {
-        <p class="error" role="alert">{{ structure.errors.productName }}</p>
-      }
-      <div class="form-actions">
-        <button mat-button type="button" (click)="creatingProduct.set(false)">{{ structure.cancel }}</button>
-        <button mat-flat-button class="ci-cta" type="submit" [disabled]="isPending()">{{ structure.createProduct }}</button>
-      </div>
-    </form>
-  }
-
+  <h3>{{ structure.productsTitle }}</h3>
   @for (product of products(); track product.id) {
-    @if (editingProduct() === product.id) {
-      <app-product-editor
-        [product]="product"
-        [isPending]="isPending()"
-        (saved)="productUpdated.emit($event); editingProduct.set(null)"
-        (cancelled)="editingProduct.set(null)"
-      />
-    } @else {
-      <div class="insurer-row">
-        <mat-checkbox [checked]="selectedProducts().includes(product.id)" (change)="toggleProduct(product.id, $event.checked)">
-          {{ product.name }}
-        </mat-checkbox>
-        @if (product.custom) {
-          <span class="badge">{{ structure.customBadge }}</span>
-        }
-        <span class="domain">{{ questionCount(product) }} {{ structure.questionsCount }}</span>
-        <span class="spacer"></span>
-        <!-- Tous les produits : un produit du catalogue modifié ou retiré l'est pour ce cabinet seulement. -->
-        @if (confirmingArchive() === product.id) {
-          <span class="confirm">
-            {{ structure.archiveProductConfirm }}
-            <button mat-button type="button" (click)="confirmingArchive.set(null)">{{ structure.cancel }}</button>
-            <button mat-flat-button class="danger" type="button" [disabled]="isPending()" (click)="archiveProduct(product.id)">
-              {{ structure.archive }}
-            </button>
-          </span>
-        } @else {
-          <button mat-icon-button type="button" [attr.aria-label]="structure.edit + ' ' + product.name" (click)="openProductEditor(product.id)">
-            <mat-icon>edit</mat-icon>
-          </button>
-          <button
-            mat-icon-button
-            type="button"
-            class="danger-text"
-            [attr.aria-label]="structure.archive + ' ' + product.name"
-            (click)="confirmingArchive.set(product.id)"
-          >
-            <mat-icon>delete</mat-icon>
-          </button>
-        }
-      </div>
-    }
+    <div class="row">
+      <mat-checkbox [checked]="selectedProducts().includes(product.id)" (change)="toggleProduct(product.id, $event.checked)">
+        {{ product.name }}
+      </mat-checkbox>
+      <span class="muted">{{ questionCount(product) }} {{ structure.questionsCount }}</span>
+    </div>
   } @empty {
     <p class="hint">{{ structure.noProducts }}</p>
   }
 
-  <div class="insurers-head">
-    <h3>{{ structure.insurersTitle }}</h3>
-    @if (editing() === null) {
-      <button mat-stroked-button type="button" (click)="openForm(null)">
-        <mat-icon>add</mat-icon>{{ structure.addInsurer }}
-      </button>
-    }
-  </div>
-
-  @if (editing() === 'new') {
-    <ng-container *ngTemplateOutlet="form" />
-  }
-
+  <h3>{{ structure.insurersTitle }}</h3>
   @for (insurer of insurers(); track insurer.id) {
-    @if (editing() === insurer.id) {
-      <ng-container *ngTemplateOutlet="form" />
-    } @else {
-      <div class="insurer-row">
-        <mat-checkbox [checked]="selectedInsurers().includes(insurer.id)" (change)="toggleInsurer(insurer.id, $event.checked)">
+    <div class="row">
+      <mat-checkbox [checked]="selectedInsurers().includes(insurer.id)" (change)="toggleInsurer(insurer.id, $event.checked)">
+        <span class="insurer">
+          @if (insurer.logo) {
+            <img class="logo" [src]="insurer.logo" alt="" loading="lazy" />
+          } @else {
+            <span class="logo initial" aria-hidden="true">{{ insurer.name.charAt(0) }}</span>
+          }
           {{ insurer.name }}
-        </mat-checkbox>
-        @if (insurer.custom) {
-          <span class="badge">{{ structure.customBadge }}</span>
-        }
-        <span class="domain">{{ insurer.extranetDomains[0] }}</span>
-        <span class="spacer"></span>
-        <!-- Tous les assureurs : un assureur du catalogue modifié ou retiré l'est pour ce cabinet seulement. -->
-        @if (confirmingArchive() === insurer.id) {
-          <span class="confirm">
-            {{ structure.archiveConfirm }}
-            <button mat-button type="button" (click)="confirmingArchive.set(null)">{{ structure.cancel }}</button>
-            <button mat-flat-button class="danger" type="button" [disabled]="isPending()" (click)="archive(insurer.id)">
-              {{ structure.archive }}
-            </button>
-          </span>
-        } @else {
-          <button mat-icon-button type="button" [attr.aria-label]="structure.edit + ' ' + insurer.name" (click)="openForm(insurer)">
-            <mat-icon>edit</mat-icon>
-          </button>
-          <button
-            mat-icon-button
-            type="button"
-            class="danger-text"
-            [attr.aria-label]="structure.archive + ' ' + insurer.name"
-            (click)="confirmingArchive.set(insurer.id)"
-          >
-            <mat-icon>delete</mat-icon>
-          </button>
-        }
-      </div>
-    }
+        </span>
+      </mat-checkbox>
+      <span class="spacer"></span>
+      <a
+        mat-icon-button
+        [href]="insurer.extranetUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        [attr.aria-label]="structure.openExtranet + ' ' + insurer.name"
+      >
+        <mat-icon>open_in_new</mat-icon>
+      </a>
+    </div>
   } @empty {
     <p class="hint">{{ structure.noInsurers }}</p>
   }
@@ -144,48 +46,3 @@
     <button mat-flat-button type="button" [disabled]="isPending()" (click)="save()">{{ structure.save }}</button>
   </div>
 </section>
-
-<ng-template #form>
-  <form class="insurer-form" (submit)="$event.preventDefault(); submit()" novalidate>
-    <p class="form-title">{{ editing() === 'new' ? structure.addInsurer : structure.editInsurer }}</p>
-
-    <label>
-      <span>{{ structure.insurerName }}</span>
-      <input type="text" maxlength="80" [value]="name()" (input)="name.set($any($event.target).value)" />
-    </label>
-
-    <label>
-      <span>{{ structure.extranetUrl }}</span>
-      <input
-        type="text" inputmode="url"
-        placeholder="https://extranet.assureur.fr"
-        [value]="url()"
-        (input)="url.set($any($event.target).value)"
-      />
-      <small>{{ structure.extranetHint }}</small>
-    </label>
-
-    <fieldset>
-      <legend>{{ structure.insurerProducts }}</legend>
-      @for (product of products(); track product.id) {
-        <mat-checkbox
-          [checked]="formProducts().includes(product.id)"
-          (change)="formProducts.set(toggle(formProducts(), product.id, $event.checked))"
-        >
-          {{ product.name }}
-        </mat-checkbox>
-      }
-    </fieldset>
-
-    @if (formError(); as error) {
-      <p class="error" role="alert">{{ error }}</p>
-    }
-
-    <div class="form-actions">
-      <button mat-button type="button" (click)="closeForm()">{{ structure.cancel }}</button>
-      <button mat-flat-button class="ci-cta" type="submit" [disabled]="isPending()">
-        {{ editing() === 'new' ? structure.addInsurer : structure.save }}
-      </button>
-    </div>
-  </form>
-</ng-template>

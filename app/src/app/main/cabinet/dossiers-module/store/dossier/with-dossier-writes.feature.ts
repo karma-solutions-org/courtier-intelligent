@@ -13,7 +13,7 @@ const AUTOSAVE_DELAY_MS = 800;
 
 /** Écritures en file : exécutées l'une après l'autre, pour qu'un changement de statut voie toujours les dernières réponses. */
 type OperationInput =
-  | { kind: 'save'; event?: boolean; sectionIndex?: number; patch?: AnswerPatch }
+  | { kind: 'save'; event?: boolean; sectionIndex?: number; insurerIds?: string[]; patch?: AnswerPatch }
   | { kind: 'status'; status: DossierStatus }
   | { kind: 'assign'; uid: string }
   | { kind: 'need'; need: NeedInput }
@@ -31,14 +31,18 @@ export function withDossierWrites() {
     { state: type<DossierStoreState>() },
     withMethods((store, service = inject(DossiersService)) => {
       /** Envoie les réponses en attente (rien à faire s'il n'y en a pas). Une erreur les remet en attente. */
-      const persist = (dossierId: string, options: { event?: boolean; sectionIndex?: number }, snapshot?: AnswerPatch): Observable<boolean> =>
+      const persist = (
+        dossierId: string,
+        options: { event?: boolean; sectionIndex?: number; insurerIds?: string[] },
+        snapshot?: AnswerPatch,
+      ): Observable<boolean> =>
         defer(() => {
           // Réponses figées à la mise en file (changement de dossier), sinon celles du dossier encore sélectionné :
           // jamais celles d'un autre dossier.
           const current = store.selectedId() === dossierId;
           const patch = snapshot ?? (current ? store.pending() : {});
           const hasPatch = Object.keys(patch).length > 0;
-          if (!hasPatch && options.sectionIndex === undefined) {
+          if (!hasPatch && options.sectionIndex === undefined && options.insurerIds === undefined) {
             return of(true);
           }
           if (current) {
@@ -83,6 +87,7 @@ export function withDossierWrites() {
               {
                 ...(operation.event !== undefined ? { event: operation.event } : {}),
                 ...(operation.sectionIndex !== undefined ? { sectionIndex: operation.sectionIndex } : {}),
+                ...(operation.insurerIds !== undefined ? { insurerIds: operation.insurerIds } : {}),
               },
               operation.patch,
             );
@@ -136,6 +141,7 @@ export function withDossierWrites() {
             eventsHasMore: false,
             eventsLoadingMore: false,
             assure: null,
+            selectedInsurers: [],
             answers: {},
             answersFor: null,
             pending: {},
@@ -207,6 +213,11 @@ export function withDossierWrites() {
         assign: (uid: string) => enqueue({ kind: 'assign', uid }),
         saveNeed: (need: NeedInput) => enqueue({ kind: 'need', need }),
         validateNeed: () => enqueue({ kind: 'validateNeed' }),
+        /** Extranets retenus pour le dossier : le questionnaire ne pose que leurs questions, la tarification ne montre qu'eux. */
+        selectInsurers: (selectedInsurers: string[]) => {
+          patchState(store, { selectedInsurers });
+          enqueue({ kind: 'save', insurerIds: selectedInsurers });
+        },
         /** Passe à une section et mémorise où le courtier s'est arrêté. */
         goToSection: (sectionIndex: number) => {
           patchState(store, { sectionIndex });

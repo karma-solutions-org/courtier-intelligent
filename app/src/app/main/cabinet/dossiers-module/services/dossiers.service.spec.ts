@@ -84,12 +84,12 @@ describe('DossiersService', () => {
       expect(result).toEqual({ events: [{ id: 'e1' }], hasMore: false });
     });
 
-    it('réunit les produits du catalogue global et ceux du cabinet', async () => {
+    it('lit les produits du catalogue global seulement (les mêmes pour tous les cabinets)', async () => {
       database.givenDocuments('ci_products', [{ id: 'auto' }]).givenDocuments('ci_cabinets/c1/ci_products', [{ id: 'cab-moto' }]);
 
-      const products = await firstValueFrom(service.watchProducts('c1'));
+      const products = await firstValueFrom(service.watchProducts());
 
-      expect(products.map((p) => p.id)).toEqual(['auto', 'cab-moto']);
+      expect(products.map((p) => p.id)).toEqual(['auto']);
     });
 
     it('lit les membres et le client dans le cabinet', async () => {

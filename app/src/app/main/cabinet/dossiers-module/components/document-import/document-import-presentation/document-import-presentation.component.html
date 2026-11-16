@@ -9,7 +9,7 @@
       <mat-form-field appearance="outline" subscriptSizing="dynamic">
         <mat-label>{{ text.type }}</mat-label>
         <mat-select [ngModel]="type()" (ngModelChange)="typeChanged.emit($event)">
-          @for (t of types; track t) {
+          @for (t of pickTypes; track t) {
             <mat-option [value]="t">{{ text.types[t] }}</mat-option>
           }
         </mat-select>
@@ -29,7 +29,7 @@
             <span class="name">{{ picked.file.name }}</span>
             <mat-form-field appearance="outline" subscriptSizing="dynamic">
               <mat-select [ngModel]="picked.type" (ngModelChange)="fileTypeChanged.emit({ id: picked.id, type: $event })" [disabled]="!!busy()">
-                @for (t of types; track t) {
+                @for (t of pickTypes; track t) {
                   <mat-option [value]="t">{{ text.types[t] }}</mat-option>
                 }
               </mat-select>

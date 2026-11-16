@@ -64,6 +64,12 @@ h2 {
   gap: 6px;
 }
 
+/* Produits : noms courts, côte à côte plutôt qu'une ligne pleine largeur chacun (en colonne sur mobile). */
+.choices.products {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
 .choices mat-radio-button {
   padding: 4px 8px;
   border-radius: 8px;

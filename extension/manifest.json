@@ -27,6 +27,7 @@
     "matches": [
       "http://localhost:4200/*",
       "http://localhost:60225/*",
+      "http://127.0.0.1:4200/*",
       "https://courtier-intelligent-test.web.app/*",
       "https://courtier-intelligent-test.firebaseapp.com/*"
     ]

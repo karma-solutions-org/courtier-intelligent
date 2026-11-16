@@ -96,7 +96,10 @@ export class DossierDetailPresentationComponent {
   readonly missing = input<CanonicalPath[]>([]);
   readonly missingLabels = input('');
   readonly isComplete = input(false);
-  readonly editable = input(false);
+  /** Réponses modifiables (avant la tarification, et pendant). */
+  readonly answersEditable = input(false);
+  /** Modification pendant la tarification : les tarifs déjà obtenus deviendront périmés. */
+  readonly editingDuringPricing = input(false);
   readonly saveStatus = input<SaveStatus>('idle');
 
   readonly need = input<NeedAnalysis | null>(null);

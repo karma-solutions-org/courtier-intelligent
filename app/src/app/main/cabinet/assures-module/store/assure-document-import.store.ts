@@ -89,8 +89,11 @@ export const AssureDocumentImportStore = signalStore(
                   service.uploadImport(picked.storagePath, picked.file).pipe(
                     switchMap(() =>
                       service.recognizePiece(picked.storagePath).pipe(
-                        // IA indisponible ou quota atteint : le fichier est bien envoyé, le courtier choisit le type.
-                        catchError(() => of({ type: null })),
+                        // IA indisponible ou quota atteint : le fichier est bien envoyé, le courtier choisit le type (raison affichée).
+                        catchError((error) => {
+                          patchState(store, { error: toBackendErrorMessage(error) });
+                          return of({ type: null });
+                        }),
                       ),
                     ),
                     map(({ type }) => update(picked.id, { type: type ?? 'autre', status: 'ready' })),

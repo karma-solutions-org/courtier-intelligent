@@ -52,6 +52,17 @@ const isYesNo = (field: FormField): boolean =>
   field.options.length === 2 && field.options.every(option => /^(oui|non|yes|no)$/i.test(option.label.trim()));
 
 /**
+ * Réponse de repli quand le dossier n'a pas la donnée demandée par l'extranet : le véhicule stationne en général à
+ * l'adresse du souscripteur, et un véhicule sans date d'achat connue est compté depuis sa mise en circulation.
+ * Utilisée même si l'extranet ne marque pas le champ obligatoire (Zephir ne le signale qu'après « Suivant »).
+ */
+const FALLBACK_PATHS: Partial<Record<CanonicalPath, CanonicalPath>> = {
+  'vehicle.parkingPostalCode': 'client.address.postalCode',
+  'vehicle.parkingCity': 'client.address.city',
+  'vehicle.purchaseDate': 'vehicle.firstRegistrationDate',
+};
+
+/**
  * Transforme le mapping en plan : quoi remplir, quoi demander (champs obligatoires absents du dossier), quoi laisser.
  * Un champ facultatif sans donnée reste vide : l'extension ne remplit rien « par défaut ».
  */
@@ -67,7 +78,8 @@ export function planFill(fields: FormField[], mappings: Mapping[], quoteData: Ca
       unmapped.push(field);
       continue;
     }
-    const value = valueOf(quoteData[path]);
+    const fallback = FALLBACK_PATHS[path];
+    const value = valueOf(quoteData[path]) ?? (fallback ? valueOf(quoteData[fallback]) : null);
     if (value === null) {
       if (field.required && !missing.has(path)) {
         missing.set(path, { canonicalPath: path, label: field.label, type: questionTypeOf(field) });

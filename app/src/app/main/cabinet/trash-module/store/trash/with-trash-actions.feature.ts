@@ -4,9 +4,10 @@ import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { catchError, EMPTY, exhaustMap, Observable, pipe, tap } from 'rxjs';
 import { setNotice } from '../../../../../core/store-features/with-notice';
 import { toBackendErrorMessage } from '../../../../../core/utils/backend-error.utils';
-import { TrashKindFilter, TrashRow } from '../../models/trash.model';
+import { TrashKindFilter, TrashPage, TrashRow, TrashSearch } from '../../models/trash.model';
 import { TrashKind, TrashService } from '../../services/trash.service';
-import { EMPTY_LIMITS, PAGE_SIZE, TrashPage, TrashSearch, TrashStoreState } from './trash.state';
+import { EMPTY_LIMITS, TRASH_PAGE_SIZE } from '../../util/trash.utils';
+import { TrashStoreState } from './trash.state';
 
 /** Lectures paginées exposées par `withTrashReads` et pilotées ici (filtres, défilement). */
 interface TrashReadsProps {
@@ -63,17 +64,18 @@ export function withTrashActions() {
           if (search) {
             if (!search.hasMore[kind] || store._searchLoadingMore()[kind]) return;
             store._searchLoadingMore.update((state) => ({ ...state, [kind]: true }));
-            store._searchLimits.update((limits) => ({ ...limits, [kind]: limits[kind] + PAGE_SIZE }));
+            store._searchLimits.update((limits) => ({ ...limits, [kind]: limits[kind] + TRASH_PAGE_SIZE }));
             return;
           }
           const page = kind === 'assure' ? store._deletedAssures() : store._deletedDossiers();
           if (!page.hasMore || store._loadingMore()[kind]) return;
           store._loadingMore.update((state) => ({ ...state, [kind]: true }));
-          store._limits.update((limits) => ({ ...limits, [kind]: limits[kind] + PAGE_SIZE }));
+          store._limits.update((limits) => ({ ...limits, [kind]: limits[kind] + TRASH_PAGE_SIZE }));
         },
         restore: (row: TrashRow) =>
           run({ action: service.restore(row.kind, row.id), message: row.kind === 'assure' ? 'Client restauré.' : 'Dossier restauré.' }),
         deleteForever: (row: TrashRow) => run({ action: service.deleteForever(row.kind, row.id), message: 'Supprimé définitivement.' }),
       };
-    }),  );
+    }),
+  );
 }

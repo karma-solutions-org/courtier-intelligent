@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { Assure, CanonicalPath, NeedInput, CanonicalValue, Dossier, DossierEvent, DossierStatus, Insurer, Member, Product } from '@shared';
-import { combineLatest, map, Observable, of } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseQueryBuilder, OrderByDirection } from '../../../../core/providers/database-query.builder';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
@@ -12,7 +12,7 @@ import { DossierEventModel } from '../models/entities/dossier-event.model';
 import { DossierModel } from '../../../../core/entities/dossier.model';
 
 /** Réponse de `dossiers-sauvegarder` : statut (peut repasser en brouillon) et complétude recalculée par le serveur. */
-export interface SaveResult {
+interface SaveResult {
   status: DossierStatus;
   completeness: { ok: boolean; missing: CanonicalPath[] };
 }
@@ -81,26 +81,14 @@ export class DossiersService {
       .pipe(map((events) => ({ events, hasMore: events.length >= limit })));
   }
 
-  /**
-   * Produits vus par le cabinet (questionnaire compris) : catalogue global et produits du cabinet,
-   * archivés compris pour que leurs dossiers restent lisibles (un nouveau dossier les écarte).
-   */
-  watchProducts(cabinetId: string): Observable<Product[]> {
-    return combineLatest([
-      this._database.list(ProductModel.entity),
-      this._database.list(ProductModel.cabinetEntity(cabinetId)),
-    ]).pipe(map(([global, cabinet]) => [...global, ...cabinet]));
+  /** Produits du catalogue (questionnaire compris), publiés depuis le dépôt back : les mêmes pour tous les cabinets. */
+  watchProducts(): Observable<Product[]> {
+    return this._database.list(ProductModel.entity);
   }
 
-  /**
-   * Assureurs vus par le cabinet (tarification, historique) : catalogue global et assureurs du cabinet,
-   * archivés compris pour que l'historique garde leur nom (la tarification les écarte).
-   */
-  watchInsurers(cabinetId: string): Observable<Insurer[]> {
-    return combineLatest([
-      this._database.list(InsurerModel.entity),
-      this._database.list(InsurerModel.cabinetEntity(cabinetId)),
-    ]).pipe(map(([global, cabinet]) => [...global, ...cabinet]));
+  /** Assureurs et leurs extranets (tarification, historique), publiés comme les produits. */
+  watchInsurers(): Observable<Insurer[]> {
+    return this._database.list(InsurerModel.entity);
   }
 
   watchMembers(cabinetId: string): Observable<Member[]> {
@@ -112,7 +100,11 @@ export class DossiersService {
     return this._backend.call('dossiers-creer', { assureId, productId });
   }
 
-  save(dossierId: string, patch: AnswerPatch, options: { sectionIndex?: number; event?: boolean } = {}): Observable<SaveResult> {
+  save(
+    dossierId: string,
+    patch: AnswerPatch,
+    options: { sectionIndex?: number; event?: boolean; insurerIds?: string[] } = {},
+  ): Observable<SaveResult> {
     return this._backend.call('dossiers-sauvegarder', { dossierId, patch, ...options });
   }
 

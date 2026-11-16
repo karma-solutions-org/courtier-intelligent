@@ -118,24 +118,26 @@
     @switch (selected()) {
       @case ('infos') {
         <div class="tab">
-          @if (missing().length && editable()) {
+          @if (missing().length && answersEditable()) {
             <p class="warning" role="status">
               {{ structure.missingBanner }}
               {{ missingLabels() }}
             </p>
           }
-          @if (!editable()) {
+          @if (!answersEditable()) {
             <p class="hint">{{ structure.readonlyNote }}</p>
+          } @else if (editingDuringPricing()) {
+            <p class="hint" role="status">{{ structure.pricingEditNote }}</p>
           }
-          <app-document-import-container class="documents" [editable]="editable()" />
+          <app-document-import-container class="documents" [editable]="answersEditable()" />
           <app-questionnaire-form
             [sections]="schema()"
             [data]="answers()"
-            [readonly]="!editable()"
+            [readonly]="!answersEditable()"
             [showMissing]="true"
             (answerChanged)="answerChanged.emit($event)"
           />
-          @if (editable()) {
+          @if (answersEditable()) {
             <div class="actions">
               <button
                 mat-flat-button

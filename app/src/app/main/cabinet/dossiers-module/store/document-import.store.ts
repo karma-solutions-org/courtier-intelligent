@@ -16,14 +16,14 @@ import { catchError, concatMap, defer, EMPTY, exhaustMap, finalize, from, map, o
 import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
 import { DOCUMENT_IMPORT_STRUCTURE } from '../components/document-import/document-import.structure';
-import { DocumentImportBusy, OcrProposal, PickedDocumentFile } from '../models/document-import.model';
+import { DocumentImportBusy, OcrProposal, PickedDocumentFile, PickedDocumentType } from '../models/document-import.model';
 import { DocumentsService } from '../services/documents.service';
-import { defaultOcrSelection, mergeOcrFields, selectedOcrAnswers } from '../util/documents.utils';
+import { defaultOcrSelection, mergeOcrFields, selectedOcrAnswers, willAnalyze } from '../util/documents.utils';
 import { DossierStore } from './dossier.store';
 
 interface DocumentImportState {
-  /** Type proposé pour les prochains fichiers choisis. */
-  type: DossierDocumentType;
+  /** Type proposé pour les prochains fichiers choisis (« auto » : l'IA reconnaît le type). */
+  type: PickedDocumentType;
   /** Fichiers choisis, chacun avec son type (pré-rempli avec le type du menu au moment du choix). */
   files: PickedDocumentFile[];
   busy: DocumentImportBusy;
@@ -46,7 +46,7 @@ const TEXT = DOCUMENT_IMPORT_STRUCTURE;
  */
 export const DocumentImportStore = signalStore(
   withState<DocumentImportState>({
-    type: 'carte_grise',
+    type: 'auto',
     files: [],
     busy: null,
     progress: null,
@@ -57,7 +57,7 @@ export const DocumentImportStore = signalStore(
     documents: [],
   }),
   withComputed(({ files, proposal, selection }, authStore = inject(AuthStore), dossierStore = inject(DossierStore)) => ({
-    anyAnalyzable: computed(() => files().some((picked) => isAnalyzableDocumentType(picked.type))),
+    anyAnalyzable: computed(() => files().some((picked) => willAnalyze(picked.type))),
     selectedCount: computed(() => Object.keys(selectedOcrAnswers(proposal()?.fields ?? [], selection())).length),
     /** Cabinet et dossier ouverts : null tant que l'un manque. */
     _key: computed(() => {
@@ -73,8 +73,8 @@ export const DocumentImportStore = signalStore(
       patchState(store, { proposal: { documentId, fields }, selection: defaultOcrSelection(fields) });
 
     return {
-      setType: (type: DossierDocumentType) => patchState(store, { type }),
-      setFileType: (id: number, type: DossierDocumentType) =>
+      setType: (type: PickedDocumentType) => patchState(store, { type }),
+      setFileType: (id: number, type: PickedDocumentType) =>
         patchState(store, { files: store.files().map((picked) => (picked.id === id ? { ...picked, type } : picked)) }),
       removeFile,
       dismissProposal: () => patchState(store, { proposal: null }),
@@ -112,14 +112,16 @@ export const DocumentImportStore = signalStore(
               return from(queue).pipe(
                 concatMap((picked, index) => {
                   patchState(store, { progress: queue.length > 1 ? { done: index, total: queue.length } : null, busy: 'upload' });
-                  const storagePath = `${dossierDocumentsFolder(key.cabinetId, key.dossierId)}/${picked.type}-${Date.now()}-${safeDocumentFileName(picked.file.name)}`;
+                  // Type inconnu tant que l'IA ne l'a pas reconnu : enregistré comme « autre », corrigé par la lecture.
+                  const registeredType: DossierDocumentType = picked.type === 'auto' ? 'autre' : picked.type;
+                  const storagePath = `${dossierDocumentsFolder(key.cabinetId, key.dossierId)}/${registeredType}-${Date.now()}-${safeDocumentFileName(picked.file.name)}`;
                   return service.upload(storagePath, picked.file).pipe(
-                    switchMap(() => service.register(key.dossierId, picked.type, storagePath, picked.file.name)),
+                    switchMap(() => service.register(key.dossierId, registeredType, storagePath, picked.file.name)),
                     tap(() => removeFile(picked.id)),
                     switchMap(({ documentId }) => {
-                      if (!isAnalyzableDocumentType(picked.type)) return of(null);
+                      if (!willAnalyze(picked.type)) return of(null);
                       patchState(store, { busy: 'analyze' });
-                      return service.analyze(key.dossierId, documentId).pipe(
+                      return service.analyze(key.dossierId, documentId, picked.type === 'auto').pipe(
                         tap(({ status, ocrFields }) => {
                           if (status === 'failed') {
                             failed.push(picked.file.name);

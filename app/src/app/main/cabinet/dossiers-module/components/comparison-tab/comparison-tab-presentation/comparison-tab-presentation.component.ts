@@ -23,6 +23,8 @@ export class ComparisonTabPresentationComponent {
   readonly columns = input<ComparisonColumn[]>([]);
   /** Assureurs dont l'offre est à refaire (dossier modifié depuis le tarif). */
   readonly staleNames = input<string[]>([]);
+  /** Tarifs lus par l'extension pas encore vérifiés : hors comparatif. */
+  readonly toReviewNames = input<string[]>([]);
   readonly canReopen = input(false);
   readonly canDecide = input(false);
   readonly busy = input(false);

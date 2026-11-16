@@ -24,6 +24,11 @@ export interface DossierState {
   products: Product[];
   /** Catalogue des assureurs (onglet Tarification, historique). */
   insurers: Insurer[];
+  /**
+   * Extranets choisis pour ce dossier (étape « Extranets ») : seules leurs questions sont posées, et seuls eux sont
+   * tarifés. Vide : ceux du cabinet. Enregistré sur le dossier (`insurerIds`).
+   */
+  selectedInsurers: string[];
   assure: Assure | null;
   /** Réponses affichées : copie locale du dossier, modifiée à la frappe (l'enregistrement suit). */
   answers: CanonicalData;
@@ -43,6 +48,8 @@ export interface DossierState {
   closing: boolean;
   /** Mise à la corbeille : en cours, faite (la fiche revient à l'espace du client) ou en échec. */
   removeStatus: 'idle' | 'pending' | 'done' | 'failed';
+  /** Pièces du client en cours de lecture : un écran couvre le formulaire du brouillon jusqu'au remplissage. */
+  clientPiecesReading: boolean;
 }
 
 /** État complet vu par les features du dossier (le message ponctuel vient de `withNotice`). */
@@ -60,6 +67,7 @@ export const initialDossierState: DossierState = {
   members: [],
   products: [],
   insurers: [],
+  selectedInsurers: [],
   assure: null,
   answers: {},
   answersFor: null,
@@ -72,4 +80,5 @@ export const initialDossierState: DossierState = {
   successMessage: null,
   closing: false,
   removeStatus: 'idle',
+  clientPiecesReading: false,
 };

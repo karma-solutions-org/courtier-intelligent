@@ -1,4 +1,4 @@
-<div class="field" [class.invalid]="invalid()">
+<div class="field" [class.invalid]="invalid() || !!constraintError()">
   @if (question().withKnowledge) {
     <span class="label">{{ labelText() }}</span>
     @if (question().mustBeKnown) {
@@ -23,6 +23,8 @@
           matInput
           type="number"
           step="any"
+          [attr.min]="constraint()?.min ?? null"
+          [attr.max]="constraint()?.max ?? null"
           [value]="knownNumber() ?? ''"
           [readonly]="readonly()"
           (input)="setKnownNumber($any($event.target).valueAsNumber)"
@@ -65,6 +67,8 @@
             matInput
             type="number"
             step="any"
+            [attr.min]="constraint()?.min ?? null"
+            [attr.max]="numberMax()"
             [value]="value() ?? ''"
             [readonly]="readonly()"
             (input)="changed.emit(toNumber($any($event.target).valueAsNumber))"
@@ -77,6 +81,7 @@
           <input
             matInput
             [matDatepicker]="datePicker"
+            [max]="maxDate()"
             [value]="value() ?? null"
             [readonly]="readonly()"
             placeholder="jj/mm/aaaa"
@@ -97,6 +102,7 @@
             matInput
             [value]="value() ?? ''"
             [readonly]="readonly()"
+            [attr.maxlength]="question().maxLength ?? null"
             autocomplete="off"
             (input)="changed.emit(toText($any($event.target).value))"
           />
@@ -106,6 +112,8 @@
   }
   @if (invalid()) {
     <span class="missing" role="alert">Ce champ est obligatoire</span>
+  } @else if (constraintError(); as error) {
+    <span class="missing" role="alert">{{ error }}</span>
   }
   @if (prefilled()) {
     <span class="prefilled">Pré-rempli d'après l'immatriculation : vérifiez et corrigez si besoin.</span>

@@ -6,7 +6,11 @@ import { CanonicalData, questionsOf } from '@shared';
 import { openConfirmDialog } from '../../../../../../core/components/confirm-dialog/util/confirm-dialog.util';
 import { ExtensionStore } from '../../../../../commons/extension-module/store/extension.store';
 import { DossierStore } from '../../../store/dossier.store';
-import { PricingCard, PricingStore } from '../../../store/pricing.store';
+import { ManualOfferSubmission, PricingCard, PricingStore } from '../../../store/pricing.store';
+import {
+  ManualOfferDialogData,
+  ManualOfferDialogPresentationComponent,
+} from '../../manual-offer-dialog/manual-offer-dialog-presentation/manual-offer-dialog-presentation.component';
 import { PricingTabPresentationComponent } from '../pricing-tab-presentation/pricing-tab-presentation.component';
 
 /** Onglet Tarification : une carte par assureur, avec le statut de son job en temps réel. */
@@ -71,5 +75,19 @@ export class PricingTabContainerComponent {
 
   protected complete(card: PricingCard, answers: CanonicalData): void {
     this.store.complete(card.insurer.id, answers);
+  }
+
+  /** Saisie (ou correction) de l'offre à la main : l'offre est enregistrée à la fermeture du dialogue. */
+  protected async openManualEntry(card: PricingCard): Promise<void> {
+    const dialog = this._dialog.open<ManualOfferDialogPresentationComponent, ManualOfferDialogData, ManualOfferSubmission>(
+      ManualOfferDialogPresentationComponent,
+      {
+        data: { insurerName: card.insurer.name, guarantees: this.dossierStore.guarantees(), offer: card.offer },
+        width: '720px',
+        maxWidth: '95vw',
+      },
+    );
+    const submission = await firstValueFrom(dialog.afterClosed());
+    if (submission) this.store.saveManualOffer(card.insurer.id, submission);
   }
 }

@@ -198,6 +198,10 @@ describe('members', () => {
     await assertFails(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { planId: 'max' }));
     await assertFails(updateDoc(doc(app('brokerA'), `ci_cabinets/${A}`), { name: 'Nouveau nom' }));
     await assertSucceeds(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { name: 'Nouveau nom' }));
+    await assertSucceeds(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { enabledInsurers: ['axa', 'oyat'], enabledProducts: ['auto'] }));
+    await assertFails(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { enabledInsurers: 'axa' }));
+    await assertFails(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { enabledInsurers: Array.from({ length: 101 }, (_, i) => `a${i}`) }));
+    await assertFails(updateDoc(doc(app('adminA'), `ci_cabinets/${A}`), { enabledProducts: { auto: true } }));
   });
 });
 
@@ -219,9 +223,10 @@ describe('assures', () => {
   const col = () => collection(app('brokerA'), `ci_cabinets/${A}/ci_assures`);
   const as1 = () => doc(app('brokerA'), `ci_cabinets/${A}/ci_assures/as1`);
   const created = (o = {}, extra = {}) => ({ ...assureData(o), createdBy: 'brokerA', createdAt: serverTimestamp(), ...extra });
-  it('create with legitimate payloads (AssuresService.create)', async () => {
-    await assertSucceeds(addDoc(col(), created()));
-    await assertSucceeds(addDoc(col(), created({ type: 'pro', civilite: null, birthDate: null, companyName: 'ACME', siret: '12345678901234' })));
+  // Création par la function assures-creer seulement (contrôle de doublon en transaction).
+  it('create denied even with a legitimate payload', async () => {
+    await assertFails(addDoc(col(), created()));
+    await assertFails(addDoc(collection(app('adminA'), `ci_cabinets/${A}/ci_assures`), created({}, { createdBy: 'adminA' })));
   });
   it('create denied with createdBy of someone else', async () => {
     await assertFails(addDoc(col(), created({}, { createdBy: 'broker2A' })));
@@ -231,8 +236,11 @@ describe('assures', () => {
     await assertFails(addDoc(col(), created({ lastName: 'x'.repeat(201) })));
     await assertFails(addDoc(col(), created({ firstName: 'x'.repeat(201) })));
   });
-  it('update with legitimate payload (AssuresService.update)', async () => {
-    await assertSucceeds(updateDoc(as1(), { ...assureData({ firstName: 'Paul', email: null }), updatedAt: serverTimestamp() }));
+  it('update with legitimate payload, email and SIRET unchanged', async () => {
+    await assertSucceeds(updateDoc(as1(), { ...assureData({ firstName: 'Paul' }), updatedAt: serverTimestamp() }));
+  });
+  it('update denied: email change (function assures-modifier only)', async () => {
+    await assertFails(updateDoc(as1(), { ...assureData({ email: 'autre@example.fr' }), updatedAt: serverTimestamp() }));
   });
   it('update denied: createdBy change, unknown keys, oversized names, big address', async () => {
     await assertFails(updateDoc(as1(), { ...assureData(), createdBy: 'brokerA', updatedAt: serverTimestamp() }));
@@ -242,9 +250,10 @@ describe('assures', () => {
     const address = Object.fromEntries(Array.from({ length: 11 }, (_, i) => [`k${i}`, 'v']));
     await assertFails(updateDoc(as1(), { ...assureData({ address }), updatedAt: serverTimestamp() }));
   });
-  it('delete: admin only', async () => {
+  // Rattaché à ses dossiers : corbeille et suppression passent par les functions.
+  it('delete denied, admin included', async () => {
     await assertFails(deleteDoc(as1()));
-    await assertSucceeds(deleteDoc(doc(app('adminA'), `ci_cabinets/${A}/ci_assures/as1`)));
+    await assertFails(deleteDoc(doc(app('adminA'), `ci_cabinets/${A}/ci_assures/as1`)));
   });
 });
 
@@ -290,6 +299,17 @@ describe('offers (extension writeCapturedOffer batch)', () => {
     batch.update(doc(db, `${base}/ci_quoteJobs/${id}`), { status: 'captured', missingFields: [], error: null, updatedAt: serverTimestamp() });
     return batch.commit();
   }
+  // L'extension n'écrit d'offre que pendant la tarification (ciExtDossierPricing).
+  const setDossier = data =>
+    env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), `ci_cabinets/${A}/ci_dossiers/${D}`), data));
+  beforeEach(() => setDossier({ status: 'tarification' }));
+
+  it('denied outside pricing or in the trash', async () => {
+    await setDossier({ status: 'en_cours' });
+    await assertFails(capture('axa'));
+    await setDossier({ status: 'comparaison', deletedAt: new Date() });
+    await assertFails(capture('axa'));
+  });
   it('owner writes auto offer + job captured in one batch', async () => {
     await assertSucceeds(capture('axa'));
   });
@@ -318,6 +338,36 @@ describe('offers (extension writeCapturedOffer batch)', () => {
     await assertFails(capture('axa', capturedOffer({ quoteNumber: 'x'.repeat(61) })));
     await assertFails(capture('axa', capturedOffer({ capturedAt: new Date(0) })));
     await assertFails(capture('axa', capturedOffer({ guarantees: Array.from({ length: 61 }, () => ({ label: 'g' })) })));
+  });
+  it('auto offer written « to review » (pending) only', async () => {
+    await assertSucceeds(capture('axa', capturedOffer({ review: 'pending' })));
+    await setJobStatus('axa', 'awaiting_submit');
+    await assertFails(capture('axa', capturedOffer({ review: 'validated' })));
+  });
+});
+
+describe('offer review (app validates an auto offer)', () => {
+  const offerPath = id => `ci_cabinets/${A}/ci_dossiers/${D}/ci_offers/${id}`;
+  const validation = (uid = 'brokerA') => ({ review: 'validated', reviewedBy: uid, reviewedAt: serverTimestamp() });
+  async function seedOffer(id, data) {
+    await env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), offerPath(id)), data));
+  }
+
+  it('member validates a pending auto offer', async () => {
+    await seedOffer('axa', { ...capturedOffer({ capturedAt: null }), review: 'pending' });
+    await assertSucceeds(updateDoc(doc(app('brokerA'), offerPath('axa')), validation()));
+  });
+  it('denied: other fields, other reviewer, wrong state', async () => {
+    await seedOffer('axa', { ...capturedOffer({ capturedAt: null }), review: 'pending' });
+    await assertFails(updateDoc(doc(app('brokerA'), offerPath('axa')), { ...validation(), premiumAnnual: 1 }));
+    await assertFails(updateDoc(doc(app('brokerA'), offerPath('axa')), validation('adminA')));
+    await assertFails(updateDoc(doc(app('brokerA'), offerPath('axa')), { review: 'pending', reviewedBy: 'brokerA', reviewedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(app('adminB'), offerPath('axa')), validation('adminB')));
+  });
+  it('denied on a manual or already confirmed offer', async () => {
+    await seedOffer('allianz', capturedOffer({ capturedAt: null }));
+    await assertFails(updateDoc(doc(app('brokerA'), offerPath('allianz')), validation()));
+    await assertFails(updateDoc(doc(app('brokerA'), offerPath('manual')), validation()));
   });
 });
 
@@ -376,6 +426,17 @@ describe('global resources', () => {
     await assertSucceeds(addDoc(collection(db, 'ci_extensionReports'), report));
     await assertFails(addDoc(collection(db, 'ci_extensionReports'), { ...report, origin: 'https://extranet.axa.fr/client?id=1' }));
     await assertFails(addDoc(collection(app('brokerA'), 'ci_extensionReports'), report));
+  });
+  it('extension reports: blocked-step snapshot only with its codes, capped', async () => {
+    const db = ext('brokerA');
+    const field = { label: 'Usage', kind: 'select', required: true, status: 'failed', path: 'vehicle.usage', failure: 'no_option', optionCount: 0 };
+    const snapshot = { stepNumber: 2, fields: [field], buttons: ['Suivant'] };
+    const blocked = { insurerId: 'axa', origin: 'https://extranet.axa.fr', step: 'fill', issue: 'step_blocked', snapshot, at: serverTimestamp() };
+    await assertSucceeds(addDoc(collection(db, 'ci_extensionReports'), blocked));
+    await assertSucceeds(addDoc(collection(db, 'ci_extensionReports'), { ...blocked, issue: 'advance_refused' }));
+    await assertFails(addDoc(collection(db, 'ci_extensionReports'), { ...blocked, issue: 'fill_failed' }));
+    await assertFails(addDoc(collection(db, 'ci_extensionReports'), { ...blocked, snapshot: { ...snapshot, html: '<form>' } }));
+    await assertFails(addDoc(collection(db, 'ci_extensionReports'), { ...blocked, snapshot: { ...snapshot, fields: Array(81).fill(field) } }));
   });
   it('catalogue read by active member, write denied', async () => {
     await assertSucceeds(getDoc(doc(app('brokerA'), 'ci_products/p1')));

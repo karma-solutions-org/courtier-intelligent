@@ -16,7 +16,7 @@ export interface NavSection {
 const ALL: UserRole[] = ['admin', 'courtier'];
 
 /** Menu latéral : chaque entrée n'est affichée qu'aux rôles indiqués. */
-export const NAVIGATION: NavSection[] = [
+const NAVIGATION: NavSection[] = [
   {
     title: null,
     items: [

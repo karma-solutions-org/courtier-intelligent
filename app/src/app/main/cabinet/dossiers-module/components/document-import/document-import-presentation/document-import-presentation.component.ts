@@ -13,10 +13,9 @@ import {
   DOSSIER_DOCUMENT_MIME_TYPES,
   DOSSIER_DOCUMENT_TYPES,
   DossierDocument,
-  DossierDocumentType,
   isAnalyzableDocumentType,
 } from '@shared';
-import { DocumentImportBusy, OcrProposal, PickedDocumentFile } from '../../../models/document-import.model';
+import { DocumentImportBusy, OcrProposal, PickedDocumentFile, PickedDocumentType } from '../../../models/document-import.model';
 import { formatOcrValue, needsConfirmation } from '../../../util/documents.utils';
 import { DOCUMENT_IMPORT_STRUCTURE } from '../document-import.structure';
 
@@ -35,8 +34,8 @@ export class DocumentImportPresentationComponent {
   /** Import et application des valeurs lues (dossier modifiable) ; sinon, liste seule. */
   readonly editable = input(true);
   readonly documents = input<DossierDocument[]>([]);
-  /** Type proposé pour les prochains fichiers choisis. */
-  readonly type = input<DossierDocumentType>('carte_grise');
+  /** Type proposé pour les prochains fichiers choisis (« auto » : l'IA reconnaît le type). */
+  readonly type = input<PickedDocumentType>('auto');
   readonly files = input<PickedDocumentFile[]>([]);
   readonly busy = input<DocumentImportBusy>(null);
   /** Import de plusieurs fichiers : position dans la file (affichée « 2/5 »). */
@@ -52,9 +51,9 @@ export class DocumentImportPresentationComponent {
   /** Réponses actuelles du dossier (pour comparer avant d'appliquer). */
   readonly answers = input<CanonicalData>({});
 
-  readonly typeChanged = output<DossierDocumentType>();
+  readonly typeChanged = output<PickedDocumentType>();
   readonly filesPicked = output<FileList | null>();
-  readonly fileTypeChanged = output<{ id: number; type: DossierDocumentType }>();
+  readonly fileTypeChanged = output<{ id: number; type: PickedDocumentType }>();
   readonly fileRemoved = output<number>();
   readonly importRequested = output<void>();
   readonly analyzeRequested = output<string>();
@@ -65,7 +64,8 @@ export class DocumentImportPresentationComponent {
   readonly downloadRequested = output<DossierDocument>();
 
   protected readonly text = DOCUMENT_IMPORT_STRUCTURE;
-  protected readonly types = DOSSIER_DOCUMENT_TYPES;
+  /** Choix proposés à l'import : « auto » laisse l'IA reconnaître le type de chaque fichier. */
+  protected readonly pickTypes: PickedDocumentType[] = ['auto', ...DOSSIER_DOCUMENT_TYPES];
   protected readonly acceptedTypes = DOSSIER_DOCUMENT_MIME_TYPES.join(',');
   protected readonly format = formatOcrValue;
   protected readonly toConfirm = needsConfirmation;

@@ -14,6 +14,13 @@
       Relancez-les depuis l'étape Tarification.
     </p>
   }
+  @if (toReviewNames().length) {
+    <p class="error" role="status">
+      <mat-icon>warning</mat-icon>
+      Tarifs à vérifier, absents du comparatif : {{ toReviewNames().join(', ') }}.
+      Validez-les ou corrigez-les depuis l'étape Tarification.
+    </p>
+  }
   @if (decision(); as decision) {
     <p class="decided" role="status">
       <mat-icon>check_circle</mat-icon>
