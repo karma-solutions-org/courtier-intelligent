@@ -1,7 +1,13 @@
-import { JobUpdateError } from '../engine/runner';
+import { matchesUrlPattern } from '@shared';
+import { isAuthPage } from '../engine/analyzer';
+import { describeClick, documentsOf, findActionTarget } from '../engine/entry-path';
+import { JobUpdateError } from '../engine/runner-ports';
+import type { FormLayout } from '../engine/layout-ai';
 import { LoadedMemory, MemoryPort, type MemorySaveOutcome } from '../engine/memory';
 import { FormRunner } from '../engine/runner';
-import { AskAiResponse, ExtensionMessage, JobContext, JobUpdate, RUNNER_PORT, type UpdateJobResponse, RunState, TabMessage } from '../shared/messages';
+import { waitForSettled } from '../engine/steps';
+import { createFloatingBar, type FloatingBar } from './floating-bar';
+import { AskAiResponse, EntryInstruction, ExtensionMessage, JobContext, JobUpdate, RUNNER_PORT, type UpdateJobResponse, type FieldsDiscoveredResponse, RunState, TabMessage } from '../shared/messages';
 
 /** Compte les champs de formulaire visibles (affiché dans le side panel). */
 function countVisibleFields(): number {
@@ -11,6 +17,26 @@ function countVisibleFields(): number {
 }
 
 let runner: FormRunner | null = null;
+/** Barre flottante (pause, sauvegarde du tarif) de la page principale pendant un remplissage. */
+let bar: FloatingBar | null = null;
+
+/** Message de la barre selon l'état publié par le remplissage (capture du tarif surtout). */
+function barStatusFor(state: RunState): string | null {
+  switch (state.phase) {
+    case 'capturing':
+      return 'Lecture du tarif affiché…';
+    case 'capture_review':
+      return 'Enregistrement…';
+    case 'capture_failed':
+      return 'Aucun tarif lisible';
+    default:
+      return null;
+  }
+}
+/** Arrête le remplissage de la page (apprentissage du chemin d'accès), ou null sans remplissage. */
+let stopRunner: (() => void) | null = null;
+/** Job de la page (page principale) : le remplissage reprend avec lui après l'apprentissage. */
+let currentJob: JobContext | null = null;
 
 /** Arrête le remplissage en cours (fermeture de la page ou extension rechargée). */
 const teardowns: (() => void)[] = [];
@@ -62,8 +88,20 @@ const memoryPort: MemoryPort = {
   invalidate: async key => void (await send({ type: 'MEMORY_INVALIDATE', key })),
 };
 
-/** Lance le remplissage de l'extranet pour ce job. */
-async function startRunner(job: JobContext): Promise<void> {
+/** La page principale de l'onglet n'est qu'un <frameset> (même origine) : aucun contenu ne peut s'y afficher. */
+function topIsFrameset(): boolean {
+  try {
+    return window.top?.document.body?.tagName === 'FRAMESET';
+  } catch {
+    return false; // page principale d'une autre origine : illisible
+  }
+}
+
+/**
+ * Lance le remplissage de l'extranet pour ce job. `waitForForm` : apprentissage du chemin en cours, la page est
+ * seulement observée jusqu'au formulaire de devis (voir RunnerPorts.waitForForm).
+ */
+async function startRunner(job: JobContext, waitForForm = false): Promise<void> {
   // Un port ouvert garde le service worker éveillé et lui permet de nous prévenir quand le dossier change.
   // Le service worker redémarre (et coupe le port) : on le rouvre tant que la page est ouverte.
   let port: chrome.runtime.Port | null = null;
@@ -99,13 +137,36 @@ async function startRunner(job: JobContext): Promise<void> {
       const saved = await send<UpdateJobResponse>({ type: 'UPDATE_JOB', dossierId: job.dossierId, insurerId: job.insurerId, update });
       if (!saved?.ok) throw new JobUpdateError(saved?.message ?? 'Avancement non enregistré dans l’application.', saved?.cancelled === true);
     },
-    publish: (state: RunState) => void send({ type: 'RUN_STATE', state }).catch(() => undefined),
+    publish: (state: RunState) => {
+      const text = barStatusFor(state);
+      if (text) bar?.setStatus(text);
+      void send({ type: 'RUN_STATE', state }).catch(() => undefined);
+    },
     memory: memoryPort,
     reportDiscovered: async (fingerprint, fields, requiredPaths) =>
-      void (await send({ type: 'FIELDS_DISCOVERED', fingerprint, fields, requiredPaths })),
+      (await send<FieldsDiscoveredResponse>({ type: 'FIELDS_DISCOVERED', fingerprint, fields, requiredPaths }))?.mapping ?? {},
+    fieldsSeen: fields => void send({ type: 'FIELDS_SEEN', fields }).catch(() => undefined),
     origin: location.origin,
-    reportIssue: async (step, issue) =>
-      void (await send({ type: 'REPORT_ISSUE', insurerId: job.insurerId, origin: location.origin, step, issue })),
+    waitForForm,
+    autoAdvance: true,
+    // Formulaire de devis atteint : l'apprentissage automatique du chemin d'accès s'arrête et l'enregistre.
+    formReached: () => {
+      stopRecording();
+      void send({ type: 'ENTRY_FORM_REACHED' }).catch(() => undefined);
+    },
+    // Lecture de la mise en page par l'IA : gardée dans le navigateur (structure seulement), par extranet et formulaire.
+    layoutCache: {
+      load: async fingerprint => {
+        const key = `layout:${location.origin}:${fingerprint}`;
+        const stored = await chrome.storage.local.get(key);
+        return (stored[key] as FormLayout | undefined) ?? null;
+      },
+      save: async (fingerprint, layout) => {
+        await chrome.storage.local.set({ [`layout:${location.origin}:${fingerprint}`]: layout });
+      },
+    },
+    reportIssue: async (step, issue, snapshot) =>
+      void (await send({ type: 'REPORT_ISSUE', insurerId: job.insurerId, origin: location.origin, step, issue, snapshot })),
     askAi: async request => {
       const response = await send<AskAiResponse>({ type: 'ASK_AI', purpose: request.purpose, messages: request.messages, maxTokens: request.maxTokens });
       if (!response.ok) throw new Error(response.message);
@@ -121,36 +182,87 @@ async function startRunner(job: JobContext): Promise<void> {
       // Port déjà invalide (contexte perdu).
     }
     runner?.stop();
+    bar?.destroy();
+    bar = null;
   };
   teardowns.push(stop);
+  stopRunner = () => {
+    stop();
+    runner = null;
+    stopRunner = null;
+    void send({ type: 'RUN_STATE', state: null }).catch(() => undefined);
+  };
   window.addEventListener('pagehide', () => {
     stop();
     void send({ type: 'RUN_STATE', state: null }).catch(() => undefined);
   });
+  // Une barre par onglet : sur la page principale, ou dans le cadre qui remplit quand la page principale n'est qu'un
+  // <frameset> (Oyat : rien ne peut s'y afficher). Jamais dans une iframe d'une page normale (publicité, menu…).
+  if (window === window.top || topIsFrameset()) {
+    const current = runner;
+    bar = createFloatingBar(document, {
+      pause: () => current.pause(),
+      resume: () => void current.resume(),
+      save: () => current.captureNow().then(() => true, () => false),
+    });
+    // « Sauvegarder le tarif » seulement quand un tarif est affiché : vérifié quand la page cesse de bouger.
+    let tariffCheck: ReturnType<typeof setTimeout> | undefined;
+    const checkTariff = () => bar?.setSaveVisible(current.hasTariffOnPage());
+    const watcher = new MutationObserver(() => {
+      clearTimeout(tariffCheck);
+      tariffCheck = setTimeout(checkTariff, 700);
+    });
+    watcher.observe(document.body, { childList: true, subtree: true, characterData: true });
+    teardowns.push(() => {
+      watcher.disconnect();
+      clearTimeout(tariffCheck);
+    });
+    checkTariff();
+  }
   await runner.start();
 }
 
 /** Répond toujours : `false` sans remplissage en cours ou si l'action échoue (l'appelant n'attend jamais en vain). */
-function respond(action: Promise<unknown> | undefined, sendResponse: (response: boolean) => void): true {
-  if (!action) sendResponse(false);
-  else action.then(() => sendResponse(true), () => sendResponse(false));
+function respond(action: Promise<unknown>, sendResponse: (response: boolean) => void): true {
+  action.then(() => sendResponse(true), () => sendResponse(false));
   return true;
 }
 
 chrome.runtime.onMessage.addListener((message: TabMessage, sender, sendResponse) => {
   // Seul le service worker de cette extension nous parle (jamais un autre onglet).
   if (sender.id !== chrome.runtime.id || sender.tab) return false;
+  // Apprentissage du chemin d'accès : envoyé à tous les cadres (les boutons d'Oyat sont dans des cadres).
+  if (message.type === 'ENTRY_RECORD_START') {
+    stopRunner?.();
+    startRecording();
+    sendResponse(true);
+    return false;
+  }
+  if (message.type === 'ENTRY_RECORD_STOP') {
+    stopRecording();
+    // Envoyé à tous les cadres : seul un cadre qui porte des champs reprend le remplissage (pas le menu).
+    if (currentJob && !runner && (window === window.top || countVisibleFields() > 0)) void startRunner(currentJob).catch(() => undefined);
+    sendResponse(true);
+    return false;
+  }
+  // Le message est envoyé à tous les cadres de l'onglet : seul celui qui remplit répond (les autres laissent la main).
+  if (!runner) return false;
   switch (message.type) {
     case 'MANUAL_MAP':
-      return respond(runner?.manualMap(message.fieldKey, message.canonicalPath), sendResponse);
+      return respond(runner.manualMap(message.fieldKey, message.canonicalPath), sendResponse);
     case 'REFILL':
-      return respond(runner?.refill(), sendResponse);
+      return respond(runner.refill(), sendResponse);
     case 'JOB_CHANGED':
-      return respond(runner?.updateJob(message.job), sendResponse);
+      return respond(runner.updateJob(message.job), sendResponse);
     case 'CAPTURE_NOW':
-      return respond(runner?.captureNow(), sendResponse);
+      return respond(runner.captureNow(), sendResponse);
+    case 'CAPTURE_SAVE_FAILED':
+      bar?.setStatus('Tarif non enregistré : voir le panneau');
+      sendResponse(true);
+      return false;
     case 'CAPTURE_DONE':
-      runner?.stop();
+      runner.stop();
+      bar?.setStatus('Tarif enregistré ✓');
       sendResponse(true);
       return false;
   }
@@ -171,11 +283,156 @@ async function findJob(): Promise<JobContext | null> {
   return null;
 }
 
-// Page analysée (side panel), puis : y a-t-il un job de tarification pour l'assureur de cet extranet ?
-send({ type: 'PAGE_DETECTED', origin: location.origin, title: document.title, fieldCount: countVisibleFields() }).catch(() => {
-  // Le service worker peut être en cours de redémarrage : rien à faire.
-});
-void findJob()
-  .then(job => (job ? startRunner(job) : undefined))
-  .catch(() => undefined);
+/** Attend que des champs apparaissent (formulaire chargé après coup) ; false si rien au bout de `timeoutMs`. */
+async function waitForFields(timeoutMs = 15_000): Promise<boolean> {
+  for (let waited = 0; countVisibleFields() === 0; waited += 1_000) {
+    if (waited >= timeoutMs) return false;
+    await delay(1_000);
+  }
+  return true;
+}
+
+// ── Chemin d'accès au formulaire (profil d'extranet) ────────────────────────
+/** Apprentissage : chaque clic de navigation du courtier est envoyé au service worker. */
+const recordClick = (event: MouseEvent) => {
+  // La connexion n'est pas un clic du chemin (« Se connecter ») : le rejeu attend que le courtier se connecte.
+  if (isAuthPage(document)) return;
+  const action = describeClick(event.target, location.href);
+  if (action) void send({ type: 'ENTRY_RECORDED', action }).catch(() => undefined);
+};
+
+function startRecording(): void {
+  document.removeEventListener('click', recordClick, true);
+  document.addEventListener('click', recordClick, true);
+}
+
+function stopRecording(): void {
+  document.removeEventListener('click', recordClick, true);
+}
+
+/** Délai pour trouver le bouton du prochain clic (menu chargé après coup, animation). */
+const ENTRY_TARGET_TIMEOUT_MS = 10_000;
+
+/**
+ * Attend que le courtier se soit connecté à l'extranet : la page de connexion disparaît (application d'une seule page).
+ * Si la connexion recharge la page, ce script s'arrête et celui de la page suivante reprend là où on en était.
+ */
+async function waitForLogin(): Promise<void> {
+  while (isAuthPage(document)) {
+    await delay(1000);
+  }
+  await waitForSettled(document);
+}
+
+/**
+ * Rejoue le chemin d'accès enregistré, clic par clic, tant que la page reste la même (application d'une seule page) ;
+ * une page rechargée reprend au clic suivant (l'avancement est gardé par le service worker, noté AVANT chaque clic).
+ * Renvoie `recording` si le courtier apprend le chemin, `done` quand il faut remplir la page.
+ */
+/** Étapes du chemin d'accès dans la console de la page (jamais de donnée : libellés des boutons et adresses des cadres). */
+const trace = (...parts: unknown[]) => console.info('[Courtier Intelligent] chemin :', ...parts);
+
+async function runEntry(): Promise<'recording' | 'learning' | 'watch' | 'done'> {
+  for (;;) {
+    const instruction = await send<EntryInstruction | false>({ type: 'ENTRY_GET' }).catch(() => false as const);
+    trace('instruction', instruction ? instruction.mode : 'injoignable');
+    if (!instruction) return 'done';
+    if (instruction.mode === 'none') return instruction.waitForForm ? 'watch' : 'done';
+    if (instruction.mode === 'record') {
+      startRecording();
+      // Apprentissage automatique : la page est observée, et remplie dès que le formulaire de devis est reconnu (le
+      // chemin s'enregistre alors).
+      return instruction.auto ? 'learning' : 'recording';
+    }
+    // Page de connexion : le courtier se connecte lui-même ; le chemin reprend dès qu'elle disparaît.
+    await waitForLogin();
+    const { action, index } = instruction;
+    trace(`clic ${index + 1} : « ${action.label} »`, 'page attendue', action.urlPattern, 'pages vues', documentsOf(document).map(d => d.location.pathname));
+    // Le premier clic se fait sur la page où il a été appris : ailleurs (formulaire déjà ouvert), le chemin est passé.
+    // Clic appris dans un cadre (Oyat) : c'est l'adresse du cadre qui compte, et les cadres se chargent après la page
+    // principale : on attend qu'ils soient là (ou que le bouton apparaisse) avant de conclure que la page est autre.
+    const onLearnedPage = () =>
+      documentsOf(document).some(d => matchesUrlPattern(d.location.href, action.urlPattern)) || !!findActionTarget(document, action);
+    for (let waited = 0; index === 0 && !onLearnedPage() && waited < ENTRY_TARGET_TIMEOUT_MS; waited += 500) await delay(500);
+    if (index === 0 && !onLearnedPage()) {
+      trace('page du premier clic absente : chemin du catalogue, ou réapprentissage');
+      await send({ type: 'ENTRY_FAILED', index, reason: 'skipped' }).catch(() => undefined);
+      // Le service worker propose la suite (chemin du catalogue, apprentissage) : on la relit.
+      continue;
+    }
+    let target = findActionTarget(document, action);
+    for (let waited = 0; !target && waited < ENTRY_TARGET_TIMEOUT_MS; waited += 500) {
+      await delay(500);
+      target = findActionTarget(document, action);
+    }
+    if (!target) {
+      trace('bouton introuvable');
+      await send({ type: 'ENTRY_FAILED', index, reason: 'not_found' }).catch(() => undefined);
+      if (index === 0) continue;
+      return 'watch';
+    }
+    // Avancement non noté (service worker injoignable) : on ne clique pas, la page se remplit telle quelle.
+    if (!(await send<boolean>({ type: 'ENTRY_CLICKED', index }).catch(() => false))) {
+      trace('avancement non enregistré : pas de clic');
+      return 'done';
+    }
+    trace('clic fait dans', target.ownerDocument.location.pathname);
+    target.click();
+    await waitForSettled(document);
+  }
+}
+
+/**
+ * Le script tourne dans chaque cadre de l'extranet. Seul le cadre qui porte le formulaire remplit : une iframe sans
+ * champ (publicité, menu…) reste muette ; la page principale qui ne fait qu'inclure le formulaire dans une iframe aussi.
+ */
+async function main(): Promise<void> {
+  const isTopFrame = window === window.top;
+  const detect = () =>
+    send({ type: 'PAGE_DETECTED', origin: location.origin, title: document.title, fieldCount: countVisibleFields() }).catch(() => {
+      // Le service worker peut être en cours de redémarrage : rien à faire.
+    });
+  if (isTopFrame) void detect();
+  const hasFrames = document.querySelector('iframe, frame') !== null;
+  if (isTopFrame) {
+    // Y a-t-il un job de tarification pour l'assureur de cet extranet ?
+    trace('page principale chargée');
+    const job = await findJob();
+    if (!job) {
+      trace('aucun job de tarification pour cet extranet');
+      return;
+    }
+    // Page principale : d'abord le chemin d'accès jusqu'au formulaire (appris ou rejoué), même si les boutons sont
+    // dans des cadres (Oyat), puis le remplissage.
+    currentJob = job;
+    trace('page principale : job', job.insurerId);
+    const entry = await runEntry();
+    trace('fin du chemin :', entry);
+    if (entry === 'recording') return;
+    // Formulaire dans un cadre : c'est le script du cadre qui remplit.
+    if (hasFrames && !(await waitForFields())) return;
+    // Sans chemin à rejouer, la connexion à l'extranet est attendue aussi avant de remplir.
+    await waitForLogin();
+    await startRunner(job, entry === 'learning' || entry === 'watch');
+    return;
+  }
+  if (!(await waitForFields())) return;
+  void detect();
+  const job = await findJob();
+  if (!job) return;
+  // Chemin d'accès en cours de rejeu (par la page principale) : ce cadre n'est pas encore le formulaire de devis.
+  const instruction = await send<EntryInstruction | false>({ type: 'ENTRY_GET' }).catch(() => false as const);
+  if (instruction && instruction.mode === 'replay') return;
+  currentJob = job;
+  // Apprentissage : les clics du courtier dans ce cadre font partie du chemin ; le cadre est seulement observé
+  // jusqu'au formulaire de devis (apprentissage automatique), ou pas rempli du tout (apprentissage manuel).
+  const learning = !!instruction && instruction.mode === 'record';
+  if (learning) startRecording();
+  if (learning && !instruction.auto) return;
+  // Chemin passé ou interrompu sans formulaire atteint : ce cadre est observé jusqu'à ce que le formulaire soit reconnu.
+  const watch = !!instruction && instruction.mode === 'none' && instruction.waitForForm === true;
+  await startRunner(job, learning || watch);
+}
+
+void main().catch(() => undefined);
 }

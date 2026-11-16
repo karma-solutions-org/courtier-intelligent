@@ -1,0 +1,6 @@
+@if (view(); as view) {
+  <span class="indicator" [class.installed]="view.installed" role="status" [attr.title]="view.title">
+    <mat-icon>{{ view.installed ? 'check_circle' : 'extension_off' }}</mat-icon>
+    <span class="text">{{ view.text }}</span>
+  </span>
+}

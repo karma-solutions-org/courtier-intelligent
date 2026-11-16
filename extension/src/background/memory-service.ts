@@ -39,8 +39,17 @@ export async function reportDiscoveredFields(
   fingerprint: string,
   fields: DiscoveredFieldInput[],
   requiredPaths: string[] = [],
-): Promise<void> {
-  await httpsCallable(getFirebase().functions, 'champs-signaler')({ insurerId, origin, formFingerprint: fingerprint, fields, requiredPaths });
+): Promise<Record<string, string>> {
+  const result = await httpsCallable<unknown, { mapping?: Record<string, string> }>(getFirebase().functions, 'champs-signaler')({
+    insurerId,
+    origin,
+    formFingerprint: fingerprint,
+    fields,
+    requiredPaths,
+  });
+  // Champ → chemin de la question créée ou retrouvée (ancien serveur : rien).
+  const mapping = result.data?.mapping;
+  return mapping && typeof mapping === 'object' ? mapping : {};
 }
 
 export async function touchMemory(key: string): Promise<void> {

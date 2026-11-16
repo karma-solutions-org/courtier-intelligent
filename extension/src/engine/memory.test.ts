@@ -1,5 +1,5 @@
 import { webcrypto } from 'node:crypto';
-import type { CanonicalPath, FormMemoryField } from '@shared';
+import type { CanonicalData, CanonicalPath, FormMemoryField } from '@shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FormField } from './analyzer';
 import { Mapping } from './mapping';
@@ -158,15 +158,27 @@ describe('toDiscoveredFields : jamais de donnée client, peu de bruit', () => {
 
   it('écarte les options qui ressemblent à une donnée client (valeur du dossier, plaque, e-mail, téléphone, date)', () => {
     const options = ['Oui', 'Dupont', 'AB-123-CD', 'EF-456-GH', 'x@y.fr', '06 12 34 56 78', '12/03/1985', 'Non'].map(v => ({ value: v, label: v }));
-    const [found] = toDiscoveredFields([field('select:q', { kind: 'select', inputType: 'select', label: 'Question libre', options })], [mapping('select:q', 'unmapped')], [], QUOTE);
+    const [found] = toDiscoveredFields([field('select:q', { kind: 'select', inputType: 'select', label: 'Question libre', options, required: true })], [mapping('select:q', 'unmapped')], [], QUOTE);
     expect(found.options.map(o => o.value)).toEqual(['Oui', 'Non']);
+  });
+
+  it('garde les options Oui / Non même si le dossier contient des réponses « oui » (pas de question en double)', () => {
+    const options = [{ value: '1', label: 'Oui' }, { value: '0', label: 'Non' }];
+    const quote = { 'extra.permis_obtenu_dans_cadre_aac': 'oui', 'extra.autre_question': 'non' } as CanonicalData;
+    const [found] = toDiscoveredFields(
+      [field('radio:onpp', { kind: 'radio', inputType: 'radio', label: 'Avez-vous été résilié pour non-paiement (NPP) ?', options, required: true })],
+      [mapping('radio:onpp', 'unmapped')],
+      [],
+      quote,
+    );
+    expect(found.options).toEqual(options);
   });
 
   it('applique safeLabel au libellé et plafonne les longueurs', () => {
     const long = 'x'.repeat(300);
     const fields = [
-      field('text:mail', { label: 'jean.dupont@example.fr' }),
-      field('text:ok', { label: 'Question normale', name: long, section: long, options: [{ value: long, label: long }] as never }),
+      field('text:mail', { label: 'jean.dupont@example.fr', required: true }),
+      field('text:ok', { label: 'Question normale', name: long, section: long, options: [{ value: long, label: long }] as never, required: true }),
     ];
     const found = toDiscoveredFields(fields, [mapping('text:mail', 'unmapped'), mapping('text:ok', 'unmapped')]);
     expect(found.map(f => f.fieldKey)).toEqual(['text:ok']);
@@ -175,10 +187,60 @@ describe('toDiscoveredFields : jamais de donnée client, peu de bruit', () => {
     expect(found[0].options[0].value.length).toBeLessThanOrEqual(80);
   });
 
+  it('ne signale que les champs obligatoires de l’extranet (un champ facultatif ne bloque pas le devis)', () => {
+    const fields = [field('text:obligatoire', { label: 'Question obligatoire', required: true }), field('text:facultatif', { label: 'Question facultative' })];
+    const found = toDiscoveredFields(fields, [mapping('text:obligatoire', 'unmapped'), mapping('text:facultatif', 'unmapped')]);
+    expect(found.map(f => f.fieldKey)).toEqual(['text:obligatoire']);
+  });
+
   it('un champ reconnu sur une question du produit absente de quoteData (masquée) n’est pas nouveau', () => {
-    const fields = [field('text:immat', { label: 'Immatriculation' })];
+    const fields = [field('text:immat', { label: 'Immatriculation', required: true })];
     const mappings = [mapping('text:immat', 'mapped', 'vehicle.registration')];
     expect(toDiscoveredFields(fields, mappings, ['vehicle.registration'])).toEqual([]);
     expect(toDiscoveredFields(fields, mappings, ['client.lastName'])).toHaveLength(1);
+  });
+});
+
+describe('Questions découvertes : lecture ratée jamais signalée', () => {
+  it('écarte des options identiques ou qui recopient le nom technique', async () => {
+    const { misreadOptions } = await import('./memory');
+    expect(misreadOptions([{ value: 'H', label: 'oSexe' }, { value: 'F', label: 'oSexe' }], 'oSexe')).toBe(true);
+    expect(misreadOptions([{ value: '1', label: 'Oui' }, { value: '0', label: 'Oui' }], 'x')).toBe(true);
+    expect(misreadOptions([{ value: 'H', label: 'Homme' }, { value: 'F', label: 'Femme' }], 'oSexe')).toBe(false);
+  });
+});
+
+describe('Questions découvertes : navigation jamais signalée', () => {
+  it('reconnaît un fil d’Ariane', async () => {
+    const { isNavigationLabel } = await import('./memory');
+    expect(isNavigationLabel('> Conducteur 1 > Véhicule')).toBe(true);
+    expect(isNavigationLabel('Étape 1 › Étape 2')).toBe(true);
+    expect(isNavigationLabel('Pays de naissance')).toBe(false);
+  });
+});
+
+describe('toDiscoveredFields : libellé introuvable (Zephir)', () => {
+  const yesNo = [{ value: 'true', label: 'Oui' }, { value: 'false', label: 'Non' }];
+  it.each(['AUTO01', 'ZSEC_B1', 'AssureDepuis'])('nom technique « %s » : pas de question', label => {
+    expect(toDiscoveredFields([field('k', { label, name: label, required: true, kind: 'radio', options: yesNo })], [])).toEqual([]);
+  });
+
+  it('libellé qui n’est qu’une réponse (« Non ») : pas de question', () => {
+    const options = [{ value: 'non', label: 'Non' }, { value: 'm2', label: 'Moins de 2 mois' }];
+    expect(toDiscoveredFields([field('k', { label: 'Non', required: true, kind: 'radio', options })], [])).toEqual([]);
+  });
+
+  it('libellé « Non » dont la liste ne garde plus que les autres réponses : pas de question', () => {
+    const options = [{ value: 'm2', label: 'Moins de 2 mois' }, { value: 'p9', label: 'Plus de 9 mois' }];
+    expect(toDiscoveredFields([field('k', { label: 'Non', required: true, kind: 'radio', options })], [])).toEqual([]);
+  });
+
+  it.each([['Garage', 'garage'], ['SIRET', 'siret'], ['CRM', null]])('mot ordinaire ou sigle « %s » : une vraie question', (label, name) => {
+    expect(toDiscoveredFields([field('k', { label, name, required: true })], []).map(f => f.label)).toEqual([label]);
+  });
+
+  it('une vraie question reste signalée', () => {
+    const label = 'La suspension faisait-elle suite à une perte de points ?';
+    expect(toDiscoveredFields([field('k', { label, required: true, kind: 'radio', options: yesNo })], []).map(f => f.label)).toEqual([label]);
   });
 });

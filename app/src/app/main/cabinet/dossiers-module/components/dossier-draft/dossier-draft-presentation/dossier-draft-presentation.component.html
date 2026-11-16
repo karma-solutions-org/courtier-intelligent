@@ -1,0 +1,99 @@
+@if (readingClientPieces()) {
+  <!-- Lecture des pièces du client : écran bloqué jusqu'au remplissage des champs. -->
+  <app-reading-overlay [message]="structure.clientPiecesReading" />
+}
+@if (dossier(); as dossier) {
+  <header>
+    <h1>{{ dossier.reference }}</h1>
+    <span class="save" [class.error]="saveStatus() === 'error'" role="status">{{
+      saveLabel()
+    }}</span>
+  </header>
+  <app-dossier-stepper-header [current]="stepOf[view()]" />
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+
+  @if (view() === 'extranets') {
+    <section class="intro">
+      <h2>{{ structure.extranetsTitle }}</h2>
+      <p>{{ structure.extranetsHint }}</p>
+    </section>
+    <app-extranet-picker
+      [insurers]="availableInsurers()"
+      [checked]="checkedInsurers()"
+      (toggled)="insurerToggled.emit($event)"
+    />
+    @if (showMissing() && !checkedInsurers().length) {
+      <p class="blocked" role="alert">{{ structure.extranetsRequired }}</p>
+    }
+    <div class="actions">
+      <span class="spacer"></span>
+      <button mat-button type="button" (click)="saveAndQuitRequested.emit()">
+        {{ structure.saveAndQuit }}
+      </button>
+      <button mat-flat-button type="button" (click)="insurersValidated.emit()">
+        {{ structure.validateExtranets }}
+      </button>
+    </div>
+  } @else if (view() === 'documents') {
+    <section class="intro">
+      <h2>{{ structure.documentsTitle }}</h2>
+      <p>{{ structure.documentsHint }}</p>
+    </section>
+    <app-document-import-container class="documents" />
+    <div class="actions">
+      <button mat-button type="button" (click)="viewChanged.emit('extranets')">
+        {{ structure.toExtranets }}
+      </button>
+      <span class="spacer"></span>
+      <button mat-button type="button" (click)="saveAndQuitRequested.emit()">
+        {{ structure.saveAndQuit }}
+      </button>
+      <button mat-flat-button type="button" (click)="viewChanged.emit('questionnaire')">
+        {{ structure.toQuestionnaire }}
+      </button>
+    </div>
+  } @else {
+    <div class="progress-row">
+      <p class="progress">
+        {{ structure.section }} {{ sectionIndex() + 1 }} {{ structure.of }}
+        {{ sectionCount() }}
+      </p>
+      <!-- Toujours visible : on peut importer un document à tout moment du questionnaire. -->
+      <button mat-stroked-button type="button" (click)="viewChanged.emit('documents')">
+        <mat-icon>upload_file</mat-icon>{{ structure.importDocument }}
+      </button>
+    </div>
+    <app-questionnaire-form
+      [sections]="currentSection()"
+      [data]="answers()"
+      [showMissing]="showMissing()"
+      (answerChanged)="answerChanged.emit($event)"
+    />
+    @if (showMissing() && sectionMissing().length) {
+      <p class="blocked" role="alert">{{ structure.sectionIncomplete }}</p>
+    }
+    <div class="actions">
+      <button
+        mat-button
+        type="button"
+        (click)="sectionIndex() === 0 ? viewChanged.emit('documents') : sectionRequested.emit(sectionIndex() - 1)"
+      >
+        {{ sectionIndex() === 0 ? structure.toDocuments : structure.previous }}
+      </button>
+      <span class="spacer"></span>
+      <button mat-button type="button" (click)="saveAndQuitRequested.emit()">
+        {{ structure.saveAndQuit }}
+      </button>
+      <button mat-flat-button type="button" [disabled]="validating()" (click)="nextRequested.emit()">
+        {{ isLastSection() ? structure.finish : structure.next }}
+      </button>
+    </div>
+  }
+} @else if (error()) {
+  <p class="error" role="alert">{{ error() }}</p>
+} @else if (loaded()) {
+  <p>{{ structure.notFound }}</p>
+}

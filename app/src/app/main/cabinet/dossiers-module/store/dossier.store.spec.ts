@@ -4,6 +4,7 @@ import { Dossier, Product } from '@shared';
 import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-status.store';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
+import { DocumentsService } from '../services/documents.service';
 import { DossiersService } from '../services/dossiers.service';
 import { DossierStore } from './dossier.store';
 
@@ -118,6 +119,8 @@ describe('DossierStore', () => {
           },
         },
         { provide: AuthStore, useValue: { cabinetId: signal('c1'), user: signal({ uid: 'u1' }) } },
+        // Reprise des pièces du client (withClientPieces) : non testée ici, le store a seulement besoin du service.
+        { provide: DocumentsService, useValue: {} },
       ],
     });
     store = TestBed.inject(DossierStore);

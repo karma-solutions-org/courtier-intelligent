@@ -1,0 +1,43 @@
+.progress {
+  margin: 0 0 12px;
+  color: var(--ci-text-muted);
+}
+
+.extranets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    padding: 6px 8px;
+    border: 1px solid var(--ci-border);
+    border-radius: 8px;
+    background: var(--ci-surface);
+  }
+
+  .insurer {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .logo {
+    flex-shrink: 0;
+    width: 56px;
+    height: 28px;
+    border-radius: 4px;
+    object-fit: contain;
+    background: #fff;
+  }
+
+  .initial {
+    display: inline-grid;
+    place-items: center;
+    font-weight: 700;
+    color: var(--ci-accent-ink);
+    background: var(--ci-accent-soft);
+  }
+}

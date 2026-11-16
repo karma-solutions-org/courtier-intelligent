@@ -10,19 +10,8 @@ import { AcceptInvitationPresentationComponent } from '../accept-invitation-pres
   selector: 'app-accept-invitation-container',
   imports: [AcceptInvitationPresentationComponent],
   providers: [InvitationStore],
-  template: `
-    <app-accept-invitation-presentation
-      [isValidLink]="!!cabinet() && !!invitation()"
-      [userEmail]="authStore.user()?.email ?? null"
-      [isPending]="invitationStore.isPending()"
-      [error]="invitationStore.error()"
-      [wrongAccount]="invitationStore.wrongAccount()"
-      [signinUrl]="signinUrl"
-      [signupUrl]="signupUrl"
-      (accepted)="invitationStore.accept({ cabinetId: cabinet(), invitationId: invitation() })"
-      (switchAccount)="switchAccount()"
-    />
-  `,
+  templateUrl: './accept-invitation-container.component.html',
+  styleUrl: './accept-invitation-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AcceptInvitationContainerComponent {

@@ -1,0 +1,205 @@
+<a mat-button [routerLink]="backUrl()" class="back"
+  ><mat-icon>arrow_back</mat-icon>{{ structure.back }}</a
+>
+
+@if (dossier(); as dossier) {
+  @if (dossier.deletedAt) {
+    <p class="trashed" role="status">
+      <mat-icon aria-hidden="true">delete</mat-icon>
+      Ce dossier est dans la corbeille. Un administrateur peut le restaurer depuis la page Corbeille.
+    </p>
+  }
+  @if (dossier.status === 'sans_suite') {
+    <p class="trashed" role="status">
+      <mat-icon aria-hidden="true">block</mat-icon>
+      Dossier classé sans suite{{ dossier.outcome?.motif ? ' : ' + dossier.outcome?.motif : '.' }}
+    </p>
+  }
+  <header class="card header" [attr.data-status]="dossier.status">
+    <div class="title">
+      <span class="title-icon" aria-hidden="true"><mat-icon>folder_open</mat-icon></span>
+      <h1>{{ dossier.reference }}</h1>
+      <app-status-chip [status]="dossier.status" />
+    </div>
+    <p class="sub">
+      {{ assure() ? nameOf(assure()!) : '—' }} ·
+      {{ product()?.name ?? dossier.productId }} ·
+      {{ dossier.createdAt?.toMillis() | date: 'd MMM y' }}
+    </p>
+
+    <ol class="pipeline" [class.halted]="isHalted(dossier.status)" aria-label="Étapes du dossier">
+      @for (stage of stages; track stage.key; let i = $index) {
+        <li
+          class="step"
+          [class.done]="stageState(stage.key) === 'done'"
+          [class.current]="stageState(stage.key) === 'current'"
+          [class.selected]="selected() === stage.key"
+        >
+          <button
+            type="button"
+            class="step-button"
+            [disabled]="!stageEnabled(stage.key)"
+            [attr.aria-current]="selected() === stage.key ? 'step' : null"
+            (click)="selectedChanged.emit(stage.key)"
+          >
+            <span class="dot" aria-hidden="true">
+              @if (stageState(stage.key) === 'done') {
+                <mat-icon>check</mat-icon>
+              } @else {
+                {{ i + 1 }}
+              }
+            </span>
+            <span class="step-label">{{ stage.label }}</span>
+          </button>
+        </li>
+      }
+    </ol>
+
+    <div class="toolbar">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="assignee">
+        <mat-label>{{ structure.assignedTo }}</mat-label>
+        <mat-select [value]="dossier.assignedTo" (selectionChange)="assignRequested.emit($event.value)">
+          @for (member of activeMembers(); track member.id) {
+            <mat-option [value]="member.id">{{
+              member.displayName || member.email
+            }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <span class="spacer"></span>
+
+      <button
+        mat-button
+        type="button"
+        [class.active]="selected() === 'history'"
+        (click)="selectedChanged.emit(selected() === 'history' ? currentStage() : 'history')"
+      >
+        <mat-icon>history</mat-icon>{{ structure.tabs.history }}
+      </button>
+
+      @if (dossier.status === 'brouillon') {
+        <a mat-stroked-button [routerLink]="[listUrl, dossier.id, 'brouillon']">{{
+          structure.resume
+        }}</a>
+      }
+
+      @if (canClose(dossier.status) && !dossier.deletedAt) {
+        <button mat-stroked-button type="button" [disabled]="closing()" (click)="closeRequested.emit({ id: dossier.id, reference: dossier.reference })">
+          <mat-icon>block</mat-icon>Classer sans suite
+        </button>
+      }
+
+      @if (isAdmin() && !dossier.deletedAt) {
+        @if (confirmingDelete()) {
+          <span class="confirm" role="alert">
+            Mettre ce dossier dans la corbeille ?
+            <button mat-button type="button" (click)="confirmingDeleteChanged.emit(false)">Annuler</button>
+            <button mat-flat-button class="danger" type="button" [disabled]="deleting()" (click)="removeRequested.emit(dossier.id)">
+              Supprimer
+            </button>
+          </span>
+        } @else {
+          <button mat-button type="button" class="danger-text" (click)="confirmingDeleteChanged.emit(true)">
+            <mat-icon>delete</mat-icon>Supprimer le dossier
+          </button>
+        }
+      }
+    </div>
+    @if (dossier.status === 'brouillon' && !isComplete() && schema().length) {
+      <p class="hint">{{ structure.incompleteHint }}</p>
+    }
+  </header>
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+  <section class="panel">
+    @switch (selected()) {
+      @case ('infos') {
+        <div class="tab">
+          @if (missing().length && answersEditable()) {
+            <p class="warning" role="status">
+              {{ structure.missingBanner }}
+              {{ missingLabels() }}
+            </p>
+          }
+          @if (!answersEditable()) {
+            <p class="hint">{{ structure.readonlyNote }}</p>
+          } @else if (editingDuringPricing()) {
+            <p class="hint" role="status">{{ structure.pricingEditNote }}</p>
+          }
+          <app-document-import-container class="documents" [editable]="answersEditable()" />
+          <app-questionnaire-form
+            [sections]="schema()"
+            [data]="answers()"
+            [readonly]="!answersEditable()"
+            [showMissing]="true"
+            (answerChanged)="answerChanged.emit($event)"
+          />
+          @if (answersEditable()) {
+            <div class="actions">
+              <button
+                mat-flat-button
+                type="button"
+                [disabled]="saveStatus() !== 'dirty' && saveStatus() !== 'error'"
+                (click)="saveRequested.emit()"
+              >
+                {{ structure.save }}
+              </button>
+            </div>
+          }
+        </div>
+      }
+      @case ('need') {
+        <div class="tab">
+          <app-need-form
+            [need]="need()"
+            [guarantees]="guarantees()"
+            [suggestion]="needSuggestion()"
+            [status]="dossier.status"
+            [readonly]="!needEditable()"
+            [isPending]="needPending() > 0"
+            (saved)="needSaved.emit($event)"
+            (validated)="needValidated.emit()"
+          />
+        </div>
+      }
+      @case ('pricing') {
+        <div class="tab"><app-pricing-tab-container /></div>
+      }
+      @case ('comparison') {
+        <div class="tab"><app-comparison-tab-container /></div>
+      }
+      @case ('proposal') {
+        <div class="tab"><app-proposal-tab-container /></div>
+      }
+      @case ('history') {
+        <div class="tab history">
+          <!-- Le titre « Historique » est celui de la carte de la frise : ici seulement la fermeture. -->
+          <button
+            mat-icon-button
+            type="button"
+            class="close"
+            [attr.aria-label]="structure.closeHistory"
+            (click)="selectedChanged.emit(currentStage())"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+          <app-dossier-timeline
+            [events]="events()"
+            [memberNames]="memberNames()"
+            [insurerNames]="insurerNames()"
+            [hasMore]="eventsHasMore()"
+            [loadingMore]="eventsLoadingMore()"
+            (loadMore)="loadMoreEvents.emit()"
+          />
+        </div>
+      }
+    }
+  </section>
+} @else if (error()) {
+  <p class="error" role="alert">{{ error() }}</p>
+} @else if (loaded()) {
+  <p>{{ structure.notFound }}</p>
+}

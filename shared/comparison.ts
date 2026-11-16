@@ -1,5 +1,6 @@
 import type { Guarantee, NeedAnalysis, Offer, OfferGap, OfferGuarantee } from './models';
 import { GENERAL_DEDUCTIBLE } from './pricing';
+import { foldText } from './text';
 
 /**
  * Comparaison des offres : normalisation des garanties (synonymes du référentiel), écarts avec le besoin et score indicatif.
@@ -34,10 +35,7 @@ export const DECISION_JUSTIFICATION_MAX = 2000;
 
 /** Texte comparable : minuscules, sans accents, ponctuation remplacée par des espaces. */
 export function normalizeText(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
+  return foldText(text)
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }

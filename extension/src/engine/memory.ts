@@ -1,4 +1,5 @@
-import { CanonicalData, CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, type DiscoveredFieldInput, isRelevantField } from '@shared';
+import { CanonicalData, CanonicalPath, FormMemoryField, isCanonicalPath, DISCOVERED_MAX_FIELDS_PER_REPORT, DISCOVERED_LABEL_MAX, DISCOVERED_MAX_CHOICES, type DiscoveredFieldInput, isRelevantField, SIGHTING_MAX_FIELDS } from '@shared';
+import { normalize } from './text';
 import type { FormField } from './analyzer';
 import { isCompatible, Mapping } from './mapping';
 
@@ -89,9 +90,9 @@ export function applyMemory(
 const MAX_LABEL = 120;
 
 /** Un libellé est un texte de formulaire : s'il ressemble à une donnée saisie (e-mail, numéro), il n'est pas conservé. */
-export function safeLabel(label: string): string | null {
+export function safeLabel(label: string, max = MAX_LABEL): string | null {
   const text = label.trim();
-  if (!text || text.length > MAX_LABEL) return null;
+  if (!text || text.length > max) return null;
   if (/[^\s@]+@[^\s@]+\.[^\s@]+/.test(text) || /\d{6,}/.test(text.replace(/[\s.\-/]/g, ''))) return null;
   return text;
 }
@@ -100,7 +101,7 @@ export function safeLabel(label: string): string | null {
 const MAX_NAME = 80;
 const MAX_FIELD_KEY = 120;
 const MAX_OPTION = 80;
-const MAX_OPTIONS = 40;
+const MAX_OPTIONS = DISCOVERED_MAX_CHOICES;
 
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 /** Plaque d'immatriculation (SIV « AB-123-CD » ou FNI « 1234 AB 75 »). */
@@ -112,21 +113,41 @@ const DATE = /\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b/;
 
 const normalizeValue = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
-/** Valeurs du dossier (texte de 3 caractères et plus) : une option qui les reprend est une donnée client. */
-function clientValues(quoteData: CanonicalData | undefined): Set<string> {
+const sameText = (a: string, b: string) => normalizeValue(a) === normalizeValue(b);
+
+/**
+ * Nom technique plutôt que question : un seul mot en code (« AUTO01 », « ZSEC_B1 », « AssureDepuis »), ou une réponse
+ * prise pour la question (« Non »). Un mot ordinaire (« Garage », même si le champ s'appelle `garage`) ou un sigle
+ * (« SIRET », « CRM ») reste une vraie question.
+ */
+export function isTechnicalLabel(label: string): boolean {
+  const text = label.trim();
+  if (/^(oui|non|yes|no)$/i.test(text)) return true;
+  return !/\s/.test(text) && (/[_\d]/.test(text) || /[a-z][A-Z]/.test(text));
+}
+
+/** Réponses qu'on trouve dans tous les dossiers : jamais une donnée qui identifie le client. */
+const GENERIC_ANSWERS = new Set(['oui', 'non', 'yes', 'aucun', 'aucune', 'autre', 'autres', 'true', 'false']);
+
+/**
+ * Valeurs du dossier (texte de 3 caractères et plus) : une option qui les reprend est une donnée client. Sauf les
+ * réponses génériques (« oui » / « non ») : sans cela, les options Oui / Non d'un extranet disparaissaient et la
+ * question était signalée en texte libre (questions en double dans le questionnaire).
+ */
+export function clientValues(quoteData: CanonicalData | undefined): Set<string> {
   const values = new Set<string>();
   for (const raw of Object.values(quoteData ?? {})) {
     const plain = raw !== null && typeof raw === 'object' && 'value' in raw ? (raw as { value: unknown }).value : raw;
     if (typeof plain === 'string' || typeof plain === 'number') {
       const text = normalizeValue(String(plain));
-      if (text.length >= 3) values.add(text);
+      if (text.length >= 3 && !GENERIC_ANSWERS.has(text)) values.add(text);
     }
   }
   return values;
 }
 
 /** Le texte ressemble-t-il à une donnée client (valeur du dossier, e-mail, plaque, téléphone, date, long numéro) ? */
-function looksLikeClientData(text: string, values: Set<string>): boolean {
+export function looksLikeClientData(text: string, values: Set<string>): boolean {
   const trimmed = text.trim();
   if (!trimmed) return false;
   if (values.has(normalizeValue(trimmed))) return true;
@@ -162,24 +183,73 @@ export function toDiscoveredFields(
       .map(m => m.fieldKey),
   );
   const values = clientValues(quoteData);
+  // Pas de filtre « déjà posée par un autre assureur » : le champ est signalé, et le serveur le rattache à la question
+  // existante (même règle, shared/question-matching.ts) en y ajoutant cet assureur. Sans ce signalement, un dossier
+  // qui ne vise que cet assureur ne verrait jamais la question (elle n'est montrée que pour les assureurs qui la posent).
   return fields
-    .filter(field => !known.has(field.key) && isRelevantField(field))
+    // Seuls les champs OBLIGATOIRES de l'extranet deviennent des questions (un champ facultatif ne bloque pas le devis),
+    // jamais un fil d'Ariane ou une barre de navigation (« > Conducteur 1 > Véhicule »).
+    .filter(field => !known.has(field.key) && field.required && isRelevantField(field) && !isNavigationLabel(field.label))
     .slice(0, DISCOVERED_MAX_FIELDS_PER_REPORT)
+    .flatMap(field => describeField(field, values));
+}
+
+/**
+ * Constat d'un parcours mené jusqu'au tarif : tous les champs vus, décrits comme un champ découvert (structure
+ * seulement). Le serveur met à jour les questions découvertes et compte celles dont le champ a disparu.
+ */
+export function toSightedFields(fields: FormField[], quoteData?: CanonicalData, mappings: Mapping[] = []): DiscoveredFieldInput[] {
+  const values = clientValues(quoteData);
+  // Question remplie dans chaque champ : le serveur en apprend ce que demande l'extranet (learnInsurerQuestions).
+  const paths = new Map(
+    mappings.filter(m => m.status === 'mapped' && m.canonicalPath !== null && isCanonicalPath(m.canonicalPath)).map(m => [m.fieldKey, m.canonicalPath as string]),
+  );
+  return fields
+    .slice(0, SIGHTING_MAX_FIELDS)
+    .flatMap(field => describeField(field, values).map(described => (paths.has(field.key) ? { ...described, canonicalPath: paths.get(field.key) } : described)));
+}
+
+/** Description sûre d'un champ, ou aucune (libellé illisible, technique, ou qui ressemble à une donnée client). */
+function describeField(field: FormField, values: ReturnType<typeof clientValues>): DiscoveredFieldInput[] {
+  return [field]
     .map(field => ({
       fieldKey: field.key.slice(0, MAX_FIELD_KEY),
-      label: safeLabel(field.label) ?? '',
+      label: safeLabel(field.label, DISCOVERED_LABEL_MAX) ?? '',
       kind: field.kind,
       inputType: field.inputType,
       name: safeText(field.name, MAX_NAME, values),
       section: field.section ? safeLabel(field.section) : null,
       options: field.options
+        // Option vide (« Choisissez », « Sélectionner… ») : une invite, jamais un choix.
+        .filter(option => option.value.trim() !== '')
         .filter(option => !looksLikeClientData(option.value, values) && !looksLikeClientData(option.label, values))
         .slice(0, MAX_OPTIONS)
         .map(option => ({ value: option.value.trim().slice(0, MAX_OPTION), label: option.label.trim().slice(0, MAX_OPTION) })),
       required: field.required,
+      ...(field.maxLength !== null && field.maxLength > 0 && field.maxLength <= 200 && field.options.length === 0 ? { maxLength: field.maxLength } : {}),
     }))
     // Libellé illisible ou qui ressemble à une donnée client : le champ n'est pas signalé du tout.
-    .filter(field => field.label !== '');
+    .filter(field => field.label !== '')
+    // Libellé introuvable sur la page : l'analyse retombe sur le nom technique (« AUTO01 », « ZSEC_B1 », « AssureDepuis »)
+    // ou sur une des réponses (« Non ») ; ce n'est pas une question qu'on peut poser au client.
+    .filter(field => !isTechnicalLabel(field.label) && !field.options.some(o => sameText(o.label, field.label)))
+    // Lecture ratée de l'extranet (options identiques, ou qui ne sont que le nom technique du champ) : jamais une question.
+    .filter(field => !misreadOptions(field.options, field.name));
+}
+
+/** Libellé de navigation (fil d'Ariane, onglets « > Étape 1 > Étape 2 ») : jamais une question. */
+export function isNavigationLabel(label: string): boolean {
+  const text = label.trim();
+  return /^[>›»]/.test(text) || /\s[>›»]\s/.test(text);
+}
+
+/** Options lues de travers : libellés en double, ou recopie du nom technique (« oSexe », « oSexe »). */
+export function misreadOptions(options: { value: string; label: string }[], name: string | null | undefined): boolean {
+  if (options.length < 2) return false;
+  const labels = options.map(option => normalize(option.label));
+  if (new Set(labels).size < labels.length) return true;
+  const technical = name ? normalize(name) : null;
+  return labels.some(label => label === '' || (technical !== null && label === technical));
 }
 
 /** Chemins des champs obligatoires de l'extranet qui ont un équivalent dans l'application. */

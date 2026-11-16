@@ -21,6 +21,7 @@ const validated = { validatedAt: { toMillis: () => 1 } } as Dossier['needAnalysi
 describe('PricingStore', () => {
   let dossier: ReturnType<typeof signal<Partial<Dossier> | null>>;
   let cabinet: ReturnType<typeof signal<Partial<Cabinet> | null>>;
+  let missing: ReturnType<typeof signal<string[]>>;
   let service: {
     watchJobs: ReturnType<typeof vi.fn>;
     watchOffers: ReturnType<typeof vi.fn>;
@@ -42,6 +43,7 @@ describe('PricingStore', () => {
       needAnalysis: validated,
     });
     cabinet = signal<Partial<Cabinet> | null>({ enabledInsurers: [] });
+    missing = signal<string[]>([]);
     service = {
       watchJobs: vi.fn(() => of([{ id: 'a', status: 'failed' } as QuoteJob])),
       watchOffers: vi.fn(() => of([])),
@@ -65,6 +67,8 @@ describe('PricingStore', () => {
           useValue: {
             selectedId: signal('d1'),
             dossier,
+            missing,
+            labels: signal(new Map([['vehicle.parkingPostalCode', 'Code postal du lieu de stationnement']])),
             product: signal(null),
             insurers: signal([
               insurer('a'),
@@ -112,6 +116,16 @@ describe('PricingStore', () => {
 
     expect(target.close).toHaveBeenCalled();
     expect(store.error()).toBe('Validez le besoin.');
+  });
+
+  it('refuse de lancer tant qu’une question obligatoire est sans réponse', () => {
+    missing.set(['vehicle.parkingPostalCode']);
+    const target = fakeWindow();
+    store.launch('a', target);
+
+    expect(service.launch).not.toHaveBeenCalled();
+    expect(target.close).toHaveBeenCalled();
+    expect(store.error()).toContain('Code postal du lieu de stationnement');
   });
 
   it('ignore un second lancement pour un assureur déjà en cours (double clic)', () => {

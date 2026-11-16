@@ -1,0 +1,16 @@
+<app-comparison-tab-presentation
+  [error]="store.error()"
+  [loaded]="store.loaded()"
+  [columns]="store.columns()"
+  [staleNames]="store.staleNames()"
+  [toReviewNames]="store.toReviewNames()"
+  [canReopen]="store.canReopen()"
+  [canDecide]="store.canDecide()"
+  [busy]="store.busy()"
+  [decision]="decision()"
+  [need]="dossierStore.need()"
+  [guarantees]="dossierStore.guarantees()"
+  [insurerNames]="dossierStore.insurerNames()"
+  (reopen)="store.reopen()"
+  (choose)="choose($event)"
+/>

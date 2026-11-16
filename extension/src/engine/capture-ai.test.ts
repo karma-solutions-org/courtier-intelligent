@@ -74,7 +74,7 @@ describe('amountRegions', () => {
     const request = buildCaptureRequest(`${PAGE} ${'z'.repeat(50_000)}`, QUOTE_DATA);
     expect(request.purpose).toBe('capture');
     expect(request.messages[0].content.length).toBeLessThanOrEqual(12_000);
-  });
+  }, 20_000); // 50 000 caractères à expurger : lent quand toute la suite tourne en parallèle
 });
 
 describe('parseCaptureResponse', () => {

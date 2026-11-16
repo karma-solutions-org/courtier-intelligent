@@ -1,0 +1,108 @@
+<div class="scroll">
+  <table>
+    <thead>
+      <tr>
+        <th scope="col" class="label">{{ text.insurer }}</th>
+        @for (column of columns(); track column.insurerId) {
+          <th
+            scope="col"
+            class="insurer"
+            [class.chosen]="column.insurerId === decidedInsurerId()"
+            [class.best]="column.insurerId === bestInsurerId()"
+          >
+            @if (column.insurerId === bestInsurerId()) {
+              <span class="best-flag">Meilleur score</span>
+            }
+            <span class="insurer-name">{{ column.insurerName }}</span>
+            @if (column.insurerId === decidedInsurerId()) {
+              <span class="badge">{{ text.chosen }}</span>
+            }
+          </th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row" class="label">{{ text.score }}</th>
+        @for (column of columns(); track column.insurerId) {
+          <td>
+            @if (column.offer.score !== null && column.offer.score !== undefined) {
+              <span [class]="scoreClass(column.offer.score)">
+                <strong class="score">{{ column.offer.score }}</strong>
+              </span>
+              <span class="out-of">/ 100</span>
+            } @else {
+              —
+            }
+          </td>
+        }
+      </tr>
+      <tr>
+        <th scope="row" class="label">{{ text.premiumAnnual }}</th>
+        @for (column of columns(); track column.insurerId) {
+          <td>{{ money(column.offer.premiumAnnual) }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row" class="label">{{ text.premiumMonthly }}</th>
+        @for (column of columns(); track column.insurerId) {
+          <td>{{ money(column.offer.premiumMonthly) }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row" class="label">{{ text.generalDeductible }}</th>
+        @for (column of columns(); track column.insurerId) {
+          <td>{{ money(column.offer.deductibles?.[general]) }}</td>
+        }
+      </tr>
+      <tr class="section">
+        <th scope="rowgroup" [attr.colspan]="columns().length + 1">{{ text.guarantees }}</th>
+      </tr>
+      @for (guarantee of guarantees(); track guarantee.code) {
+        <tr>
+          <th scope="row" class="label">
+            {{ guarantee.label }}
+            @if (mandatory().includes(guarantee.code)) {
+              <span class="tag">{{ text.mandatory }}</span>
+            } @else if (niceToHave().includes(guarantee.code)) {
+              <span class="tag soft">{{ text.niceToHave }}</span>
+            }
+          </th>
+          @for (column of columns(); track column.insurerId) {
+            @let coverage = coverageOf(column.offer, guarantee.code);
+            <td [title]="text.coverage[coverage]" [class.best-col]="column.insurerId === bestInsurerId()">
+              <span [class]="'pill pill--' + coverage"><mat-icon aria-hidden="true">{{ icons[coverage] }}</mat-icon>{{ text.coverage[coverage] }}</span>
+              @if (detailOf(column.offer, guarantee.code); as detail) {
+                <span class="detail">{{ detail }}</span>
+              }
+            </td>
+          }
+        </tr>
+      }
+      <tr>
+        <th scope="row" class="label">{{ text.gaps }}</th>
+        @for (column of columns(); track column.insurerId) {
+          <td class="gaps">
+            @for (gap of column.offer.gaps ?? []; track $index) {
+              <p [class]="gap.severity"><mat-icon aria-hidden="true">{{ gap.severity === 'ko' ? 'cancel' : 'error' }}</mat-icon>{{ gap.message }}</p>
+            } @empty {
+              <p>{{ text.noGap }}</p>
+            }
+          </td>
+        }
+      </tr>
+      @if (canDecide()) {
+        <tr>
+          <th scope="row" class="label"></th>
+          @for (column of columns(); track column.insurerId) {
+            <td>
+              <button mat-flat-button type="button" [disabled]="busy()" (click)="choose.emit(column)">
+                {{ column.insurerId === decidedInsurerId() ? text.chosen : text.choose }}
+              </button>
+            </td>
+          }
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

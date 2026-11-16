@@ -1,7 +1,8 @@
+import { DashboardDossierRow } from '../models/dashboard-row.model';
 import { conversionOutcome, Dossier, DOSSIER_STATUSES, DossierStatus } from '@shared';
 
 /** Statuts où le dossier attend une action du courtier en charge. */
-export const TO_PROCESS_STATUSES: DossierStatus[] = [
+const TO_PROCESS_STATUSES: DossierStatus[] = [
   'brouillon',
   'complet',
   'besoin_valide',
@@ -69,6 +70,24 @@ export function conversionRates(dossiers: Dossier[], keyOf: (dossier: Dossier) =
 }
 
 /** Date Firestore en millisecondes (0 si absente ou mal formée). */
-export function millis(value: { toMillis(): number } | null | undefined): number {
+function millis(value: { toMillis(): number } | null | undefined): number {
   return typeof value?.toMillis === 'function' ? value.toMillis() : 0;
+}
+
+/** Lignes affichées pour des dossiers : nom du client (ou « — ») et nom du produit (ou son identifiant). */
+export function toDashboardRows(
+  dossiers: Dossier[],
+  assureName: (assureId: string) => string | null,
+  productNames: Map<string, string>,
+): DashboardDossierRow[] {
+  return dossiers.map((dossier) => ({
+    dossier,
+    assureName: assureName(dossier.assureId) ?? '—',
+    productName: productNames.get(dossier.productId) ?? dossier.productId,
+  }));
+}
+
+/** Lien d'un dossier : un brouillon se reprend dans son questionnaire, les autres s'ouvrent sur leur fiche. */
+export function dossierLinkOf(dossiersUrl: string, dossier: Dossier): string[] {
+  return dossier.status === 'brouillon' ? [dossiersUrl, dossier.id, 'brouillon'] : [dossiersUrl, dossier.id];
 }

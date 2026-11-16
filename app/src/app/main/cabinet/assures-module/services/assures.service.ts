@@ -1,8 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import { Assure, AssureDocument, AssureDuplicateReason, AssureDocumentType, AssureOcrValues, AssureReadableType, Dossier } from '@shared';
-import { combineLatest, map, Observable, of } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
+import { DatabaseQueryBuilder, FilterOperator, OrderByDirection } from '../../../../core/providers/database-query.builder';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
+import { AssureModel } from '../../../../core/entities/assure.model';
+import { DossierModel } from '../../../../core/entities/dossier.model';
+import { AssureDocumentModel } from '../models/entities/assure-document.model';
 import { StorageProvider } from '../../../../core/providers/storage.provider';
 import { AssureData } from '../models/assure-form.model';
 
@@ -15,7 +19,7 @@ export class AssuresService {
   /** Pièces rangées avec le client (CIN, Kbis), de la plus récente à la plus ancienne. */
   watchDocuments(cabinetId: string, assureId: string): Observable<AssureDocument[]> {
     return this._database
-      .watchCollection<AssureDocument>(`ci_cabinets/${cabinetId}/ci_assures/${assureId}/ci_documents`)
+      .list(AssureDocumentModel.entity(cabinetId, assureId))
       .pipe(map(documents => documents.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))));
   }
 
@@ -46,7 +50,7 @@ export class AssuresService {
   /** Assurés du cabinet hors corbeille : recherche et pagination se font côté app (Firestore n'a pas de recherche texte). */
   watchAssures(cabinetId: string): Observable<Assure[]> {
     return this._database
-      .watchCollection<Assure>(`ci_cabinets/${cabinetId}/ci_assures`, { orderBy: [{ field: 'lastName' }] })
+      .list(AssureModel.entity(cabinetId), new DatabaseQueryBuilder().orderBy('lastName').build())
       .pipe(map((assures) => assures.filter((assure) => !assure.deletedAt)));
   }
 
@@ -56,10 +60,15 @@ export class AssuresService {
    */
   watchAssuresPage(cabinetId: string, limit: number, sort: 'name' | 'recent'): Observable<{ assures: Assure[]; hasMore: boolean }> {
     return this._database
-      .watchCollection<Assure>(`ci_cabinets/${cabinetId}/ci_assures`, {
-        orderBy: [sort === 'recent' ? { field: 'createdAt', direction: 'desc' } : { field: 'lastName' }],
-        limit,
-      })
+      .list(
+        AssureModel.entity(cabinetId),
+        (sort === 'recent'
+          ? new DatabaseQueryBuilder().orderBy('createdAt', OrderByDirection.desc)
+          : new DatabaseQueryBuilder().orderBy('lastName')
+        )
+          .limit(limit)
+          .build(),
+      )
       .pipe(map((assures) => ({ assures: assures.filter((assure) => !assure.deletedAt), hasMore: assures.length >= limit })));
   }
 
@@ -88,22 +97,20 @@ export class AssuresService {
 
   /** Fiches des clients trouvés, en direct et dans l'ordre donné (clients dans la corbeille ou disparus écartés). */
   watchAssuresByIds(cabinetId: string, ids: string[]): Observable<Assure[]> {
-    if (!ids.length) return of([]);
-    return combineLatest(ids.map((id) => this.watchAssure(cabinetId, id))).pipe(
-      map((assures) => assures.filter((assure): assure is Assure => !!assure && !assure.deletedAt)),
-    );
+    // Requêtes groupées par lots de 30 (au lieu d'un écouteur par client) ; l'ordre de `ids` est conservé.
+    return this._database
+      .listByIds(AssureModel.entity(cabinetId), ids)
+      .pipe(map((assures) => assures.filter((assure) => !assure.deletedAt)));
   }
 
   watchAssure(cabinetId: string, assureId: string): Observable<Assure | null> {
-    return this._database.watchDocument<Assure>(`ci_cabinets/${cabinetId}/ci_assures/${assureId}`);
+    return this._database.watchById(AssureModel.entity(cabinetId), assureId);
   }
 
   /** Dossiers d'un assuré, du plus récent au plus ancien. */
   watchDossiersOf(cabinetId: string, assureId: string): Observable<Dossier[]> {
     return this._database
-      .watchCollection<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers`, {
-        filters: [{ field: 'assureId', operator: '==', value: assureId }],
-      })
+      .list(DossierModel.entity(cabinetId), new DatabaseQueryBuilder().where('assureId', FilterOperator.isEqualTo, assureId).build())
       .pipe(map(dossiers => dossiers.filter(dossier => !dossier.deletedAt).sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))));
   }
 

@@ -231,4 +231,3 @@ export function createAuthController(ports: { auth: AuthPort; backend: BackendPo
   };
 }
 
-export type AuthController = ReturnType<typeof createAuthController>;

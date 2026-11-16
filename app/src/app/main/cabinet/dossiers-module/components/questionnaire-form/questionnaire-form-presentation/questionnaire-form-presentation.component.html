@@ -1,0 +1,19 @@
+@for (section of sections(); track section.title) {
+  <section class="card">
+    <h2><span class="section-index" aria-hidden="true">{{ $index + 1 }}</span>{{ section.title }}</h2>
+    <div class="grid">
+      @for (question of section.questions; track question.canonicalPath) {
+        @if (isVisible(question)) {
+          <app-question-field
+            [class.wide]="question.type === 'boolean' || question.withKnowledge"
+            [question]="question"
+            [value]="data()[question.canonicalPath]"
+            [readonly]="readonly()"
+            [showMissing]="showMissing()"
+            (changed)="answerChanged.emit({ path: question.canonicalPath, value: $event })"
+          />
+        }
+      }
+    </div>
+  </section>
+}

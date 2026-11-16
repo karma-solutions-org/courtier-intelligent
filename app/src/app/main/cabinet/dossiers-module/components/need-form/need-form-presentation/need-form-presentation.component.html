@@ -1,0 +1,93 @@
+<section class="card">
+  <h2>{{ text.title }}</h2>
+
+  @if (validatedAt(); as validatedAt) {
+    <p class="banner ok" role="status"><mat-icon>verified</mat-icon>{{ text.validatedOn }} {{ validatedAt | date: 'd MMMM y' }}</p>
+  } @else if (need()) {
+    <p class="banner" role="status">{{ text.saved }}</p>
+  } @else if (!readonly()) {
+    <p class="banner" role="status">{{ text.notSaved }}</p>
+  }
+  @if (readonly()) {
+    <p class="hint">{{ text.readonly }}</p>
+  }
+
+  @if (showSuggestion()) {
+    <div class="suggestions" role="region" [attr.aria-label]="text.suggestionsTitle">
+      <h3>{{ text.suggestionsTitle }}</h3>
+      <ul>
+        @for (reason of suggestion()!.reasons; track reason) {
+          <li>{{ reason }}</li>
+        }
+      </ul>
+      <p class="hint">{{ text.suggestionsHint }}</p>
+      <button mat-stroked-button type="button" (click)="applySuggestion()">{{ text.apply }}</button>
+    </div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="grid">
+      <mat-form-field appearance="outline">
+        <mat-label>{{ text.coverage }}</mat-label>
+        <mat-select formControlName="coverageLevel">
+          <mat-option value="">{{ text.none }}</mat-option>
+          @for (level of levels; track level.value) {
+            <mat-option [value]="level.value">{{ level.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <span></span>
+      <mat-form-field appearance="outline">
+        <mat-label>{{ text.budget }}</mat-label>
+        <input matInput type="number" min="0" step="any" formControlName="budgetMax" />
+        @if (form.controls.budgetMax.invalid) {
+          <mat-error>{{ text.amountInvalid }}</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>{{ text.deductible }}</mat-label>
+        <input matInput type="number" min="0" step="any" formControlName="maxDeductible" />
+        @if (form.controls.maxDeductible.invalid) {
+          <mat-error>{{ text.amountInvalid }}</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>{{ text.mandatory }}</mat-label>
+        <mat-select multiple formControlName="mandatoryGuarantees">
+          @for (guarantee of guarantees(); track guarantee.code) {
+            <mat-option [value]="guarantee.code">{{ guarantee.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>{{ text.nice }}</mat-label>
+        <mat-select multiple formControlName="niceToHave">
+          @for (guarantee of niceOptions(); track guarantee.code) {
+            <mat-option [value]="guarantee.code">{{ guarantee.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="wide">
+        <mat-label>{{ text.notes }}</mat-label>
+        <textarea matInput rows="4" maxlength="2000" formControlName="notes"></textarea>
+      </mat-form-field>
+    </div>
+
+    @if (status() === 'besoin_valide' && !readonly()) {
+      <p class="hint">{{ text.reopenWarning }}</p>
+    }
+    @if (!readonly()) {
+      <div class="actions">
+        <!-- Un seul bouton : à l'étape « Complet », valider enregistre aussi la saisie en cours. -->
+        @if (status() === 'complet') {
+          <span class="hint">{{ validateHint() }}</span>
+          <button mat-flat-button type="button" [disabled]="!canValidate() || isPending()" (click)="saveAndValidate()">
+            {{ text.validate }}
+          </button>
+        } @else {
+          <button mat-flat-button type="submit" [disabled]="pristine() || isPending()">{{ text.save }}</button>
+        }
+      </div>
+    }
+  </form>
+</section>

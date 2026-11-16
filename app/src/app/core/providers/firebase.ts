@@ -7,9 +7,9 @@ import type { FirebaseStorage } from 'firebase/storage';
 import { environment } from '../../../environments/environment';
 
 /** Service Firebase chargé à la première utilisation (SDK hors du bundle initial). */
-export type LazyService<T> = () => Promise<T>;
+type LazyService<T> = () => Promise<T>;
 
-export const FIREBASE_APP = new InjectionToken<FirebaseApp>('FIREBASE_APP');
+const FIREBASE_APP = new InjectionToken<FirebaseApp>('FIREBASE_APP');
 export const FIREBASE_AUTH = new InjectionToken<LazyService<Auth>>('FIREBASE_AUTH');
 export const FIRESTORE = new InjectionToken<LazyService<Firestore>>('FIRESTORE');
 export const FIREBASE_FUNCTIONS = new InjectionToken<LazyService<Functions>>('FIREBASE_FUNCTIONS');

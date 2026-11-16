@@ -1,0 +1,18 @@
+<app-pricing-tab-presentation
+  [canPrice]="store.canPrice()"
+  [awaitingCoverage]="awaitingCoverage()"
+  [extensionMissing]="extensionMissing()"
+  [error]="store.error()"
+  [loaded]="store.loaded()"
+  [cards]="store.cards()"
+  [busyIds]="store.busy()"
+  [questions]="questions()"
+  [answers]="dossierStore.answers()"
+  [hasInsurers]="dossierStore.insurers().length > 0"
+  (launch)="launch($event)"
+  (cancel)="cancel($event)"
+  (openExtranet)="openExtranet($event)"
+  (answered)="complete($event.card, $event.answers)"
+  (manualEntry)="openManualEntry($event)"
+  (validate)="store.validateOffer($event.insurer.id)"
+/>

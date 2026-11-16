@@ -2,7 +2,10 @@ import { inject, Injectable } from '@angular/core';
 import { Assure, Dossier } from '@shared';
 import { map, Observable } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
+import { DatabaseQueryBuilder, OrderByDirection } from '../../../../core/providers/database-query.builder';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
+import { AssureModel } from '../../../../core/entities/assure.model';
+import { DossierModel } from '../../../../core/entities/dossier.model';
 
 export type TrashKind = 'assure' | 'dossier';
 
@@ -18,14 +21,14 @@ export class TrashService {
    */
   watchDeletedAssures(cabinetId: string, limit: number): Observable<{ items: Assure[]; hasMore: boolean }> {
     return this._database
-      .watchCollection<Assure>(`ci_cabinets/${cabinetId}/ci_assures`, { orderBy: [{ field: 'deletedAt', direction: 'desc' }], limit })
+      .list(AssureModel.entity(cabinetId), new DatabaseQueryBuilder().orderBy('deletedAt', OrderByDirection.desc).limit(limit).build())
       .pipe(map((items) => ({ items: items.filter((assure) => !!assure.deletedAt), hasMore: items.length >= limit })));
   }
 
   /** Dossiers dans la corbeille, du plus récemment supprimé au plus ancien : les `limit` premiers. */
   watchDeletedDossiers(cabinetId: string, limit: number): Observable<{ items: Dossier[]; hasMore: boolean }> {
     return this._database
-      .watchCollection<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers`, { orderBy: [{ field: 'deletedAt', direction: 'desc' }], limit })
+      .list(DossierModel.entity(cabinetId), new DatabaseQueryBuilder().orderBy('deletedAt', OrderByDirection.desc).limit(limit).build())
       .pipe(map((items) => ({ items: items.filter((dossier) => !!dossier.deletedAt), hasMore: items.length >= limit })));
   }
 
@@ -43,13 +46,13 @@ export class TrashService {
   /** Dossiers trouvés, en direct et dans l'ordre donné (restaurés ou disparus écartés). */
   watchDeletedDossiersByIds(cabinetId: string, ids: string[]): Observable<Dossier[]> {
     return this._database
-      .watchByIds<Dossier>(`ci_cabinets/${cabinetId}/ci_dossiers`, ids)
+      .listByIds(DossierModel.entity(cabinetId), ids)
       .pipe(map((dossiers) => dossiers.filter((dossier) => !!dossier.deletedAt)));
   }
 
   /** Clients des dossiers affichés (le nom d'un dossier supprimé vient de son client, actif ou non). */
   watchAssuresByIds(cabinetId: string, ids: string[]): Observable<Assure[]> {
-    return this._database.watchByIds<Assure>(`ci_cabinets/${cabinetId}/ci_assures`, ids);
+    return this._database.listByIds(AssureModel.entity(cabinetId), ids);
   }
 
   restore(kind: TrashKind, id: string): Observable<{ ok: boolean }> {

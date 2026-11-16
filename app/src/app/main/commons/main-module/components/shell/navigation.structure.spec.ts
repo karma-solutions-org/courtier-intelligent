@@ -5,12 +5,12 @@ const labelsFor = (role: Parameters<typeof navigationFor>[0]) =>
   navigationFor(role).flatMap(section => section.items.map(item => item.label));
 
 describe('navigationFor', () => {
-  it('montre au courtier ses clients, sans les paramètres du cabinet', () => {
-    expect(labelsFor('courtier')).toEqual(['Tableau de bord', 'Clients']);
+  it('montre au courtier ses clients et ses dossiers à traiter, sans les paramètres du cabinet', () => {
+    expect(labelsFor('courtier')).toEqual(['Tableau de bord', 'Clients', 'Mes dossiers à traiter']);
   });
 
   it("ajoute les paramètres du cabinet pour l'admin", () => {
-    expect(labelsFor('admin')).toEqual(['Tableau de bord', 'Clients', 'Paramètres', 'Corbeille']);
+    expect(labelsFor('admin')).toEqual(['Tableau de bord', 'Clients', 'Mes dossiers à traiter', 'Paramètres', 'Corbeille']);
   });
 
   it('ne montre que le tableau de bord à un compte sans cabinet', () => {

@@ -1,0 +1,53 @@
+@if (showMenuButton()) {
+  <button class="icon-btn" type="button" (click)="menuToggled.emit()" aria-label="Ouvrir le menu">
+    <mat-icon>menu</mat-icon>
+  </button>
+}
+
+<div class="logo-container" aria-label="Courtier Intelligent">
+  <span class="logo-ba">courtier</span><span class="logo-zz">intelligent</span>
+</div>
+
+@if (moduleTitle()) {
+  <nav class="nav-links" aria-label="Module courant">
+    <span class="nav-link active">{{ moduleTitle() }}</span>
+  </nav>
+}
+
+<div class="actions">
+  <app-extension-indicator class="extension" [ping]="extension()" />
+
+  <button class="user-profile" type="button" [matMenuTriggerFor]="userMenu" [title]="displayName()" aria-label="Menu utilisateur">
+    <span class="avatar" [class.has-logo]="!!logoUrl()">
+      @if (logoUrl(); as logo) {
+        <img [src]="logo" alt="Logo du cabinet" />
+      } @else {
+        {{ initials() }}
+      }
+    </span>
+  </button>
+</div>
+
+<mat-menu #userMenu="matMenu" xPosition="before" class="ci-menu-panel">
+  <div class="menu-identity">
+    <span class="identity-avatar" [class.has-logo]="!!logoUrl()" aria-hidden="true">
+      @if (logoUrl(); as logo) {
+        <img [src]="logo" alt="" />
+      } @else {
+        {{ initials() }}
+      }
+    </span>
+    <span class="identity-text">
+      <span class="identity-name">{{ displayName() }}</span>
+      <span class="identity-role">{{ roleLabel() }}</span>
+      @if (email(); as mail) {
+        <span class="identity-role">{{ mail }}</span>
+      }
+    </span>
+  </div>
+  <mat-divider />
+  <button mat-menu-item class="danger" (click)="signedOut.emit()">
+    <mat-icon>logout</mat-icon>
+    Se déconnecter
+  </button>
+</mat-menu>

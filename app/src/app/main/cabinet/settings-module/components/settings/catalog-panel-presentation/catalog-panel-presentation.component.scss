@@ -1,0 +1,48 @@
+h3 {
+  margin: 16px 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+}
+
+.insurer {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.logo {
+  width: 56px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.initial {
+  display: inline-grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--ci-accent-ink);
+  background: var(--ci-accent-soft);
+}
+
+.muted {
+  font-size: 13px;
+  color: var(--ci-text-muted);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.actions {
+  margin-top: 16px;
+}

@@ -1,0 +1,22 @@
+<div class="banner" role="status" [class.expired]="expired()">
+  <mat-icon>warning</mat-icon>
+  <p>
+    @if (expired()) {
+      Votre cabinet dépasse la limite de son offre ({{ maxUtilisateurs() }} utilisateurs) :
+      @if (role() === 'admin') {
+        seuls les administrateurs ont accès pour le moment. Désactivez des membres dans Paramètres → Membres pour rétablir
+        l'accès de toute l'équipe.
+      } @else {
+        l'accès est réservé aux administrateurs.
+      }
+    } @else {
+      Votre offre autorise {{ maxUtilisateurs() }} utilisateurs, votre cabinet en compte davantage.
+      @if (role() === 'admin') {
+        Désactivez des membres avant le {{ graceEndsAt() | date: 'd MMMM y' }} : les invitations sont bloquées et, après
+        cette date, seuls les administrateurs auront accès.
+      } @else {
+        Après le {{ graceEndsAt() | date: 'd MMMM y' }}, l'accès sera réservé aux administrateurs.
+      }
+    }
+  </p>
+</div>

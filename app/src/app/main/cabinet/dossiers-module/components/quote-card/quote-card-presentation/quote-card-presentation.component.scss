@@ -1,0 +1,181 @@
+.busy {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.card {
+  display: grid;
+  /* Un contenu large (groupe de boutons, libellé long) ne fait jamais déborder la carte de sa colonne. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+  gap: 12px;
+  align-content: start;
+  padding: 20px;
+  border: 1px solid var(--ci-border);
+  border-radius: 8px;
+  background: var(--ci-surface);
+  box-shadow: var(--ci-shadow-sm);
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.insurer-logo {
+  flex-shrink: 0;
+  width: 64px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.status {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--ci-text-muted);
+  background: var(--mat-sys-surface-container);
+}
+
+.status.progress {
+  color: var(--mat-sys-on-primary-container);
+  background: var(--mat-sys-primary-container);
+}
+
+.status.action {
+  color: var(--mat-sys-on-tertiary-container);
+  background: var(--mat-sys-tertiary-container);
+}
+
+.status.ok {
+  color: var(--ci-success);
+  background: var(--ci-success-soft);
+}
+
+.status.ko {
+  color: var(--mat-sys-on-error-container);
+  background: var(--mat-sys-error-container);
+}
+
+.offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+}
+
+.offer strong {
+  font-size: 22px;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--mat-sys-surface-container);
+}
+
+.hint,
+.meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ci-text-muted);
+}
+
+.steps {
+  display: grid;
+  gap: 6px;
+}
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--mat-sys-on-error-container);
+  background: var(--mat-sys-error-container);
+}
+
+footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--ci-shadow-sm);
+  transition: border-color 0.15s;
+
+  &:hover {
+    border-color: var(--border-strong);
+  }
+}
+
+h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.insurer-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-weight: 600;
+  color: var(--ci-navy-900);
+  background: var(--ci-navy-50);
+}
+
+.status {
+  font-weight: 600;
+}
+
+.status.progress {
+  color: var(--ci-info);
+  background: var(--ci-info-soft);
+}
+
+.status.action {
+  color: var(--ci-warning);
+  background: var(--ci-warning-soft);
+}
+
+.status.ok {
+  color: var(--ci-success);
+  background: var(--ci-success-soft);
+}
+
+.status.ko {
+  color: var(--ci-danger);
+  background: var(--ci-danger-soft);
+}
+
+.offer strong {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ci-navy-900);
+}
+
+.badge {
+  color: var(--ci-warning);
+  background: var(--ci-warning-soft);
+  font-weight: 600;
+}

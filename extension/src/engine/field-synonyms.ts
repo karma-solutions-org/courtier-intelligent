@@ -1,4 +1,4 @@
-import { isFixedCanonicalPath, type CanonicalPath, type FixedCanonicalPath } from '@shared';
+import { CANONICAL_PATHS, isFixedCanonicalPath, parseClaimPath, type CanonicalPath, type ClaimField, type ClaimPath, type FixedCanonicalPath } from '@shared';
 import type { FieldKind } from './analyzer';
 
 /**
@@ -6,6 +6,8 @@ import type { FieldKind } from './analyzer';
  * (`extra.kilometrage_annuel`), son code en clair (« kilometrage annuel »).
  */
 export function pathExample(path: CanonicalPath): string {
+  const claim = parseClaimPath(path);
+  if (claim) return `${FIELD_SYNONYMS[path as ClaimPath].labels[0]} (sinistre ${claim.index})`;
   return isFixedCanonicalPath(path) ? FIELD_SYNONYMS[path].labels[0] : path.slice('extra.'.length).replace(/_/g, ' ');
 }
 
@@ -17,7 +19,18 @@ export function expectsDate(path: CanonicalPath, value: unknown): boolean {
 /** Type de réponse attendu pour un chemin canonique : détermine les champs HTML compatibles. */
 export type Expected = 'text' | 'date' | 'number' | 'boolean' | 'choice';
 
+/** Même valeur pour la rubrique (type, responsabilité, date) de chacun des sinistres détaillés. */
+function perClaim<T>(byField: Record<ClaimField, T>): Record<ClaimPath, T> {
+  return Object.fromEntries(
+    CANONICAL_PATHS.flatMap(path => {
+      const claim = parseClaimPath(path);
+      return claim ? [[path, byField[claim.field]]] : [];
+    }),
+  ) as Record<ClaimPath, T>;
+}
+
 export const PATH_EXPECTED: Record<FixedCanonicalPath, Expected> = {
+  ...perClaim<Expected>({ type: 'choice', responsibility: 'choice', date: 'date' }),
   'client.firstName': 'text',
   'client.lastName': 'text',
   'client.nationalId': 'text',
@@ -46,6 +59,8 @@ export const PATH_EXPECTED: Record<FixedCanonicalPath, Expected> = {
   'driver.lastName': 'text',
   'driver.birthDate': 'date',
   'driver.licenseDate': 'date',
+  'driver.birthCountry': 'text',
+  'driver.licenseCountry': 'text',
   'driver.licenseType': 'choice',
   'driver.profession': 'text',
   'driver.socioProfessionalCategory': 'choice',
@@ -84,6 +99,12 @@ export interface FieldSynonyms {
 }
 
 export const FIELD_SYNONYMS: Record<FixedCanonicalPath, FieldSynonyms> = {
+  // Une ligne du tableau « Sinistres » : seul le champ de la ligne n vise le sinistre n (voir scoreCandidate).
+  ...perClaim<FieldSynonyms>({
+    type: { labels: ['type de sinistre', 'nature du sinistre', 'type', 'nature', 'nature de sinistre', 'type du sinistre'], names: ['typesinistre', 'naturesinistre', 'claimtype'] },
+    responsibility: { labels: ['responsabilite', 'taux de responsabilite', 'part de responsabilite', 'pourcentage de responsabilite', 'responsable', 'responsabilite engagee'], names: ['responsabilite', 'responsibility', 'tauxresponsabilite'] },
+    date: { labels: ['date du sinistre', 'date de survenance', 'date', 'date de survenance du sinistre', 'survenu le', 'date de l accident'], names: ['datesinistre', 'datesurvenance', 'claimdate'] },
+  }),
   'client.firstName': { labels: ['prenom', 'votre prenom', 'prenom du souscripteur', 'prenom du titulaire'], names: ['prenom', 'firstname', 'givenname'], autocomplete: ['given-name'] },
   'client.lastName': { labels: ['nom', 'votre nom', 'nom de famille', 'nom du souscripteur', 'nom du titulaire', 'nom d usage'], names: ['nom', 'lastname', 'familyname', 'surname'], autocomplete: ['family-name'] },
   'client.nationalId': { labels: ['numero de securite sociale', 'n securite sociale', 'numero d identification', 'numero insee', 'piece d identite'], names: ['nir', 'secu', 'insee'] },
@@ -104,27 +125,29 @@ export const FIELD_SYNONYMS: Record<FixedCanonicalPath, FieldSynonyms> = {
   'vehicle.vehicleValue': { labels: ['valeur du vehicule', 'valeur a neuf', 'valeur d achat', 'valeur estimee', 'valeur venale', 'prix du vehicule', 'valeur'], names: ['valeur', 'vehiclevalue', 'prix'] },
   'vehicle.vehicleType': { labels: ['type de vehicule', 'categorie du vehicule', 'type', 'categorie'], names: ['vehicletype', 'typevehicule', 'categorie'] },
   'vehicle.usage': { labels: ['usage du vehicule', 'usage', 'utilisation du vehicule', 'utilisation', 'type d usage', 'usage principal'], names: ['usage', 'utilisation'] },
-  'vehicle.parkingType': { labels: ['stationnement', 'lieu de stationnement', 'stationnement de nuit', 'lieu de stationnement la nuit', 'garage', 'lieu de garage', 'ou stationne votre vehicule'], names: ['stationnement', 'parking', 'garage'] },
+  'vehicle.parkingType': { labels: ['stationnement', 'lieu de stationnement', 'stationnement de nuit', 'lieu de stationnement la nuit', 'garage', 'lieu de garage','ou stationne votre vehicule'], names: ['stationnement', 'parking'] },
   'vehicle.energyType': { labels: ['energie', 'type d energie', 'carburant', 'type de carburant', 'motorisation energie', 'source d energie'], names: ['energie', 'energy', 'carburant', 'fuel', 'fueltype'] },
   'vehicle.parkingPostalCode': { labels: ['code postal de stationnement', 'code postal du lieu de stationnement', 'code postal de garage', 'code postal du lieu de garage', 'localisation du vehicule'], names: ['cpstationnement', 'cpgarage', 'parkingpostalcode', 'garagezip'] },
-  'vehicle.parkingCity': { labels: ['ville de stationnement', 'commune de stationnement', 'ville du lieu de garage', 'commune de garage'], names: ['villestationnement', 'villegarage', 'parkingcity'] },
+  'vehicle.parkingCity': { labels: ['ville de stationnement', 'commune de stationnement', 'ville du lieu de stationnement', 'commune du lieu de stationnement','ville du lieu de garage', 'commune de garage'], names: ['villestationnement', 'villegarage', 'parkingcity'] },
   'vehicle.purchaseDate': { labels: ['date d achat', 'date d acquisition', 'achete le', 'date d achat du vehicule'], names: ['purchasedate', 'achat', 'acquisition'] },
 
   'driver.firstName': { labels: ['prenom du conducteur', 'prenom conducteur', 'prenom du conducteur principal'], names: ['driverfirstname', 'prenomconducteur'] },
   'driver.lastName': { labels: ['nom du conducteur', 'nom conducteur', 'nom du conducteur principal'], names: ['driverlastname', 'nomconducteur'] },
   'driver.birthDate': { labels: ['date de naissance du conducteur', 'naissance du conducteur', 'date de naissance conducteur'], names: ['driverbirthdate', 'naissanceconducteur'] },
+  'driver.birthCountry': { labels: ['pays de naissance', 'pays de naissance du conducteur', 'ne en', 'nationalite de naissance'], names: ['paysnaissance', 'birthcountry', 'countryofbirth'] },
+  'driver.licenseCountry': { labels: ['pays d obtention du permis', 'pays du permis', 'permis obtenu en', 'pays de delivrance du permis'], names: ['payspermis', 'licensecountry'] },
   'driver.licenseDate': { labels: ['date d obtention du permis', 'date du permis', 'obtention du permis', 'permis obtenu le', 'date d obtention du permis de conduire', 'date de permis'], names: ['licensedate', 'datepermis', 'obtentionpermis', 'permis'] },
   'driver.licenseType': { labels: ['type de permis', 'categorie de permis', 'permis', 'permis de conduire'], names: ['licensetype', 'typepermis', 'categoriepermis'] },
   'driver.profession': { labels: ['profession', 'metier', 'activite professionnelle'], names: ['profession', 'metier', 'job'], autocomplete: ['organization-title'] },
   'driver.socioProfessionalCategory': { labels: ['categorie socio professionnelle', 'categorie socioprofessionnelle', 'csp', 'situation professionnelle', 'statut professionnel'], names: ['csp', 'categoriesocioprofessionnelle', 'socioprofessional'] },
   'driver.phone': { labels: ['telephone du conducteur', 'telephone conducteur'], names: ['driverphone'] },
 
-  'insuranceHistory.currentlyInsured': { labels: ['etes vous actuellement assure', 'actuellement assure', 'etes vous assure', 'deja assure', 'avez vous un contrat en cours', 'assure actuellement', 'avez vous deja ete assure'], names: ['currentlyinsured', 'dejaassure', 'assureactuellement'] },
+  'insuranceHistory.currentlyInsured': { labels: ['etes vous actuellement assure', 'actuellement assure', 'etes vous assure', 'deja assure', 'avez vous un contrat en cours', 'assure actuellement', 'avez vous deja ete assure', 'avez vous ete assure', 'assure sur un contrat automobile'], names: ['currentlyinsured', 'dejaassure', 'assureactuellement'] },
   'insuranceHistory.previousInsurer': { labels: ['assureur actuel', 'assureur precedent', 'compagnie actuelle', 'compagnie d assurance actuelle', 'ancien assureur', 'assureur', 'votre assureur actuel'], names: ['assureur', 'previousinsurer', 'insurer', 'compagnie'] },
   'insuranceHistory.previousContractStartDate': { labels: ['date de debut du contrat actuel', 'debut du contrat actuel', 'date d effet du contrat actuel', 'assure depuis le', 'date de souscription du contrat actuel'], names: ['contractstart', 'debutcontrat', 'dateeffet'] },
   'insuranceHistory.previousContractEndDate': { labels: ['date d echeance du contrat', 'echeance du contrat actuel', 'echeance', 'date d echeance', 'fin du contrat actuel', 'date de fin du contrat'], names: ['contractend', 'echeance', 'findecontrat'] },
-  'insuranceHistory.seniority': { labels: ['anciennete d assurance', 'anciennete', 'duree d assurance', 'depuis combien de temps etes vous assure', 'anciennete d assurance en mois'], names: ['seniority', 'anciennete'] },
-  'insuranceHistory.bonusMalus': { labels: ['bonus malus', 'coefficient bonus malus', 'crm', 'coefficient de reduction majoration', 'coefficient crm', 'votre bonus malus'], names: ['bonusmalus', 'crm', 'bonus'] },
+  'insuranceHistory.seniority': { labels: ['anciennete d assurance', 'anciennete', 'assure sans interruption depuis', 'assure sans interruption', 'duree d assurance', 'depuis combien de temps etes vous assure', 'anciennete d assurance en mois'], names: ['seniority', 'anciennete'] },
+  'insuranceHistory.bonusMalus': { labels: ['bonus malus', 'coefficient bonus malus', 'crm', 'coefficient de reduction majoration', 'coefficient crm', 'votre bonus malus', 'bonus malus declare a la date d effet souhaitee'], names: ['bonusmalus', 'crm', 'bonus'] },
   'insuranceHistory.claimsCount': { labels: ['nombre de sinistres', 'sinistres', 'sinistres sur les 36 derniers mois', 'nombre de sinistres declares', 'sinistres des 3 dernieres annees', 'nombre de sinistres sur 36 mois'], names: ['claims', 'sinistres', 'nbsinistres', 'claimscount'] },
   'insuranceHistory.responsibleClaimsCount': { labels: ['sinistres responsables', 'dont sinistres responsables', 'nombre de sinistres responsables', 'sinistres totalement ou partiellement responsables'], names: ['responsibleclaims', 'sinistresresponsables'] },
   'insuranceHistory.nonResponsibleClaimsCount': { labels: ['sinistres non responsables', 'dont sinistres non responsables', 'nombre de sinistres non responsables'], names: ['nonresponsibleclaims', 'sinistresnonresponsables'] },

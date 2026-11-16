@@ -1,0 +1,15 @@
+form {
+  display: grid;
+  gap: 12px;
+}
+
+.intro {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ci-text-muted);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

@@ -1,0 +1,12 @@
+<h1>{{ structure.createTitle }}</h1>
+<app-assure-document-import-container (pieceRead)="pieces.update(list => [...list, $event])" />
+<app-assure-form
+  [prefill]="prefill()"
+  mode="create"
+  [isPending]="store.isPending()"
+  [error]="store.error()"
+  [duplicates]="duplicates()"
+  (candidateChanged)="checkDuplicates($event)"
+  (submitted)="store.create($event)"
+  (cancelled)="back()"
+/>

@@ -16,12 +16,13 @@ export interface NavSection {
 const ALL: UserRole[] = ['admin', 'courtier'];
 
 /** Menu latéral : chaque entrée n'est affichée qu'aux rôles indiqués. */
-export const NAVIGATION: NavSection[] = [
+const NAVIGATION: NavSection[] = [
   {
     title: null,
     items: [
       { label: 'Tableau de bord', icon: 'space_dashboard', url: CabinetRouteContainerModel.DASHBOARD_ROUTE.url, roles: ALL },
       { label: 'Clients', icon: 'group', url: CabinetRouteContainerModel.CLIENTS_ROUTE.url, roles: ALL },
+      { label: 'Mes dossiers à traiter', icon: 'assignment', url: CabinetRouteContainerModel.DOSSIERS_TO_PROCESS_ROUTE.url, roles: ALL },
     ],
   },
   {

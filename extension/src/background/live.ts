@@ -3,7 +3,6 @@ import { collectionGroup, doc, getDoc, limit, onSnapshot, orderBy, query, where 
 import { getFirebase } from '../shared/firebase';
 import type { CurrentJob, ExtensionUser } from '../shared/messages';
 import { JobSnapshot, pickCurrentJob } from './jobs';
-import { insurerDocPath } from '@shared';
 
 export interface LiveHandlers {
   /** La fiche du membre a changé (ou n'est plus lisible) : la session est à revérifier. */
@@ -26,8 +25,7 @@ export function startLiveWatch(user: ExtensionUser, handlers: LiveHandlers): () 
   const loadInsurerName = async (insurerId: string) => {
     if (insurerNames.has(insurerId)) return;
     try {
-      // Assureur du catalogue, ou ajouté par le cabinet (identifiant préfixé, voir shared/cabinet-insurers.ts).
-      const snapshot = await getDoc(doc(firestore, insurerDocPath(user.cabinetId, insurerId)));
+      const snapshot = await getDoc(doc(firestore, `ci_insurers/${insurerId}`));
       const name = snapshot.get('name');
       if (typeof name === 'string') {
         insurerNames.set(insurerId, name);

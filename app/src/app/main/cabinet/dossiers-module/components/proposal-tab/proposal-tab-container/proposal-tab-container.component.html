@@ -1,0 +1,13 @@
+<app-proposal-tab-presentation
+  [dossier]="dossier()"
+  [insurerName]="insurerName()"
+  [chosenOffer]="store.chosenOffer()"
+  [chosenOfferStale]="store.chosenOfferStale()"
+  [canSend]="canSend()"
+  [defaultRecipient]="defaultRecipient()"
+  [busy]="store.busy()"
+  [error]="store.error()"
+  (sendRequested)="store.send($event)"
+  (answerRequested)="answer($event)"
+  (subscriptionRequested)="subscribe()"
+/>

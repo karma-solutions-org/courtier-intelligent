@@ -1,3 +1,4 @@
+import { foldText } from '@shared';
 import type { CapturedGuarantee, CapturedOffer } from '../shared/messages';
 import { isVisible } from './analyzer';
 import { hasPremium } from './offer';
@@ -74,11 +75,7 @@ export function visibleText(root: Element): string {
 
 /** Comme `normalize`, mais garde la ponctuation utile aux montants et aux numéros (« , », « . », « € », « / », « - »). */
 const fold = (text: string) =>
-  text
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
+  foldText(text).replace(/\s+/g, ' ');
 
 const HEADINGS = 'h1, h2, h3, h4, h5, h6, [role="heading"], caption, legend, dt, th, strong, b';
 
@@ -285,8 +282,14 @@ const RESULT_HEADING =
 /** Le titre de la page (ou d'une section principale) annonce-t-il un résultat (« Votre tarif », « Votre devis »…) ? */
 export function hasResultHeading(doc: Document): boolean {
   const titles = [doc.title, ...[...doc.querySelectorAll('h1, h2, h3, [role="heading"]')].filter(isVisible).map(h => visibleText(h))];
-  return titles.some(title => RESULT_HEADING.test(normalize(title)));
+  if (titles.some(title => RESULT_HEADING.test(normalize(title)))) return true;
+  // Sans titre explicite, l'en-tête d'un tableau de prix (« Tarifs Formules (euros) ») annonce aussi le résultat.
+  const tableHeads = [...doc.querySelectorAll('table th, table caption')].filter(isVisible).map(cell => visibleText(cell));
+  return tableHeads.some(head => RESULT_TABLE_HEADING.test(normalize(head)));
 }
+
+/** En-tête d'un tableau de tarifs : « Tarifs formules », « Tarif (euros) », « Prime annuelle », « Cotisation TTC »… */
+const RESULT_TABLE_HEADING = /\b(tarifs? (des )?formules?|tarifs? (en )?euros|tarifs? ttc|primes? (annuelle|mensuelle|ttc)|cotisations? (annuelle|mensuelle|ttc))\b/;
 
 export interface PageExtraction {
   offer: CapturedOffer;

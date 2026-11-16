@@ -1,0 +1,26 @@
+<app-card [heading]="structure.title" [subtitle]="structure.hint">
+  @if (rows().length) {
+    <app-table [columns]="columns" [rows]="rows()" [trackBy]="byId">
+      <ng-template appTableCell="date" let-row>{{ row.entry.at?.toMillis() | date: 'd MMM y HH:mm' }}</ng-template>
+      <ng-template appTableCell="event" let-row>
+        <span [class.refused]="row.refused">{{ row.label }}</span>
+        @if (row.device) {
+          <span class="sub">{{ structure.device }} : {{ row.device }}</span>
+        }
+      </ng-template>
+    </app-table>
+  } @else if (!hasMore()) {
+    <p class="hint">{{ structure.empty }}</p>
+  }
+  <div
+    class="more"
+    appInfiniteScroll
+    [appInfiniteScrollDisabled]="!hasMore() || loadingMore()"
+    [appInfiniteScrollCount]="entries().length"
+    (reached)="loadMore.emit()"
+  >
+    @if (hasMore()) {
+      <span>Chargement de la suite…</span>
+    }
+  </div>
+</app-card>

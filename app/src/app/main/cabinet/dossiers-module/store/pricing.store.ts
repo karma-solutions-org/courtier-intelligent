@@ -12,15 +12,17 @@ import {
   CanonicalData,
   Insurer,
   insurersForProduct,
+  ManualOfferInput,
   Offer,
   PRICING_DOSSIER_STATUSES,
+  quoteDocumentsFolder,
   QuoteJob,
 } from '@shared';
-import { catchError, EMPTY, filter, merge, mergeMap, Observable, pipe, switchMap, tap } from 'rxjs';
+import { catchError, EMPTY, filter, map, merge, mergeMap, Observable, of, pipe, switchMap, tap } from 'rxjs';
 import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
 import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-status.store';
-import { PricingService } from '../services/pricing.service';
+import { PricingService, QuoteDocumentRef } from '../services/pricing.service';
 import { DossierStore } from './dossier.store';
 
 /** Message unique après l'annulation d'une tarification (snackbar et carte de l'assureur). */
@@ -33,10 +35,18 @@ export interface PricingCard {
   offer: Offer | null;
 }
 
+/** Saisie manuelle : l'offre et, éventuellement, le devis à joindre. */
+export interface ManualOfferSubmission {
+  offer: ManualOfferInput;
+  file: File | null;
+}
+
 type Action =
   | { kind: 'launch'; insurerId: string; target: Window | null }
   | { kind: 'complete'; insurerId: string; answers: CanonicalData }
-  | { kind: 'cancel'; insurerId: string };
+  | { kind: 'cancel'; insurerId: string }
+  | { kind: 'manual'; insurerId: string; submission: ManualOfferSubmission }
+  | { kind: 'validate'; insurerId: string };
 
 interface PricingState {
   jobs: QuoteJob[];
@@ -63,9 +73,10 @@ export const PricingStore = signalStore(
     (store, dossierStore = inject(DossierStore), cabinetStatus = inject(CabinetStatusStore)) => ({
       cards: computed<PricingCard[]>(() => {
         const productId = dossierStore.dossier()?.productId ?? '';
-        const enabled = cabinetStatus.cabinet()?.enabledInsurers ?? [];
-        const replacedProductId = dossierStore.product()?.replaces ?? null;
-        return insurersForProduct(dossierStore.insurers(), productId, enabled, replacedProductId).map((insurer) => ({
+        // Les extranets choisis pour le dossier, à défaut ceux du cabinet.
+        const chosen = dossierStore.dossier()?.insurerIds ?? [];
+        const enabled = chosen.length ? chosen : (cabinetStatus.cabinet()?.enabledInsurers ?? []);
+        return insurersForProduct(dossierStore.insurers(), productId, enabled).map((insurer) => ({
           insurer,
           job: store.jobs().find((j) => j.id === insurer.id) ?? null,
           offer: store.offers().find((o) => o.id === insurer.id) ?? null,
@@ -95,6 +106,20 @@ export const PricingStore = signalStore(
         });
 
       /** Envoie le devis dans Storage (rangé dans le dossier, nommé d'après l'assureur), avant d'enregistrer l'offre. */
+      const upload = (
+        dossierId: string,
+        insurerId: string,
+        file: File | null,
+      ): Observable<QuoteDocumentRef | null> => {
+        if (!file) return of(null);
+        const extension =
+          file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf';
+        const storagePath = `${quoteDocumentsFolder(authStore.cabinetId()!, dossierId)}/${insurerId}-${Date.now()}.${extension}`;
+        return service
+          .uploadQuoteDocument(storagePath, file)
+          .pipe(map(() => ({ storagePath, fileName: file.name })));
+      };
+
       const perform = (action: Action): Observable<unknown> => {
         const dossierId = dossierStore.selectedId();
         if (!dossierId) {
@@ -129,6 +154,21 @@ export const PricingStore = signalStore(
                   }),
                 ),
               );
+          case 'manual':
+            return upload(dossierId, action.insurerId, action.submission.file).pipe(
+              switchMap((document) =>
+                service.saveManualOffer(dossierId, action.insurerId, action.submission.offer, document),
+              ),
+              tap(() => patchState(store, { successMessage: 'Offre enregistrée.' })),
+            );
+          case 'validate': {
+            const cabinetId = authStore.cabinetId();
+            const uid = authStore.user()?.uid;
+            if (!cabinetId || !uid) return EMPTY;
+            return service
+              .validateOffer(cabinetId, dossierId, action.insurerId, uid)
+              .pipe(tap(() => patchState(store, { successMessage: 'Tarif validé.' })));
+          }
         }
       };
 
@@ -190,16 +230,30 @@ export const PricingStore = signalStore(
       };
     },
   ),
-  withMethods((store) => ({
+  withMethods((store, dossierStore = inject(DossierStore)) => ({
     /**
      * « Tarifer » ou « Relancer » : écrit le job puis ouvre l'extranet dans `target`, un onglet ouvert au clic
-     * (ouvert après la réponse du serveur, il serait bloqué par le navigateur).
+     * (ouvert après la réponse du serveur, il serait bloqué par le navigateur). Refusé tant qu'une question obligatoire
+     * est sans réponse (dossier commencé avant qu'elle le devienne) : l'extension resterait bloquée sur l'extranet.
      */
-    launch: (insurerId: string, target: Window | null) =>
-      store._act({ kind: 'launch', insurerId, target }),
+    launch: (insurerId: string, target: Window | null) => {
+      const missing = dossierStore.missing();
+      if (missing.length) {
+        target?.close();
+        const labels = dossierStore.labels();
+        const names = missing.map((path) => labels.get(path) ?? path).join(', ');
+        patchState(store, { error: `Complétez d'abord le dossier (onglet Informations) : ${names}.` });
+        return;
+      }
+      store._act({ kind: 'launch', insurerId, target });
+    },
     cancel: (insurerId: string) => store._act({ kind: 'cancel', insurerId }),
     complete: (insurerId: string, answers: CanonicalData) =>
       store._act({ kind: 'complete', insurerId, answers }),
+    saveManualOffer: (insurerId: string, submission: ManualOfferSubmission) =>
+      store._act({ kind: 'manual', insurerId, submission }),
+    /** Tarif lu par l'extension, vérifié par le courtier : il entre dans le comparatif. */
+    validateOffer: (insurerId: string) => store._act({ kind: 'validate', insurerId }),
   })),
   withHooks({
     onInit: (store) => {

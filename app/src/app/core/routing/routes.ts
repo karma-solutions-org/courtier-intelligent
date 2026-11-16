@@ -10,7 +10,7 @@ export const ROUTES: Routes = [
     pathMatch: 'full',
     title: 'Courtier Intelligent — Le back-office des cabinets de courtage',
     loadComponent: () =>
-      import('../../main/commons/presentation-module/components/landing-container/landing-container.component').then(
+      import('../../main/commons/presentation-module/components/landing/landing-container/landing-container.component').then(
         c => c.LandingContainerComponent,
       ),
   },
@@ -29,6 +29,6 @@ export const ROUTES: Routes = [
     path: '**',
     title: 'Page introuvable — Courtier Intelligent',
     loadComponent: () =>
-      import('../../main/commons/main-module/components/not-found/not-found.component').then(c => c.NotFoundComponent),
+      import('../../main/commons/main-module/components/not-found/not-found-presentation/not-found-presentation.component').then(c => c.NotFoundPresentationComponent),
   },
 ];
