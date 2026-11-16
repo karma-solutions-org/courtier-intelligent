@@ -1,0 +1,72 @@
+/* Atlas Mutuelle (démo locale) : charte verte et claire, cartes arrondies, assistant en 4 étapes. */
+:root { --vert: #0f7b5f; --vert-fonce: #0a5240; --menthe: #e3f4ee; --or: #e0b13a; --fond: #f6f8f7; --texte: #22302b; --gris: #66756f; --bord: #cfdcd6; --rouge: #b3261e; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; background: var(--fond); color: var(--texte); }
+.atl-demo { margin: 0; background: var(--or); color: #3a2a00; text-align: center; font-size: .8rem; padding: 5px 8px; }
+.atl-entete { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; padding: 14px 28px; background: #fff; border-bottom: 3px solid var(--vert); }
+.atl-logo { font-size: 1.35rem; font-weight: bold; color: var(--vert-fonce); }
+.atl-logo em { font-style: normal; color: var(--vert); }
+.atl-logo small { font-size: .75rem; font-weight: normal; color: var(--gris); }
+.atl-pic { color: var(--or); }
+.atl-compte { font-size: .85rem; color: var(--gris); }
+.atl-cadre { max-width: 820px; margin: 28px auto; padding: 0 16px; }
+h1 { font-size: 1.5rem; color: var(--vert-fonce); margin: 0 0 14px; }
+h2 { font-size: 1.15rem; color: var(--vert); margin: 0 0 16px; }
+h3 { font-size: 1rem; color: var(--vert-fonce); margin: 22px 0 8px; }
+.atl-progression { margin-bottom: 18px; }
+.atl-progress { height: 10px; background: #dde8e3; border-radius: 99px; overflow: hidden; }
+.atl-progress-bar { display: block; height: 100%; background: linear-gradient(90deg, var(--vert), #2bb38a); transition: width .3s; }
+.atl-jalons { display: flex; justify-content: space-between; list-style: none; padding: 0; margin: 8px 0 0; font-size: .8rem; color: var(--gris); }
+.atl-jalons li.is-done { color: var(--vert); }
+.atl-jalons li.is-current { color: var(--vert-fonce); font-weight: bold; }
+.atl-etape, .atl-resultat { background: #fff; border: 1px solid var(--bord); border-radius: 14px; padding: 22px 26px; box-shadow: 0 2px 8px rgba(15,123,95,.06); }
+.atl-grille { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; }
+.atl-q { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.atl-q.atl-large { grid-column: 1 / -1; }
+.atl-q > label, .atl-libelle { font-size: .88rem; font-weight: bold; }
+abbr { color: var(--rouge); text-decoration: none; border: 0; }
+input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="date"], input[type="month"], select {
+  font: inherit; padding: 9px 11px; border: 1px solid var(--bord); border-radius: 8px; background: #fff; }
+input:focus, select:focus, button:focus-visible, [role="radio"]:focus { outline: 3px solid #9fd9c4; outline-offset: 1px; }
+[aria-invalid="true"] { border-color: var(--rouge) !important; }
+.atl-segment { display: inline-flex; border: 1px solid var(--vert); border-radius: 99px; overflow: hidden; width: max-content; }
+.atl-segment [role="radio"] { padding: 7px 22px; cursor: pointer; font-size: .9rem; }
+.atl-segment [role="radio"][aria-checked="true"] { background: var(--vert); color: #fff; }
+.atl-liste { position: relative; max-width: 320px; }
+.atl-liste-bouton { width: 100%; text-align: left; font: inherit; padding: 9px 11px; border: 1px solid var(--bord); border-radius: 8px; background: #fff; cursor: pointer; }
+.atl-liste-bouton[data-value=""] { color: var(--gris); }
+.atl-liste-options { position: absolute; z-index: 3; left: 0; right: 0; list-style: none; margin: 4px 0 0; padding: 4px; background: #fff; border: 1px solid var(--bord); border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,.12); max-height: 220px; overflow: auto; }
+.atl-liste-options li { padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+.atl-liste-options li:hover { background: var(--menthe); }
+fieldset { border: 1px solid var(--bord); border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; }
+legend { font-size: .88rem; font-weight: bold; padding: 0 6px; }
+.atl-cases label { display: block; margin: 4px 0; font-size: .9rem; }
+.atl-pastilles label { display: inline-block; margin: 4px 6px 4px 0; }
+.atl-pastilles input { position: absolute; opacity: 0; }
+.atl-pastilles span { display: inline-block; padding: 7px 16px; border: 1px solid var(--vert); border-radius: 99px; cursor: pointer; font-size: .88rem; }
+.atl-pastilles input:checked + span { background: var(--vert); color: #fff; }
+.atl-pastilles input:focus-visible + span { outline: 3px solid #9fd9c4; }
+.atl-date { display: flex; gap: 8px; }
+.atl-bascule { display: flex; gap: 8px; flex-wrap: wrap; }
+.atl-bascule button { font: inherit; font-size: .9rem; padding: 8px 18px; border: 1px solid var(--bord); border-radius: 8px; background: #fff; cursor: pointer; }
+.atl-bascule button[aria-pressed="true"] { background: var(--vert); border-color: var(--vert); color: #fff; }
+.atl-erreur { color: var(--rouge); font-size: .88rem; margin: 6px 0 0; }
+.atl-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; }
+.atl-btn { font: inherit; font-weight: bold; padding: 10px 22px; border-radius: 99px; border: 0; background: var(--vert); color: #fff; cursor: pointer; text-decoration: none; display: inline-block; }
+.atl-btn:hover { background: var(--vert-fonce); }
+.atl-btn-sec { background: transparent; color: var(--vert); border: 1px solid var(--vert); }
+.atl-btn-sec:hover { background: var(--menthe); }
+.atl-btn-final { background: var(--or); color: #3a2a00; }
+.atl-attente { text-align: center; padding: 40px; color: var(--vert-fonce); font-weight: bold; }
+.atl-loader { display: inline-block; width: 18px; height: 18px; border: 3px solid var(--menthe); border-top-color: var(--vert); border-radius: 50%; animation: atl-tourne 1s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes atl-tourne { to { transform: rotate(360deg); } }
+.atl-ref, .atl-recap { color: var(--gris); font-size: .9rem; }
+.atl-prix { background: var(--menthe); border-radius: 12px; padding: 18px 22px; margin: 14px 0; }
+.atl-montant { font-size: 2.3rem; font-weight: bold; color: var(--vert-fonce); }
+.atl-periode { font-size: 1.1rem; color: var(--vert); }
+.atl-prix-an { margin: 6px 0 0; }
+.atl-remise { margin: 4px 0 0; font-size: .8rem; color: var(--gris); }
+.atl-garanties li { margin: 4px 0; }
+.atl-lien { color: var(--vert); }
+.atl-pied { text-align: center; font-size: .78rem; color: var(--gris); margin: 34px 0; }
+@media (max-width: 640px) { .atl-grille { grid-template-columns: 1fr; } .atl-jalons { font-size: .7rem; } }

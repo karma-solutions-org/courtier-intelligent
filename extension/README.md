@@ -16,6 +16,19 @@ npm test                   # 297 tests (Vitest + jsdom)
 npm run typecheck
 ```
 
+### Extranets de démonstration (tarification multi-assureurs en local)
+
+Trois faux extranets statiques, tous reconnus par le vrai moteur (tests `src/engine/demo-extranet*.test.ts`) ; à
+charger avec un build `build:demo` (localhost autorisé) et à déclarer dans le catalogue des assureurs (dépôt back).
+
+| Assureur (id catalogue) | Dossier | Commande | Adresse | Parcours |
+|---|---|---|---|---|
+| Assureur Test (`assureur-test-local`) | `demo-extranet/` | `npm run demo:extranet` | <http://localhost:8090/index.html> | 3 pages : souscripteur, véhicule, conducteur + antécédents |
+| Horizon Assurances (`assureur-horizon-local`) | `demo-extranet-horizon/` | `npm run demo:horizon` | <http://localhost:8091/index.html> | 1 seule page en volets (véhicule, conducteur, souscripteur), cases multiples, liste maison, page « Votre cotisation » |
+| Atlas Mutuelle (`assureur-atlas-local`) | `demo-extranet-atlas/` | `npm run demo:atlas` | <http://localhost:8092/index.html> | assistant 4 étapes sur une page (antécédents → souscripteur), contrôles ARIA, tarif au mois sur la même page |
+
+`npm run demo:all` sert les trois à la fois (Ctrl+C arrête tout). Détails dans le `README.md` de chaque dossier.
+
 Pour que l'app détecte l'extension, renseigner son identifiant (visible dans `chrome://extensions`) dans `extensionId` des fichiers `app/src/environments/`.
 
 ## Architecture

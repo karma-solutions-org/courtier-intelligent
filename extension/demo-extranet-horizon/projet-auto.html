@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Projet auto – Horizon Assurances (démo locale)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ribbon">Démonstration locale – extranet fictif, aucune donnée n'est transmise.</div>
+  <header class="hz">
+    <div class="brand">Horizon <b>Assurances</b><small>(démo locale) – portail des partenaires</small></div>
+    <nav>Cabinet partenaire – démo</nav>
+  </header>
+  <main class="page">
+    <h1>Projet d'assurance automobile</h1>
+    <p class="lead">Saisie sur une seule page : déroulez chaque volet, puis calculez la cotisation. Les champs marqués <span class="req">*</span> sont obligatoires.</p>
+
+    <form id="hz-projet" data-cible="cotisation.html" novalidate>
+
+      <!-- Volet 1 : le véhicule -->
+      <section class="acc">
+        <h2><button type="button" class="acc-toggle" aria-expanded="true" aria-controls="hz-volet-vehicule">1 · Le véhicule</button></h2>
+        <div class="acc-body" id="hz-volet-vehicule">
+          <fieldset class="bloc">
+            <legend>Véhicule assuré</legend>
+            <div class="row">
+              <label for="hz-immat-1">Immatriculation <span class="req">*</span></label>
+              <div class="cases">
+                <input id="hz-immat-1" name="immat_bloc1" type="text" maxlength="2" size="2" title="2 lettres" required>
+                <span class="sep">-</span>
+                <input id="hz-immat-2" name="immat_bloc2" type="text" maxlength="3" size="3" title="3 chiffres" required>
+                <span class="sep">-</span>
+                <input id="hz-immat-3" name="immat_bloc3" type="text" maxlength="2" size="2" title="2 lettres" required>
+              </div>
+            </div>
+            <div class="row">
+              <label for="hz-categorie">Catégorie du véhicule <span class="req">*</span></label>
+              <select id="hz-categorie" name="categorie" required>
+                <option value="">Choisir…</option>
+                <option value="VP">Véhicule de tourisme (VP)</option>
+                <option value="VU">Camionnette / utilitaire léger</option>
+                <option value="2R">Deux-roues motorisé</option>
+              </select>
+            </div>
+            <div class="row"><label for="hz-constructeur">Constructeur <span class="req">*</span></label><input id="hz-constructeur" name="constructeur" type="text" required></div>
+            <div class="row"><label for="hz-modele">Modèle commercial <span class="req">*</span></label><input id="hz-modele" name="modeleCommercial" type="text" required></div>
+            <div class="row"><label for="hz-finition">Finition</label><input id="hz-finition" name="finition" type="text"></div>
+            <div class="row">
+              <label for="hz-dmec">Date de 1re mise en circulation <span class="req">*</span></label>
+              <input id="hz-dmec" name="dmec" type="text" placeholder="JJ/MM/AAAA" inputmode="numeric" required>
+            </div>
+            <div class="row">
+              <label for="hz-cv">Puissance fiscale (CV) <span class="req">*</span></label>
+              <select id="hz-cv" name="cv" required>
+                <option value="">Choisir…</option>
+                <option value="3">3 CV</option><option value="4">4 CV</option><option value="5">5 CV</option><option value="6">6 CV</option>
+                <option value="7">7 CV</option><option value="8">8 CV</option><option value="9">9 CV</option><option value="10">10 CV</option>
+                <option value="11">11 CV</option><option value="12">12 CV</option><option value="13">13 CV et plus</option>
+              </select>
+            </div>
+            <div class="row">
+              <label for="hz-energie">Énergie</label>
+              <select id="hz-energie" name="energie">
+                <option value="">Choisir…</option>
+                <option value="ES">Essence</option><option value="GO">Gazole</option><option value="HY">Hybride</option><option value="EL">Électrique</option>
+              </select>
+            </div>
+            <div class="row"><label for="hz-valeur">Valeur d'achat TTC (€)</label><input id="hz-valeur" name="valeurAchat" type="number" min="0" step="100"></div>
+            <div class="row">
+              <label class="q">Usage déclaré <span class="req">*</span></label>
+              <div class="choix">
+                <label><input type="radio" name="usageDeclare" value="LOISIRS" required> Loisirs uniquement</label>
+                <label><input type="radio" name="usageDeclare" value="TRAJET"> Loisirs et trajet travail</label>
+                <label><input type="radio" name="usageDeclare" value="PRO"> Usage professionnel</label>
+              </div>
+            </div>
+            <div class="row">
+              <span class="q" id="hz-garage-libelle">Lieu de garage la nuit <span class="req">*</span></span>
+              <div class="combo-wrap">
+                <div class="combo" id="hz-garage" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false"
+                     aria-controls="hz-garage-liste" aria-labelledby="hz-garage-libelle" aria-required="true" data-champ="garageNuit" data-value="">Choisissez…</div>
+                <ul class="combo-list" id="hz-garage-liste" role="listbox" hidden>
+                  <li role="option" data-code="BOX">Garage ou box fermé</li>
+                  <li role="option" data-code="CLOS">Parking privé clos</li>
+                  <li role="option" data-code="RUE">Dans la rue</li>
+                </ul>
+              </div>
+            </div>
+          </fieldset>
+        </div>
+      </section>
+
+      <!-- Volet 2 : le conducteur et ses antécédents -->
+      <section class="acc">
+        <h2><button type="button" class="acc-toggle" aria-expanded="true" aria-controls="hz-volet-conducteur">2 · Le conducteur</button></h2>
+        <div class="acc-body" id="hz-volet-conducteur">
+          <fieldset class="bloc">
+            <legend>Conducteur principal</legend>
+            <div class="row"><label for="hz-cond-nom">Nom <span class="req">*</span></label><input id="hz-cond-nom" name="condNom" type="text" required></div>
+            <div class="row"><label for="hz-cond-prenom">Prénom <span class="req">*</span></label><input id="hz-cond-prenom" name="condPrenom" type="text" required></div>
+            <div class="row">
+              <label for="hz-cond-naiss-j">Date de naissance <span class="req">*</span></label>
+              <div class="cases">
+                <input id="hz-cond-naiss-j" name="cond_naiss_jour" type="text" maxlength="2" size="2" placeholder="JJ" inputmode="numeric" required>
+                <span class="sep">/</span>
+                <input name="cond_naiss_mois" type="text" maxlength="2" size="2" placeholder="MM" inputmode="numeric" required>
+                <span class="sep">/</span>
+                <input name="cond_naiss_annee" type="text" maxlength="4" size="4" placeholder="AAAA" inputmode="numeric" required>
+              </div>
+            </div>
+            <div class="row"><label for="hz-permis">Date d'obtention du permis B <span class="req">*</span></label><input id="hz-permis" name="obtentionPermis" type="date" required></div>
+            <div class="row"><label for="hz-profession">Profession exercée</label><input id="hz-profession" name="professionExercee" type="text"></div>
+          </fieldset>
+          <fieldset class="bloc">
+            <legend>Antécédents d'assurance</legend>
+            <div class="row">
+              <label class="q">Êtes-vous assuré actuellement ? <span class="req">*</span></label>
+              <div class="choix">
+                <label><input type="radio" name="assureActuel" value="O" required> Oui</label>
+                <label><input type="radio" name="assureActuel" value="N"> Non</label>
+              </div>
+            </div>
+            <div class="row"><label for="hz-compagnie">Compagnie actuelle</label><input id="hz-compagnie" name="compagnie" type="text"></div>
+            <div class="row">
+              <label for="hz-crm">Coefficient de réduction-majoration <span class="req">*</span></label>
+              <input id="hz-crm" name="crm" type="text" inputmode="decimal" placeholder="ex. 0,85" required>
+              <span class="help">Tel qu'indiqué sur le relevé d'information (0,50 à 3,50).</span>
+            </div>
+            <div class="row">
+              <label for="hz-sinistres">Nombre de sinistres déclarés (3 dernières années) <span class="req">*</span></label>
+              <select id="hz-sinistres" name="sinistres" required>
+                <option value="">Choisir…</option>
+                <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4 et plus</option>
+              </select>
+            </div>
+            <div class="row">
+              <label class="q">Avez-vous fait l'objet d'une résiliation ? <span class="req">*</span></label>
+              <div class="choix">
+                <label><input type="radio" name="resiliation" value="O" required> Oui</label>
+                <label><input type="radio" name="resiliation" value="N"> Non</label>
+              </div>
+            </div>
+          </fieldset>
+        </div>
+      </section>
+
+      <!-- Volet 3 : le souscripteur -->
+      <section class="acc">
+        <h2><button type="button" class="acc-toggle" aria-expanded="true" aria-controls="hz-volet-souscripteur">3 · Le souscripteur</button></h2>
+        <div class="acc-body" id="hz-volet-souscripteur">
+          <fieldset class="bloc">
+            <legend>Souscripteur du contrat</legend>
+            <div class="row"><label for="hz-sous-nom">Nom d'usage <span class="req">*</span></label><input id="hz-sous-nom" name="nomUsage" type="text" required></div>
+            <div class="row"><label for="hz-sous-prenom">Prénom <span class="req">*</span></label><input id="hz-sous-prenom" name="prenomSouscripteur" type="text" required></div>
+            <div class="row"><label for="hz-sous-naissance">Né(e) le <span class="req">*</span></label><input id="hz-sous-naissance" name="neLe" type="date" required></div>
+            <div class="row"><label for="hz-courriel">Courriel <span class="req">*</span></label><input id="hz-courriel" name="courriel" type="email" required></div>
+            <div class="row">
+              <label for="hz-tel-1">Téléphone mobile</label>
+              <div class="cases">
+                <input id="hz-tel-1" name="tel_1" type="text" maxlength="2" size="2" inputmode="numeric">
+                <input name="tel_2" type="text" maxlength="2" size="2" inputmode="numeric">
+                <input name="tel_3" type="text" maxlength="2" size="2" inputmode="numeric">
+                <input name="tel_4" type="text" maxlength="2" size="2" inputmode="numeric">
+                <input name="tel_5" type="text" maxlength="2" size="2" inputmode="numeric">
+              </div>
+            </div>
+            <div class="row"><label for="hz-adresse">Adresse postale <span class="req">*</span></label><input id="hz-adresse" name="adressePostale" type="text" required></div>
+            <div class="row"><label for="hz-cp">Code postal <span class="req">*</span></label><input id="hz-cp" name="cp" type="text" maxlength="5" inputmode="numeric" required></div>
+            <div class="row"><label for="hz-commune">Commune <span class="req">*</span></label><input id="hz-commune" name="commune" type="text" required></div>
+          </fieldset>
+        </div>
+      </section>
+
+      <div class="footer-actions">
+        <a class="discret" href="index.html">‹ Retour au portail</a>
+        <button type="submit" class="cta">Calculer la cotisation</button>
+      </div>
+    </form>
+  </main>
+  <div class="overlay" id="hz-calcul" hidden>Calcul de la cotisation en cours…</div>
+  <footer class="hz">Horizon Assurances (démo locale) – extranet fictif pour la démonstration de Courtier Intelligent.</footer>
+  <script src="app.js"></script>
+</body>
+</html>

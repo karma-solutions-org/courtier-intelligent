@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Étude tarifaire auto – Atlas Mutuelle (démo locale)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <p class="atl-demo">Site de démonstration local · aucune donnée n'est transmise · aucun contrat n'est souscrit</p>
+  <header class="atl-entete">
+    <div class="atl-logo"><span class="atl-pic">▲</span> Atlas <em>Mutuelle</em> <small>(démo locale)</small></div>
+    <div class="atl-compte">Espace intermédiaires · Cabinet démo</div>
+  </header>
+
+  <main class="atl-cadre">
+    <div id="atl-parcours">
+      <h1>Étude tarifaire automobile</h1>
+      <div class="atl-progression">
+        <div class="atl-progress" role="progressbar" aria-label="Avancement de l'étude" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1" aria-valuetext="Antécédents">
+          <span class="atl-progress-bar" style="width: 25%"></span>
+        </div>
+        <ol class="atl-jalons">
+          <li class="is-current">Antécédents</li>
+          <li>Conducteur</li>
+          <li>Véhicule</li>
+          <li>Souscripteur</li>
+        </ol>
+      </div>
+
+      <form id="atl-etude" novalidate>
+        <!-- Étape 1 : antécédents -->
+        <section class="atl-etape" data-etape="1">
+          <h2>Vos antécédents d'assurance</h2>
+          <div class="atl-q">
+            <span class="atl-libelle" id="atl-q-assure">Actuellement assuré(e) ? <abbr title="obligatoire">*</abbr></span>
+            <div class="atl-segment" role="radiogroup" aria-labelledby="atl-q-assure" aria-required="true" data-champ="hist_assure">
+              <div role="radio" aria-checked="false" tabindex="0" data-value="oui">Oui</div>
+              <div role="radio" aria-checked="false" tabindex="-1" data-value="non">Non</div>
+            </div>
+          </div>
+          <div class="atl-q" id="atl-bloc-assureur" hidden>
+            <span class="atl-libelle" id="atl-assureur-lbl">Compagnie d'assurance actuelle</span>
+            <div class="atl-liste">
+              <button type="button" class="atl-liste-bouton" id="atl-assureur" aria-haspopup="listbox" aria-expanded="false" aria-controls="atl-assureur-options"
+                      aria-labelledby="atl-assureur-lbl" data-champ="hist_compagnie" data-value="">Sélectionnez une compagnie</button>
+              <ul class="atl-liste-options" id="atl-assureur-options" role="listbox" hidden>
+                <li role="option">AXA</li><li role="option">Allianz</li><li role="option">Generali</li><li role="option">Groupama</li>
+                <li role="option">MAAF</li><li role="option">MACIF</li><li role="option">MAIF</li><li role="option">Matmut</li>
+                <li role="option">GMF</li><li role="option">Autre compagnie</li>
+              </ul>
+            </div>
+          </div>
+          <div class="atl-q">
+            <label for="atl-coef">Coefficient bonus/malus actuel <abbr title="obligatoire">*</abbr></label>
+            <input id="atl-coef" name="hist_coef" type="number" min="0.5" max="3.5" step="0.01" required>
+          </div>
+          <div class="atl-q">
+            <label for="atl-nbsin">Nombre de sinistres (36 derniers mois) <abbr title="obligatoire">*</abbr></label>
+            <input id="atl-nbsin" name="hist_nb_sin" type="number" min="0" max="20" required>
+          </div>
+          <fieldset class="atl-cases">
+            <legend>Déclarations (cochez si concerné)</legend>
+            <label><input type="checkbox" name="hist_resilie" value="1"> Avez-vous déjà été résilié(e) ?</label>
+            <label><input type="checkbox" name="hist_suspension" value="1"> Suspension ou annulation de permis depuis 5 ans</label>
+          </fieldset>
+          <p class="atl-erreur" role="alert" hidden></p>
+          <div class="atl-nav"><span></span><button type="button" class="atl-btn" data-action="suivant">Étape suivante ›</button></div>
+        </section>
+
+        <!-- Étape 2 : conducteur -->
+        <section class="atl-etape" data-etape="2" hidden>
+          <h2>Conducteur principal</h2>
+          <div class="atl-grille">
+            <div class="atl-q"><label for="atl-cnd-nom">Nom du conducteur <abbr title="obligatoire">*</abbr></label><input id="atl-cnd-nom" name="cnd_nom" type="text" required></div>
+            <div class="atl-q"><label for="atl-cnd-prenom">Prénom du conducteur <abbr title="obligatoire">*</abbr></label><input id="atl-cnd-prenom" name="cnd_prenom" type="text" required></div>
+          </div>
+          <div class="atl-q">
+            <label for="atl-cnd-naiss-jour">Date de naissance <abbr title="obligatoire">*</abbr></label>
+            <div class="atl-date">
+              <select id="atl-cnd-naiss-jour" name="cnd_naissance_jour" required><option value="">Jour</option></select>
+              <select name="cnd_naissance_mois" aria-label="Mois" required>
+                <option value="">Mois</option>
+                <option value="1">janvier</option><option value="2">février</option><option value="3">mars</option><option value="4">avril</option>
+                <option value="5">mai</option><option value="6">juin</option><option value="7">juillet</option><option value="8">août</option>
+                <option value="9">septembre</option><option value="10">octobre</option><option value="11">novembre</option><option value="12">décembre</option>
+              </select>
+              <select name="cnd_naissance_annee" aria-label="Année" required><option value="">Année</option></select>
+            </div>
+          </div>
+          <div class="atl-q"><label for="atl-cnd-permis">Date d'obtention du permis <abbr title="obligatoire">*</abbr></label><input id="atl-cnd-permis" name="cnd_permis" type="month" required></div>
+          <fieldset class="atl-pastilles">
+            <legend>Type de permis <abbr title="obligatoire">*</abbr></legend>
+            <label><input type="radio" name="cnd_type_permis" value="B" required><span>Permis B</span></label>
+            <label><input type="radio" name="cnd_type_permis" value="AAC"><span>B – conduite accompagnée</span></label>
+            <label><input type="radio" name="cnd_type_permis" value="A"><span>Permis A</span></label>
+          </fieldset>
+          <div class="atl-q">
+            <label for="atl-cnd-csp">Catégorie socio-professionnelle</label>
+            <select id="atl-cnd-csp" name="cnd_csp">
+              <option value="">Sélectionner…</option>
+              <option value="SAL">Salarié(e) du secteur privé</option>
+              <option value="FON">Fonctionnaire / agent public</option>
+              <option value="CAD">Cadre</option>
+              <option value="ART">Artisan, commerçant</option>
+              <option value="LIB">Profession libérale</option>
+              <option value="RET">Retraité(e)</option>
+              <option value="ETU">Étudiant(e)</option>
+              <option value="SAN">Sans activité professionnelle</option>
+            </select>
+          </div>
+          <p class="atl-erreur" role="alert" hidden></p>
+          <div class="atl-nav"><button type="button" class="atl-btn atl-btn-sec" data-action="precedent">‹ Étape précédente</button><button type="button" class="atl-btn" data-action="suivant">Étape suivante ›</button></div>
+        </section>
+
+        <!-- Étape 3 : véhicule -->
+        <section class="atl-etape" data-etape="3" hidden>
+          <h2>Le véhicule à assurer</h2>
+          <div class="atl-q">
+            <span class="atl-libelle">Type de véhicule <abbr title="obligatoire">*</abbr></span>
+            <div class="atl-bascule" role="group" aria-label="Type de véhicule" data-champ="veh_genre" data-obligatoire>
+              <button type="button" aria-pressed="false">Tourisme</button>
+              <button type="button" aria-pressed="false">Utilitaire</button>
+              <button type="button" aria-pressed="false">Deux-roues</button>
+            </div>
+          </div>
+          <div class="atl-grille">
+            <div class="atl-q"><label for="atl-veh-immat">N° d'immatriculation <abbr title="obligatoire">*</abbr></label><input id="atl-veh-immat" name="veh_plaque" type="text" placeholder="AA-123-AA" required></div>
+            <div class="atl-q"><label for="atl-veh-marque">Marque <abbr title="obligatoire">*</abbr></label><input id="atl-veh-marque" name="veh_marque" type="text" required></div>
+            <div class="atl-q"><label for="atl-veh-modele">Modèle <abbr title="obligatoire">*</abbr></label><input id="atl-veh-modele" name="veh_modele" type="text" required></div>
+            <div class="atl-q"><label for="atl-veh-version">Version</label><input id="atl-veh-version" name="veh_version" type="text"></div>
+            <div class="atl-q"><label for="atl-veh-mec">Mise en circulation <abbr title="obligatoire">*</abbr></label><input id="atl-veh-mec" name="veh_mec" type="date" required></div>
+            <div class="atl-q"><label for="atl-veh-cv">Chevaux fiscaux <abbr title="obligatoire">*</abbr></label><input id="atl-veh-cv" name="veh_cv" type="number" min="1" max="99" required></div>
+            <div class="atl-q"><label for="atl-veh-valeur">Valeur estimée du véhicule (€)</label><input id="atl-veh-valeur" name="veh_valeur" type="number" min="0" step="100"></div>
+            <div class="atl-q">
+              <label for="atl-veh-usage">Usage du véhicule <abbr title="obligatoire">*</abbr></label>
+              <select id="atl-veh-usage" name="veh_usage" required>
+                <option value="">Sélectionner…</option>
+                <option value="U1">Privé (loisirs)</option>
+                <option value="U2">Privé + trajet domicile-travail</option>
+                <option value="U3">Professionnel (tournées)</option>
+              </select>
+            </div>
+            <div class="atl-q">
+              <label for="atl-veh-nuit">Stationnement nocturne <abbr title="obligatoire">*</abbr></label>
+              <select id="atl-veh-nuit" name="veh_nuit" required>
+                <option value="">Sélectionner…</option>
+                <option value="G">Garage individuel</option>
+                <option value="P">Parking résidentiel fermé</option>
+                <option value="V">Voie publique</option>
+              </select>
+            </div>
+          </div>
+          <p class="atl-erreur" role="alert" hidden></p>
+          <div class="atl-nav"><button type="button" class="atl-btn atl-btn-sec" data-action="precedent">‹ Étape précédente</button><button type="button" class="atl-btn" data-action="suivant">Étape suivante ›</button></div>
+        </section>
+
+        <!-- Étape 4 : souscripteur -->
+        <section class="atl-etape" data-etape="4" hidden>
+          <h2>Le souscripteur</h2>
+          <div class="atl-grille">
+            <div class="atl-q"><label for="atl-sou-nom">Nom <abbr title="obligatoire">*</abbr></label><input id="atl-sou-nom" name="sou_nom" type="text" required></div>
+            <div class="atl-q"><label for="atl-sou-prenom">Prénom <abbr title="obligatoire">*</abbr></label><input id="atl-sou-prenom" name="sou_prenom" type="text" required></div>
+            <div class="atl-q"><label for="atl-sou-naissance">Date de naissance <abbr title="obligatoire">*</abbr></label><input id="atl-sou-naissance" name="sou_naissance" type="text" placeholder="AAAA-MM-JJ" required></div>
+            <div class="atl-q"><label for="atl-sou-mail">E-mail <abbr title="obligatoire">*</abbr></label><input id="atl-sou-mail" name="sou_mail" type="email" required></div>
+            <div class="atl-q"><label for="atl-sou-tel">Téléphone</label><input id="atl-sou-tel" name="sou_tel" type="tel"></div>
+            <div class="atl-q atl-large"><label for="atl-sou-adresse">Adresse postale <abbr title="obligatoire">*</abbr></label><input id="atl-sou-adresse" name="sou_adresse" type="text" required></div>
+            <div class="atl-q"><label for="atl-sou-cp">Code postal <abbr title="obligatoire">*</abbr></label><input id="atl-sou-cp" name="sou_cp" type="text" maxlength="5" inputmode="numeric" required></div>
+            <div class="atl-q"><label for="atl-sou-ville">Ville <abbr title="obligatoire">*</abbr></label><input id="atl-sou-ville" name="sou_ville" type="text" required></div>
+          </div>
+          <p class="atl-erreur" role="alert" hidden></p>
+          <div class="atl-nav"><button type="button" class="atl-btn atl-btn-sec" data-action="precedent">‹ Étape précédente</button><button type="submit" class="atl-btn atl-btn-final">Découvrir mon tarif</button></div>
+        </section>
+      </form>
+    </div>
+
+    <div class="atl-attente" id="atl-attente" hidden><span class="atl-loader"></span> Calcul de votre tarif…</div>
+
+    <!-- Résultat : affiché sur la même page, sans rechargement -->
+    <section class="atl-resultat" id="atl-resultat" hidden>
+      <h2>Votre proposition tarifaire</h2>
+      <p class="atl-ref">Proposition n° <span id="atl-numero">ATL-2026-00000</span> · valable 30 jours · formule Essentielle+</p>
+      <p id="atl-recap" class="atl-recap"></p>
+      <div class="atl-prix">
+        <div class="atl-prix-mois"><span class="atl-montant" id="atl-mensuel">—</span> <span class="atl-periode">/ mois</span></div>
+        <p class="atl-prix-an">soit <strong id="atl-annuel">—</strong> par an en paiement comptant</p>
+        <p class="atl-remise">Paiement comptant : 4 % de moins que douze mensualités.</p>
+      </div>
+      <p>Franchise de base : <strong id="atl-franchise">—</strong></p>
+      <h3>Vos garanties</h3>
+      <ul class="atl-garanties">
+        <li>Responsabilité civile : incluse</li>
+        <li>Défense et recours : incluse, plafond 10 000 €</li>
+        <li>Bris de glace : incluse, franchise 0 €</li>
+        <li>Vol et incendie : incluse, plafond 12 000 €, franchise 200 €</li>
+        <li>Assistance 0 km : en option</li>
+        <li>Dommages tous accidents : non incluse</li>
+      </ul>
+      <h3>Exclusions principales</h3>
+      <ul>
+        <li>Dommages subis par un conducteur sans permis valide</li>
+        <li>Dommages survenus en état d'ivresse ou sous stupéfiants</li>
+        <li>Usage du véhicule non déclaré (VTC, location)</li>
+      </ul>
+      <div class="atl-nav"><a class="atl-lien" href="etude.html">‹ Nouvelle étude</a><span></span></div>
+    </section>
+  </main>
+  <footer class="atl-pied">Atlas Mutuelle (démo locale) – extranet fictif pour la démonstration de Courtier Intelligent.</footer>
+  <script src="app.js"></script>
+</body>
+</html>
