@@ -12,7 +12,7 @@ import { DOSSIER_STATUSES, DossierStatus, isOfferToReview, isTransitionAllowed, 
 import { catchError, EMPTY, exhaustMap, pipe, switchMap, tap } from 'rxjs';
 import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
-import { ComparisonColumn } from '../components/comparison-table/comparison-table.component';
+import { ComparisonColumn } from '../components/comparison-table/comparison-table-presentation/comparison-table-presentation.component';
 import { COMPARISON_STRUCTURE } from '../components/comparison-tab/comparison-tab.structure';
 import { ComparisonService } from '../services/comparison.service';
 import { DossiersService } from '../services/dossiers.service';

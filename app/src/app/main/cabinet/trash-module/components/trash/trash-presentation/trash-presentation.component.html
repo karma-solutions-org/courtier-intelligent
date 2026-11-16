@@ -1,0 +1,146 @@
+<header class="head">
+  <h1>Corbeille</h1>
+  <p class="sub">
+    Les clients et dossiers supprimés restent ici jusqu'à leur restauration ou leur suppression définitive.
+    Un client restauré revient avec les dossiers supprimés en même temps que lui.
+  </p>
+</header>
+
+<div class="filters">
+  <mat-form-field appearance="outline" class="search" subscriptSizing="dynamic">
+    <mat-label>Rechercher</mat-label>
+    <mat-icon matPrefix>search</mat-icon>
+    <input
+      matInput
+      type="search"
+      [value]="query()"
+      (input)="queryChanged.emit($any($event.target).value)"
+      (keydown.escape)="queryChanged.emit('')"
+    />
+    <mat-hint>Nom du client ou référence du dossier</mat-hint>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Afficher</mat-label>
+    <mat-select [value]="kind()" (selectionChange)="kindChanged.emit($event.value)">
+      <mat-option value="all">Tout</mat-option>
+      <mat-option value="assure">Clients</mat-option>
+      <mat-option value="dossier">Dossiers</mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Supprimé</mat-label>
+    <mat-select [value]="period()" (selectionChange)="periodChanged.emit($event.value)">
+      <mat-option [value]="0">À tout moment</mat-option>
+      <mat-option [value]="1">Aujourd'hui</mat-option>
+      <mat-option [value]="7">Ces 7 derniers jours</mat-option>
+      <mat-option [value]="30">Ces 30 derniers jours</mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  @if (hasFilters()) {
+    <button mat-button type="button" class="clear" (click)="filtersCleared.emit()">
+      <mat-icon>filter_alt_off</mat-icon>Effacer les filtres
+    </button>
+  }
+</div>
+
+@if (loadError()) {
+  <p class="banner error" role="alert">
+    <mat-icon>error_outline</mat-icon>{{ loadError() }}
+  </p>
+}
+@if (searchUnavailable()) {
+  <p class="banner" role="status">
+    <mat-icon>info</mat-icon>Recherche avancée indisponible : résultats limités aux éléments chargés.
+  </p>
+}
+
+@for (group of groups(); track group.title) {
+  <app-card [heading]="group.title + ' (' + group.rows.length + (group.hasMore ? '+' : '') + ')'">
+    @if (group.rows.length) {
+      <ul class="rows">
+        @for (row of group.rows; track row.id) {
+          <li>
+            <div class="what">
+              <span class="title">{{ row.title }}</span>
+              <span class="detail">
+                {{ row.detail }} · Supprimé le {{ row.deletedAt?.toMillis() | date: 'dd/MM/y à HH:mm' }}
+              </span>
+              @if (row.blocked) {
+                <span class="detail">{{ row.blocked }}</span>
+              }
+              @if (row.protected) {
+                <span class="detail">Proposition envoyée : conservé, suppression définitive impossible.</span>
+              }
+            </div>
+            @if (confirming() === row.id) {
+              <span class="confirm" role="alert">
+                Supprimer définitivement « {{ row.title }} » ? Action irréversible.
+                <button
+                  #cancelDelete
+                  mat-button
+                  type="button"
+                  [attr.aria-label]="'Annuler la suppression définitive de ' + row.title"
+                  (click)="confirmingChanged.emit(null)"
+                >
+                  Annuler
+                </button>
+                <button
+                  mat-flat-button
+                  class="danger"
+                  type="button"
+                  [disabled]="busy()"
+                  [attr.aria-label]="'Confirmer la suppression définitive de ' + row.title"
+                  (click)="deleteRequested.emit(row)"
+                >
+                  Confirmer la suppression
+                </button>
+              </span>
+            } @else {
+              <div class="actions">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [disabled]="busy() || !!row.blocked"
+                  [attr.aria-label]="'Restaurer ' + row.title"
+                  (click)="restoreRequested.emit(row)"
+                >
+                  <mat-icon>restore_from_trash</mat-icon>Restaurer
+                </button>
+                @if (!row.protected) {
+                  <button
+                    mat-button
+                    type="button"
+                    class="danger-text"
+                    [disabled]="busy()"
+                    [attr.aria-label]="'Supprimer définitivement ' + row.title"
+                    (click)="confirmingChanged.emit(row.id)"
+                  >
+                    <mat-icon>delete_forever</mat-icon>Supprimer définitivement
+                  </button>
+                }
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    } @else if (group.loading) {
+      <div class="loading" role="status"><mat-progress-spinner mode="indeterminate" diameter="24" />Chargement…</div>
+    } @else if (!group.hasMore) {
+      <p class="empty">{{ hasFilters() ? 'Aucun élément ne correspond aux filtres.' : group.empty }}</p>
+    }
+    <div
+      class="more"
+      appInfiniteScroll
+      [appInfiniteScrollDisabled]="!group.hasMore || group.loadingMore"
+      [appInfiniteScrollCount]="group.loadedCount"
+      (reached)="loadMore.emit(group.kind)"
+    >
+      @if (group.hasMore) {
+        <span>Chargement de la suite…</span>
+      }
+    </div>
+  </app-card>
+}

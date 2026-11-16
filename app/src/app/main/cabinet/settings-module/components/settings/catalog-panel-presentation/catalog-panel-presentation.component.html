@@ -1,0 +1,48 @@
+<section class="card">
+  <h2>{{ structure.title }}</h2>
+  <p class="hint">{{ structure.hint }}</p>
+
+  <h3>{{ structure.productsTitle }}</h3>
+  @for (product of products(); track product.id) {
+    <div class="row">
+      <mat-checkbox [checked]="selectedProducts().includes(product.id)" (change)="toggleProduct(product.id, $event.checked)">
+        {{ product.name }}
+      </mat-checkbox>
+      <span class="muted">{{ questionCount(product) }} {{ structure.questionsCount }}</span>
+    </div>
+  } @empty {
+    <p class="hint">{{ structure.noProducts }}</p>
+  }
+
+  <h3>{{ structure.insurersTitle }}</h3>
+  @for (insurer of insurers(); track insurer.id) {
+    <div class="row">
+      <mat-checkbox [checked]="selectedInsurers().includes(insurer.id)" (change)="toggleInsurer(insurer.id, $event.checked)">
+        <span class="insurer">
+          @if (insurer.logo) {
+            <img class="logo" [src]="insurer.logo" alt="" loading="lazy" />
+          } @else {
+            <span class="logo initial" aria-hidden="true">{{ insurer.name.charAt(0) }}</span>
+          }
+          {{ insurer.name }}
+        </span>
+      </mat-checkbox>
+      <span class="spacer"></span>
+      <a
+        mat-icon-button
+        [href]="insurer.extranetUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        [attr.aria-label]="structure.openExtranet + ' ' + insurer.name"
+      >
+        <mat-icon>open_in_new</mat-icon>
+      </a>
+    </div>
+  } @empty {
+    <p class="hint">{{ structure.noInsurers }}</p>
+  }
+
+  <div class="actions">
+    <button mat-flat-button type="button" [disabled]="isPending()" (click)="save()">{{ structure.save }}</button>
+  </div>
+</section>

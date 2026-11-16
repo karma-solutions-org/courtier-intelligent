@@ -1,18 +1,13 @@
-import { Dossier, DossierStatus, PROPOSAL_DOSSIER_STATUSES } from '@shared';
+import { Dossier, DossierStatus, PROPOSAL_DOSSIER_STATUSES, TERMINAL_DOSSIER_STATUSES } from '@shared';
 
-export type Stage = 'infos' | 'need' | 'pricing' | 'comparison' | 'proposal';
-export type StageState = 'done' | 'current' | 'todo';
+/** Étapes de travail d'un dossier (une seule navigation sur la fiche). */
+export type DossierStage = 'infos' | 'need' | 'pricing' | 'comparison' | 'proposal';
 
-/** Une étape de la frise du dossier, prête à afficher. */
-export interface PipelineStep {
-  key: Stage;
-  label: string;
-  state: StageState;
-  enabled: boolean;
-}
+/** Vue affichée sur la fiche : une étape, ou l'historique. */
+export type DossierDetailView = DossierStage | 'history';
 
-/** Les étapes du dossier : chacune ouvre son espace de travail (une seule navigation). */
-export const DOSSIER_STAGES: readonly { key: Stage; label: string }[] = [
+/** Les étapes du dossier, dans l'ordre : chacune ouvre son espace de travail. */
+export const DOSSIER_STAGES: readonly { key: DossierStage; label: string }[] = [
   { key: 'infos', label: 'Informations' },
   { key: 'need', label: 'Couverture' },
   { key: 'pricing', label: 'Tarification' },
@@ -21,7 +16,7 @@ export const DOSSIER_STAGES: readonly { key: Stage; label: string }[] = [
 ];
 
 /** Étape de travail correspondant à chaque statut : c'est elle qui s'ouvre à l'arrivée sur le dossier. */
-const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
+const STAGE_OF_STATUS: Record<DossierStatus, DossierStage> = {
   brouillon: 'infos',
   complet: 'need',
   besoin_valide: 'pricing',
@@ -35,21 +30,33 @@ const STAGE_OF_STATUS: Record<DossierStatus, Stage> = {
   sans_suite: 'infos',
 };
 
-/** Le comparatif s'ouvre dès la tarification (les offres arrivent au fil de l'eau). */
-const COMPARISON_STATUSES: readonly DossierStatus[] = ['tarification', 'comparaison', 'decision', 'proposition_envoyee', 'souscrit', 'refuse'];
-
 /** Étape où se trouve le dossier, d'après son statut (sans suite : la dernière étape atteinte). */
-export function currentStageOf(dossier: Dossier | null): Stage {
-  if (!dossier) return 'infos';
-  if (dossier.status === 'sans_suite') {
+export function currentStageOf(dossier: Dossier | null): DossierStage {
+  const status = dossier?.status;
+  if (!dossier || !status) return 'infos';
+  if (status === 'sans_suite') {
     if (dossier.decision || dossier.proposal) return 'proposal';
     if (dossier.needAnalysis?.validatedAt) return 'pricing';
     return dossier.completeness?.ok ? 'need' : 'infos';
   }
-  return STAGE_OF_STATUS[dossier.status];
+  return STAGE_OF_STATUS[status];
 }
 
-export function isStageEnabled(dossier: Dossier | null, stage: Stage): boolean {
+/** Le comparatif s'ouvre dès la tarification (les offres arrivent au fil de l'eau). */
+export function comparisonEnabledFor(dossier: Dossier | null): boolean {
+  return (
+    ['tarification', 'comparaison', 'decision', 'proposition_envoyee', 'souscrit', 'refuse'].includes(dossier?.status ?? '') ||
+    (dossier?.status === 'sans_suite' && !!dossier?.needAnalysis?.validatedAt)
+  );
+}
+
+/** La proposition s'ouvre dès qu'une offre est retenue (sans suite : seulement si une décision existe). */
+export function proposalEnabledFor(dossier: Dossier | null): boolean {
+  return !!dossier && (PROPOSAL_DOSSIER_STATUSES.includes(dossier.status) || dossier.status === 'sans_suite') && !!dossier.decision;
+}
+
+/** L'étape peut-elle être ouverte ? */
+export function stageEnabledFor(stage: DossierStage, dossier: Dossier | null): boolean {
   const status = dossier?.status;
   switch (stage) {
     case 'infos':
@@ -59,24 +66,26 @@ export function isStageEnabled(dossier: Dossier | null, stage: Stage): boolean {
     case 'pricing':
       return !!status && status !== 'brouillon' && status !== 'complet';
     case 'comparison':
-      return !!status && (COMPARISON_STATUSES.includes(status) || (status === 'sans_suite' && !!dossier?.needAnalysis?.validatedAt));
+      return comparisonEnabledFor(dossier);
     case 'proposal':
-      // La proposition s'ouvre dès qu'une offre est retenue (sans suite : seulement si une décision existe).
-      return !!dossier && (PROPOSAL_DOSSIER_STATUSES.includes(dossier.status) || dossier.status === 'sans_suite') && !!dossier.decision;
+      return proposalEnabledFor(dossier);
   }
 }
 
-/** La frise : chaque étape avec son état (faite, en cours, à faire) et si elle peut s'ouvrir. */
-export function pipelineOf(dossier: Dossier | null): PipelineStep[] {
-  const current = DOSSIER_STAGES.findIndex(stage => stage.key === currentStageOf(dossier));
-  return DOSSIER_STAGES.map((stage, order) => ({
-    ...stage,
-    state: dossier?.status === 'souscrit' || order < current ? 'done' : order === current ? 'current' : 'todo',
-    enabled: isStageEnabled(dossier, stage.key),
-  }));
+/** État d'une étape dans la frise : passée, en cours ou à venir (tout est fait une fois le contrat souscrit). */
+export function stageStateFor(stage: DossierStage, dossier: Dossier | null): 'done' | 'current' | 'todo' {
+  if (dossier?.status === 'souscrit') return 'done';
+  const order = DOSSIER_STAGES.findIndex((s) => s.key === stage);
+  const current = DOSSIER_STAGES.findIndex((s) => s.key === currentStageOf(dossier));
+  return order < current ? 'done' : order === current ? 'current' : 'todo';
 }
 
-/** Dossier arrêté (refusé, sans suite) : la frise est grisée. */
+/** Dossier arrêté (refusé ou sans suite) : la frise s'affiche en retrait. */
 export function isHaltedStatus(status: DossierStatus): boolean {
   return status === 'refuse' || status === 'sans_suite';
+}
+
+/** Un dossier se classe sans suite à toute étape, tant qu'il n'est pas clos. */
+export function canCloseStatus(status: DossierStatus): boolean {
+  return !TERMINAL_DOSSIER_STATUSES.includes(status);
 }

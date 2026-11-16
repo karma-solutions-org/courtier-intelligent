@@ -5,13 +5,13 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
-import { LogoComponent } from '../../../../../../core/components/logo/logo.component';
+import { LogoPresentationComponent } from '../../../../../../core/components/logo/logo-presentation/logo-presentation.component';
 import { FORGET_PASSWORD_PAGE_STRUCTURE } from './forget-password-page.structure';
 
 @Component({
   selector: 'app-forget-password-presentation',
   imports: [
-    LogoComponent,
+    LogoPresentationComponent,
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
@@ -20,7 +20,7 @@ import { FORGET_PASSWORD_PAGE_STRUCTURE } from './forget-password-page.structure
     MatProgressSpinnerModule,
   ],
   templateUrl: './forget-password-presentation.component.html',
-  styleUrl: '../../auth-layout.scss',
+  styleUrls: ['../../auth-layout.scss', './forget-password-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ForgetPasswordPresentationComponent {

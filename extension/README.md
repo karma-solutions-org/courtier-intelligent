@@ -7,8 +7,11 @@ Extension MV3 (TypeScript) : elle remplit les extranets des assureurs à partir 
 
 ```bash
 npm install
-npm run build              # dist/ : à charger dans chrome://extensions (mode développeur → Charger l'extension non empaquetée)
+npm run build:dev          # dist/ de développement (localhost autorisé, sourcemaps) : à charger dans chrome://extensions
+npm run build:demo         # idem, avec les faux extranets (npm run demo:extranet…, ports 8090-8092)
 npm run build:emulators    # idem, mais vise les emulators Firebase locaux (auth 9099, firestore 8080, functions 5001)
+npm run watch              # build de développement reconstruit à chaque modification
+npm run build              # build de PRODUCTION (paquet à publier) : sans localhost ni sourcemaps
 npm test                   # 297 tests (Vitest + jsdom)
 npm run typecheck
 ```

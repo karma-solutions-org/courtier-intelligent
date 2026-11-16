@@ -14,7 +14,7 @@ export const CABINET_ROUTES: Routes = [
     path: CabinetRouteContainerModel.DASHBOARD_ROUTE.path,
     title: 'Tableau de bord — Courtier Intelligent',
     loadComponent: () =>
-      import('../../../main/commons/main-module/components/home-container/home-container.component').then(
+      import('../../../main/commons/main-module/components/home/home-container/home-container.component').then(
         (c) => c.HomeContainerComponent,
       ),
   },
@@ -29,7 +29,7 @@ export const CABINET_ROUTES: Routes = [
         // Vue transverse (compteurs du tableau de bord) ; la gestion courante passe par l'espace client.
         title: 'Dossiers — Courtier Intelligent',
         loadComponent: () =>
-          import('../../../main/cabinet/dossiers-module/components/dossiers-container/dossiers-container.component').then(
+          import('../../../main/cabinet/dossiers-module/components/dossiers/dossiers-container/dossiers-container.component').then(
             (c) => c.DossiersContainerComponent,
           ),
       },
@@ -37,8 +37,17 @@ export const CABINET_ROUTES: Routes = [
         path: CabinetRouteContainerModel.DOSSIER_NEW_ROUTE.path,
         title: 'Nouveau dossier — Courtier Intelligent',
         loadComponent: () =>
-          import('../../../main/cabinet/dossiers-module/components/new-dossier-container/new-dossier-container.component').then(
+          import('../../../main/cabinet/dossiers-module/components/new-dossier/new-dossier-container/new-dossier-container.component').then(
             (c) => c.NewDossierContainerComponent,
+          ),
+      },
+      {
+        // « Mes dossiers à traiter » en pleine page (la carte du tableau de bord n'en montre que les premiers).
+        path: CabinetRouteContainerModel.DOSSIERS_TO_PROCESS_ROUTE.path,
+        title: 'Mes dossiers à traiter — Courtier Intelligent',
+        loadComponent: () =>
+          import('../../../main/cabinet/dashboard-module/components/dossiers-to-process/dossiers-to-process-container/dossiers-to-process-container.component').then(
+            (c) => c.DossiersToProcessContainerComponent,
           ),
       },
       {
@@ -48,7 +57,7 @@ export const CABINET_ROUTES: Routes = [
         providers: [DossierStore],
         canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
-          import('../../../main/cabinet/dossiers-module/components/dossier-draft-container/dossier-draft-container.component').then(
+          import('../../../main/cabinet/dossiers-module/components/dossier-draft/dossier-draft-container/dossier-draft-container.component').then(
             (c) => c.DossierDraftContainerComponent,
           ),
       },
@@ -58,7 +67,7 @@ export const CABINET_ROUTES: Routes = [
         providers: [DossierStore],
         canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
-          import('../../../main/cabinet/dossiers-module/components/dossier-detail-container/dossier-detail-container.component').then(
+          import('../../../main/cabinet/dossiers-module/components/dossier-detail/dossier-detail-container/dossier-detail-container.component').then(
             (c) => c.DossierDetailContainerComponent,
           ),
       },
@@ -77,7 +86,7 @@ export const CABINET_ROUTES: Routes = [
         pathMatch: 'full',
         title: 'Clients — Courtier Intelligent',
         loadComponent: () =>
-          import('../../../main/cabinet/assures-module/components/assures-container/assures-container.component').then(
+          import('../../../main/cabinet/assures-module/components/assures/assures-container/assures-container.component').then(
             (c) => c.AssuresContainerComponent,
           ),
       },
@@ -86,7 +95,7 @@ export const CABINET_ROUTES: Routes = [
         title: 'Nouveau client — Courtier Intelligent',
         canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
-          import('../../../main/cabinet/assures-module/components/new-assure-container/new-assure-container.component').then(
+          import('../../../main/cabinet/assures-module/components/new-assure/new-assure-container/new-assure-container.component').then(
             (c) => c.NewAssureContainerComponent,
           ),
       },
@@ -95,7 +104,7 @@ export const CABINET_ROUTES: Routes = [
         title: 'Espace client — Courtier Intelligent',
         canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
-          import('../../../main/cabinet/assures-module/components/assure-detail-container/assure-detail-container.component').then(
+          import('../../../main/cabinet/assures-module/components/assure-detail/assure-detail-container/assure-detail-container.component').then(
             (c) => c.AssureDetailContainerComponent,
           ),
       },
@@ -107,7 +116,7 @@ export const CABINET_ROUTES: Routes = [
     title: 'Paramètres — Courtier Intelligent',
     providers: [SettingsStore],
     loadComponent: () =>
-      import('../../../main/cabinet/settings-module/components/settings-container/settings-container.component').then(
+      import('../../../main/cabinet/settings-module/components/settings/settings-container/settings-container.component').then(
         (c) => c.SettingsContainerComponent,
       ),
   },
@@ -116,7 +125,7 @@ export const CABINET_ROUTES: Routes = [
     canMatch: [roleGuard('admin')],
     title: 'Corbeille — Courtier Intelligent',
     loadComponent: () =>
-      import('../../../main/cabinet/trash-module/components/trash-container/trash-container.component').then(
+      import('../../../main/cabinet/trash-module/components/trash/trash-container/trash-container.component').then(
         (c) => c.TrashContainerComponent,
       ),
   },

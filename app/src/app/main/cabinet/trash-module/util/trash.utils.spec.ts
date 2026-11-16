@@ -1,5 +1,6 @@
 import { Assure, Dossier } from '@shared';
-import { NOT_LOADING, TrashSources, trashGroups, visibleTrashGroups } from './trash.utils';
+import { TrashSources } from '../models/trash.model';
+import { NOT_LOADING, trashGroups, visibleTrashGroups } from './trash.utils';
 
 const at = (millis: number) => ({ toMillis: () => millis });
 const now = Date.now();

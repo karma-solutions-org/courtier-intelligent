@@ -1,5 +1,5 @@
 import { Dossier } from '@shared';
-import { currentStageOf, isStageEnabled, pipelineOf } from './dossier-stages.utils';
+import { currentStageOf, DOSSIER_STAGES, stageEnabledFor, stageStateFor } from './dossier-stages.utils';
 
 const dossier = (overrides: Partial<Dossier>): Dossier =>
   ({ id: 'd', reference: '2026-000001', assureId: 'a', productId: 'auto', status: 'brouillon', decision: null, proposal: null, needAnalysis: null, ...overrides }) as Dossier;
@@ -20,27 +20,27 @@ describe('currentStageOf', () => {
   });
 });
 
-describe('isStageEnabled', () => {
+describe('stageEnabledFor', () => {
   it('n’ouvre que les étapes atteintes', () => {
     const draft = dossier({ status: 'brouillon' });
-    expect(isStageEnabled(draft, 'infos')).toBe(true);
-    expect(isStageEnabled(draft, 'need')).toBe(false);
-    expect(isStageEnabled(dossier({ status: 'complet' }), 'pricing')).toBe(false);
-    expect(isStageEnabled(dossier({ status: 'tarification' }), 'comparison')).toBe(true);
+    expect(stageEnabledFor('infos', draft)).toBe(true);
+    expect(stageEnabledFor('need', draft)).toBe(false);
+    expect(stageEnabledFor('pricing', dossier({ status: 'complet' }))).toBe(false);
+    expect(stageEnabledFor('comparison', dossier({ status: 'tarification' }))).toBe(true);
   });
 
   it('n’ouvre la proposition qu’avec une offre retenue', () => {
-    expect(isStageEnabled(dossier({ status: 'decision' }), 'proposal')).toBe(false);
-    expect(isStageEnabled(dossier({ status: 'decision', decision: {} as Dossier['decision'] }), 'proposal')).toBe(true);
+    expect(stageEnabledFor('proposal', dossier({ status: 'decision' }))).toBe(false);
+    expect(stageEnabledFor('proposal', dossier({ status: 'decision', decision: {} as Dossier['decision'] }))).toBe(true);
   });
 });
 
-describe('pipelineOf', () => {
+describe('stageStateFor', () => {
   it('marque les étapes faites, en cours et à faire', () => {
-    expect(pipelineOf(dossier({ status: 'tarification' })).map(step => step.state)).toEqual(['done', 'done', 'current', 'todo', 'todo']);
+    expect(DOSSIER_STAGES.map((stage) => stageStateFor(stage.key, dossier({ status: 'tarification' })))).toEqual(['done', 'done', 'current', 'todo', 'todo']);
   });
 
   it('un dossier souscrit a toutes ses étapes faites', () => {
-    expect(pipelineOf(dossier({ status: 'souscrit' })).every(step => step.state === 'done')).toBe(true);
+    expect(DOSSIER_STAGES.every((stage) => stageStateFor(stage.key, dossier({ status: 'souscrit' })) === 'done')).toBe(true);
   });
 });

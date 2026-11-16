@@ -1,0 +1,95 @@
+<header>
+  <h1><span class="h1-icon" aria-hidden="true"><mat-icon>folder_copy</mat-icon></span>{{ structure.title }}</h1>
+  <a mat-flat-button [routerLink]="createUrl()">
+    <mat-icon>add</mat-icon>
+    {{ structure.create }}
+  </a>
+</header>
+
+<app-card>
+  <div class="filters">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ structure.search }}</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input
+        matInput
+        type="search"
+        [value]="filter().query"
+        [placeholder]="structure.searchHint"
+        (input)="filterChanged.emit({ query: $any($event.target).value })"
+        (keydown.escape)="filterChanged.emit({ query: '' })"
+      />
+      @if (searching()) {
+        <mat-hint>{{ structure.searching }}</mat-hint>
+      } @else if (searchUnavailable()) {
+        <mat-hint>{{ structure.searchUnavailable }}</mat-hint>
+      }
+    </mat-form-field>
+    <mat-slide-toggle [checked]="filter().mine" (change)="filterChanged.emit({ mine: $event.checked })">
+      {{ structure.mine }}
+    </mat-slide-toggle>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ structure.filters.status }}</mat-label>
+      <mat-select [value]="filter().status" (selectionChange)="filterChanged.emit({ status: $event.value })">
+        <mat-option value="">{{ structure.filters.all }}</mat-option>
+        @for (status of statuses; track status) {
+          <mat-option [value]="status">{{ statusLabels[status] }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ structure.filters.product }}</mat-label>
+      <mat-select [value]="filter().productId" (selectionChange)="filterChanged.emit({ productId: $event.value })">
+        <mat-option value="">{{ structure.filters.allProducts }}</mat-option>
+        @for (product of products(); track product.id) {
+          <mat-option [value]="product.id">{{ product.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ structure.filters.courtier }}</mat-label>
+      <mat-select
+        [value]="filter().mine ? '' : filter().assignedTo"
+        [disabled]="filter().mine"
+        (selectionChange)="filterChanged.emit({ assignedTo: $event.value })"
+      >
+        <mat-option value="">{{ structure.filters.allCourtiers }}</mat-option>
+        @for (member of courtiers(); track member.id) {
+          <mat-option [value]="member.id">{{ member.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    @if (!isDefault()) {
+      <button mat-button type="button" (click)="filterReset.emit()">{{ structure.reset }}</button>
+    }
+  </div>
+
+  @if (!loaded()) {
+    <p class="empty">{{ structure.loading }}</p>
+  } @else if (rows().length) {
+    <app-table [columns]="columns" [rows]="rows()" [trackBy]="byId">
+      <ng-template appTableCell="reference" let-row>
+        <a class="ref" [routerLink]="[baseUrl(), row.dossier.id]">{{ row.dossier.reference || '—' }}</a>
+        @if (row.dossier.status === 'brouillon') {
+          <a class="resume" [routerLink]="[baseUrl(), row.dossier.id, 'brouillon']">{{ structure.resume }}</a>
+        }
+      </ng-template>
+      <ng-template appTableCell="status" let-row><app-status-chip [status]="row.dossier.status" /></ng-template>
+      <ng-template appTableCell="createdAt" let-row>{{ row.dossier.createdAt?.toMillis() | date: 'd MMM y' }}</ng-template>
+    </app-table>
+  } @else {
+    <div class="empty-wrap"><svg class="empty-art" viewBox="0 0 120 80" aria-hidden="true"><rect x="30" y="14" width="60" height="50" rx="8" fill="#fff" stroke="#d1d5db" stroke-width="2"/><rect x="40" y="26" width="30" height="5" rx="2.5" fill="#d1d5db"/><rect x="40" y="37" width="40" height="4" rx="2" fill="#e5e7eb"/><rect x="40" y="46" width="24" height="4" rx="2" fill="#e5e7eb"/></svg><p class="empty">{{ hasFilter() ? structure.noResult : structure.empty }}</p></div>
+  }
+
+  <div
+    class="more"
+    appInfiniteScroll
+    [appInfiniteScrollDisabled]="!loaded() || !hasMore() || loadingMore()"
+    [appInfiniteScrollCount]="loadedCount()"
+    (reached)="loadMore.emit()"
+  >
+    @if (loaded() && hasMore()) {
+      <span>{{ structure.loadingMore }}</span>
+    }
+  </div>
+</app-card>

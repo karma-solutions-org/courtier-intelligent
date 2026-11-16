@@ -1,0 +1,93 @@
+:host {
+  display: block;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  margin: 0 0 16px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.save {
+  font-size: 13px;
+  color: var(--ci-text-muted);
+
+  &.error {
+    color: var(--mat-sys-error);
+  }
+}
+
+.intro {
+  margin: 0 0 16px;
+
+  h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0;
+    color: var(--ci-text-muted);
+  }
+}
+
+.progress-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+
+  .progress {
+    margin: 0;
+  }
+}
+
+.progress {
+  margin: 0 0 12px;
+  color: var(--ci-text-muted);
+}
+
+.documents {
+  margin-bottom: 16px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.blocked {
+  margin: 16px 0 0;
+  color: var(--mat-sys-error);
+}
+
+.error {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: var(--mat-sys-on-error-container);
+  background: var(--mat-sys-error-container);
+}

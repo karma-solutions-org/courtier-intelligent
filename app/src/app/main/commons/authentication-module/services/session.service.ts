@@ -3,6 +3,7 @@ import { Member, Session } from '@shared';
 import { catchError, from, map, Observable, of, switchMap } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
+import { MemberModel } from '../../../../core/entities/member.model';
 
 const DEVICE_DB = 'courtier-intelligent';
 const DEVICE_STORE = 'device';
@@ -41,7 +42,7 @@ export class SessionService {
 
   /** Signal de vie : dernière activité de l'appareil, visible dans le suivi des membres. */
   heartbeat(cabinetId: string, uid: string): Observable<void> {
-    return this._database.update(`ci_cabinets/${cabinetId}/ci_members/${uid}`, {
+    return this._database.updateById(MemberModel.entity(cabinetId), uid, {
       'session.lastSeen': this._database.serverTimestamp(),
     });
   }
@@ -49,7 +50,7 @@ export class SessionService {
   /** Session actuellement autorisée pour ce membre (null si aucune). */
   watchActiveSession(cabinetId: string, uid: string): Observable<Session | null> {
     return this._database
-      .watchDocument<Member>(`ci_cabinets/${cabinetId}/ci_members/${uid}`)
+      .watchById(MemberModel.entity(cabinetId), uid)
       .pipe(map(member => member?.session ?? null));
   }
 }

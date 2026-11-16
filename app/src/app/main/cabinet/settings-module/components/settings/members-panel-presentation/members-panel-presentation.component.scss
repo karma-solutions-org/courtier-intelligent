@@ -1,0 +1,242 @@
+.invite {
+  display: grid;
+  grid-template-columns: 1fr 200px auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.invite-button {
+  height: 56px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 14px 12px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--ci-border);
+}
+
+td:first-child {
+  white-space: nowrap;
+}
+
+th {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ci-text-muted);
+}
+
+.sub {
+  display: block;
+  font-size: 13px;
+  color: var(--ci-text-muted);
+}
+
+.bound-device + .bound-device {
+  margin-top: 2px;
+}
+
+.me {
+  margin-left: 6px;
+  color: var(--ci-text-muted);
+}
+
+/* Rôle : pastille à largeur fixe, texte entier (« Administrateur ») à la taille du tableau. */
+.role-select {
+  width: 172px;
+  --mat-select-trigger-text-size: 13px;
+  --mat-select-trigger-text-weight: 600;
+}
+
+.status {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ci-success);
+  background: var(--ci-success-soft);
+
+  &.disabled {
+    color: var(--ci-text-muted);
+    background: var(--mat-sys-surface-container);
+  }
+}
+
+.inactive td {
+  opacity: 0.6;
+}
+
+.right {
+  text-align: right;
+}
+
+th.center,
+td.center {
+  text-align: center;
+}
+
+/* Colonnes égales : chaque contenu est centré dans sa colonne, l'écart entre les quatre est donc le même. */
+table {
+  table-layout: fixed;
+  min-width: 880px;
+}
+
+.col-main {
+  width: calc((100% - 130px) / 4);
+}
+
+.col-action {
+  width: 130px;
+}
+
+th:nth-child(-n + 4),
+td:nth-child(-n + 4) {
+  text-align: center;
+}
+
+td:first-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+td:nth-child(3) .device {
+  justify-items: center;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.role-cell .role-select {
+  display: inline-block;
+  text-align: left;
+}
+
+h3 {
+  margin: 24px 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.seats {
+  margin: -8px 0 12px;
+  color: var(--ci-text-muted);
+
+  &.full strong {
+    color: var(--mat-sys-error);
+  }
+}
+
+.limit {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--mat-sys-on-tertiary-container);
+  background: var(--mat-sys-tertiary-container);
+}
+
+.pending {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--ci-border);
+  }
+}
+
+@media (max-width: 700px) {
+  .invite {
+    grid-template-columns: 1fr;
+  }
+}
+
+.role-cell {
+  white-space: nowrap;
+}
+
+.role-cell .role-select {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ci-navy-800);
+  background: var(--ci-navy-100);
+  box-sizing: border-box;
+}
+
+.role-cell[data-role='admin'] .role-select {
+  background: var(--st-tarification-bg);
+}
+
+.role-cell[data-role='courtier'] .role-select {
+  background: var(--ci-accent-soft);
+}
+
+/* Appareil : la carte de l'appareil, puis la dernière activité et l'aide, empilées et alignées. */
+.device {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  min-width: 240px;
+
+  .sub {
+    max-width: 420px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+}
+
+.bound-device {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ci-border);
+  background: var(--ci-navy-50);
+
+  strong {
+    font-size: 13px;
+  }
+
+  .sub {
+    font-size: 12px;
+  }
+}
+
+th {
+  color: var(--ci-navy-800);
+  background: var(--ci-navy-50);
+}
+
+.status {
+  color: var(--ci-success);
+  background: var(--ci-success-soft);
+}
+
+.limit {
+  border-left: 3px solid var(--ci-warning);
+  color: var(--ci-warning);
+  background: var(--ci-warning-soft);
+}
+
+.seats strong {
+  color: var(--ci-navy-900);
+}

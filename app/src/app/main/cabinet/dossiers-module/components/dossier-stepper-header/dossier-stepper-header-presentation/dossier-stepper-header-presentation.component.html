@@ -1,0 +1,14 @@
+<ol aria-label="Étapes de création du dossier">
+  @for (label of steps; track label; let index = $index) {
+    <li [class.done]="index + 1 < current()" [class.current]="index + 1 === current()" [attr.aria-current]="index + 1 === current() ? 'step' : null">
+      <span class="bullet">
+        @if (index + 1 < current()) {
+          <mat-icon>check</mat-icon>
+        } @else {
+          {{ index + 1 }}
+        }
+      </span>
+      <span class="label">{{ label }}</span>
+    </li>
+  }
+</ol>

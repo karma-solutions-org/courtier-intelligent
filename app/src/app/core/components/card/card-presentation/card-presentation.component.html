@@ -1,0 +1,18 @@
+@if (heading() || subtitle()) {
+  <header class="card-head">
+    <div class="card-heading">
+      @if (heading()) {
+        <h2 class="card-title">{{ heading() }}</h2>
+      }
+      @if (subtitle()) {
+        <p class="card-subtitle">{{ subtitle() }}</p>
+      }
+    </div>
+    <div class="card-actions">
+      <ng-content select="[cardActions]" />
+    </div>
+  </header>
+}
+<div class="card-body">
+  <ng-content />
+</div>

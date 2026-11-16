@@ -1,0 +1,38 @@
+/* Disposition BAZZ-CRM : barre du haut pleine largeur, rail sombre dessous, contenu à droite. */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.main-body {
+  flex: 1;
+  min-height: 0;
+  background: var(--ci-bg);
+}
+
+.sidenav {
+  width: 16.389rem;
+  border: none;
+  border-radius: 0;
+  background: var(--ci-sidebar-bg);
+}
+
+.content-area {
+  display: flex;
+  flex-direction: column;
+  background: var(--ci-bg);
+}
+
+.page {
+  flex: 1;
+  min-width: 0;
+  padding: 2rem;
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 1.25rem 1rem;
+  }
+}

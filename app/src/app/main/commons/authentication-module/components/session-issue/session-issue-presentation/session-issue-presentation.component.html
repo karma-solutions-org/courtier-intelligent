@@ -1,0 +1,14 @@
+<div class="card" role="alert">
+  <mat-icon class="icon">{{ content().icon }}</mat-icon>
+  <h1>{{ content().title }}</h1>
+  <p>{{ content().explanation }}</p>
+  <ul>
+    @for (step of content().steps; track step) {
+      <li>{{ step }}</li>
+    }
+  </ul>
+  @if (notice(); as notice) {
+    <p class="detail">{{ notice }}</p>
+  }
+  <a mat-flat-button [routerLink]="signinUrl()">{{ actions.backToSignin }}</a>
+</div>

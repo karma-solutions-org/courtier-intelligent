@@ -3,6 +3,7 @@ import { DossierDocument, DossierDocumentStatus, DossierDocumentType, OcrField }
 import { Observable } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
+import { DossierDocumentModel } from '../models/entities/dossier-document.model';
 import { StorageProvider } from '../../../../core/providers/storage.provider';
 
 /** Documents d'un dossier (E12) : envoi dans Storage, enregistrement et lecture automatique via les functions `documents-*`. */
@@ -13,7 +14,7 @@ export class DocumentsService {
   private readonly _storage = inject(StorageProvider);
 
   watchDocuments(cabinetId: string, dossierId: string): Observable<DossierDocument[]> {
-    return this._database.watchCollection<DossierDocument>(`ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_documents`);
+    return this._database.list(DossierDocumentModel.entity(cabinetId, dossierId));
   }
 
   upload(storagePath: string, file: Blob): Observable<string> {

@@ -1,0 +1,92 @@
+<h2 mat-dialog-title>{{ text.title }} · {{ data.insurerName }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content>
+    <div class="grid">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ text.quoteNumber }}</mat-label>
+        <input matInput formControlName="quoteNumber" autocomplete="off" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ text.premiumAnnual }}</mat-label>
+        <input matInput type="number" min="0" step="any" formControlName="premiumAnnual" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ text.premiumMonthly }}</mat-label>
+        <input matInput type="number" min="0" step="any" formControlName="premiumMonthly" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ text.generalDeductible }}</mat-label>
+        <input matInput type="number" min="0" step="any" formControlName="generalDeductible" />
+      </mat-form-field>
+    </div>
+
+    @if (data.guarantees.length) {
+      <h3>{{ text.guarantees }}</h3>
+      <div class="guarantees" formArrayName="guarantees">
+        @for (guarantee of data.guarantees; track guarantee.code; let i = $index) {
+          <div class="row" [formGroupName]="i">
+            <mat-checkbox formControlName="included">{{ guarantee.label }}</mat-checkbox>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>{{ text.limit }}</mat-label>
+              <input
+                matInput
+                type="number"
+                min="0"
+                step="any"
+                formControlName="limit"
+                [attr.aria-label]="guarantee.label + ' : ' + text.limit"
+              />
+            </mat-form-field>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>{{ text.deductible }}</mat-label>
+              <input
+                matInput
+                type="number"
+                min="0"
+                step="any"
+                formControlName="deductible"
+                [attr.aria-label]="guarantee.label + ' : ' + text.deductible"
+              />
+            </mat-form-field>
+          </div>
+        }
+      </div>
+    }
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="full">
+      <mat-label>{{ text.exclusions }}</mat-label>
+      <textarea matInput rows="3" formControlName="exclusions"></textarea>
+    </mat-form-field>
+
+    <div class="document">
+      <span class="label">{{ text.document }}</span>
+      <input
+        #fileInput
+        type="file"
+        hidden
+        [accept]="acceptedTypes"
+        (change)="pickFile($any($event.target).files)"
+      />
+      <button mat-stroked-button type="button" (click)="fileInput.click()">
+        <mat-icon>attach_file</mat-icon>{{ text.chooseFile }}
+      </button>
+      @if (file(); as file) {
+        <span class="file">{{ file.name }}</span>
+      } @else if (data.offer?.documentId) {
+        <span class="hint">{{ text.keptDocument }}</span>
+      }
+    </div>
+
+    @if (problems().length) {
+      <ul class="error" role="alert">
+        @for (problem of problems(); track problem) {
+          <li>{{ problem }}</li>
+        }
+      </ul>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>{{ text.cancel }}</button>
+    <button mat-flat-button type="submit">{{ text.save }}</button>
+  </mat-dialog-actions>
+</form>

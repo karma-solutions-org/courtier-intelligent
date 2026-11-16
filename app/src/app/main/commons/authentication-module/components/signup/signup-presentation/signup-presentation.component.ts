@@ -5,7 +5,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
-import { LogoComponent } from '../../../../../../core/components/logo/logo.component';
+import { LogoPresentationComponent } from '../../../../../../core/components/logo/logo-presentation/logo-presentation.component';
 import { SignupModel } from '../../../models/signup.model';
 import { SIGNUP_PAGE_STRUCTURE } from './signup-page.structure';
 
@@ -17,7 +17,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
 @Component({
   selector: 'app-signup-presentation',
   imports: [
-    LogoComponent,
+    LogoPresentationComponent,
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
@@ -26,7 +26,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
     MatProgressSpinnerModule,
   ],
   templateUrl: './signup-presentation.component.html',
-  styleUrl: '../../auth-layout.scss',
+  styleUrls: ['../../auth-layout.scss', './signup-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SignupPresentationComponent {

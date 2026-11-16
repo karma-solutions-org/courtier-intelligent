@@ -1,0 +1,95 @@
+<header class="page-head">
+  <div>
+    <p class="eyebrow">{{ structure.eyebrow }}</p>
+    <h1>
+      {{ structure.title }}
+      @if (loaded()) {
+        <span class="count">({{ total() }}{{ hasMore() ? '+' : '' }})</span>
+      }
+    </h1>
+  </div>
+  <a mat-flat-button class="ci-cta" [routerLink]="createUrl()">
+    <mat-icon>add</mat-icon>
+    {{ structure.create }}
+  </a>
+</header>
+
+<section class="card toolbar" [attr.aria-label]="structure.filters.label">
+  <label class="search">
+    <mat-icon aria-hidden="true">search</mat-icon>
+    <input
+      type="search"
+      [placeholder]="structure.searchPlaceholder"
+      [attr.aria-label]="structure.search"
+      [value]="query()"
+      (input)="queryChanged.emit($any($event.target).value)"
+    />
+  </label>
+
+  <select
+    class="select"
+    [attr.aria-label]="structure.filters.type"
+    [value]="filters().type"
+    (change)="filtersChanged.emit({ type: $any($event.target).value })"
+  >
+    <option value="all">{{ structure.filters.allTypes }}</option>
+    @for (type of types; track type.value) {
+      <option [value]="type.value">{{ type.label }}</option>
+    }
+  </select>
+
+  <select
+    class="select"
+    [attr.aria-label]="structure.filters.sort"
+    [value]="filters().sort"
+    (change)="filtersChanged.emit({ sort: $any($event.target).value })"
+  >
+    <option value="name">{{ structure.filters.sortName }}</option>
+    <option value="recent">{{ structure.filters.sortRecent }}</option>
+  </select>
+
+  @if (hasFilters()) {
+    <button type="button" class="clear" (click)="filtersCleared.emit()">
+      <mat-icon aria-hidden="true">filter_alt_off</mat-icon>{{ structure.filters.clear }}
+    </button>
+  }
+</section>
+
+<app-card [heading]="structure.eyebrow" [padded]="false">
+
+  @if (!loaded()) {
+    <p class="empty">{{ structure.loading }}</p>
+  } @else if (assures().length) {
+    <app-table [columns]="columns" [rows]="assures()" [trackBy]="byId" [rowLink]="rowLink">
+      <ng-template appTableCell="name" let-assure>
+        <div class="who">
+          <span class="avatar" aria-hidden="true">
+            <mat-icon>{{ assure.type === 'pro' ? 'apartment' : 'person' }}</mat-icon>
+          </span>
+          <span class="who-text">
+            <a [routerLink]="[detailBaseUrl(), assure.id]" (click)="$event.stopPropagation()">{{ nameOf(assure) }}</a>
+            <span class="sub">{{ assure.email || '—' }}</span>
+          </span>
+        </div>
+      </ng-template>
+      <ng-template appTableCell="type" let-assure><span class="type">{{ typeLabel(assure) }}</span></ng-template>
+      <ng-template appTableCell="identifier" let-assure><span class="mono">{{ assure.siret || '—' }}</span></ng-template>
+      <ng-template appTableCell="phone" let-assure>{{ assure.phone || '—' }}</ng-template>
+      <ng-template appTableCell="city" let-assure>{{ assure.address?.city || '—' }}</ng-template>
+    </app-table>
+  } @else {
+    <p class="empty">{{ hasFilters() ? structure.noResult : structure.empty }}</p>
+  }
+
+  <div
+    class="more"
+    appInfiniteScroll
+    [appInfiniteScrollDisabled]="!loaded() || !hasMore() || loadingMore()"
+    [appInfiniteScrollCount]="loadedCount()"
+    (reached)="loadMore.emit()"
+  >
+    @if (loaded() && hasMore()) {
+      <span>{{ structure.loadingMore }}</span>
+    }
+  </div>
+</app-card>

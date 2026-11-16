@@ -1,0 +1,153 @@
+<section class="card">
+  <h2>{{ structure.inviteTitle }}</h2>
+  <p class="seats" [class.full]="isFull()">
+    {{ structure.seats }} : <strong>{{ usedSeats() }} / {{ maxUtilisateurs() }}</strong>
+    · {{ structure.resetsThisMonth }} :
+    <strong [class.full]="resetsExhausted()">{{ deviceResetsUsed() }} / {{ deviceResetsQuota() }}</strong>
+    @if (maxAppareilsParUtilisateur() > 1) {
+      · {{ structure.devicesPerUser }} : <strong>{{ maxAppareilsParUtilisateur() }}</strong>
+    }
+  </p>
+  @if (resetsExhausted()) {
+    <p class="limit" role="status">{{ structure.resetsExhausted }}</p>
+  }
+  @if (isFull()) {
+    <p class="limit" role="status">{{ structure.limitReached }}</p>
+  }
+  <form [formGroup]="inviteForm" (ngSubmit)="submitInvite()" novalidate class="invite">
+    <mat-form-field appearance="outline" class="invite-email">
+      <mat-label>{{ structure.email }}</mat-label>
+      <input matInput type="email" formControlName="email" />
+      @if (inviteForm.controls.email.hasError('email')) {
+        <mat-error>{{ structure.emailInvalid }}</mat-error>
+      }
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>{{ structure.role }}</mat-label>
+      <mat-select formControlName="role">
+        @for (role of roles; track role.value) {
+          <mat-option [value]="role.value">{{ role.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <button mat-flat-button type="submit" class="invite-button" [disabled]="isPending() || isFull()">
+      {{ structure.invite }}
+    </button>
+  </form>
+  <p class="hint">{{ structure.inviteHint }}</p>
+</section>
+
+<section class="card">
+  <h2>{{ structure.listTitle }} ({{ members().length }})</h2>
+  <div class="table-scroll">
+    <table>
+      <!-- Quatre colonnes de même largeur (espacement régulier), plus une colonne étroite pour l'action. -->
+      <colgroup>
+        <col class="col-main" />
+        <col class="col-main" />
+        <col class="col-main" />
+        <col class="col-main" />
+        <col class="col-action" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>{{ structure.columns.member }}</th>
+          <th class="center">{{ structure.columns.role }}</th>
+          <th>{{ structure.columns.device }}</th>
+          <th class="center">{{ structure.columns.status }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (member of members(); track member.id) {
+          @let isMe = member.id === currentUid();
+          <tr [class.inactive]="member.status === 'disabled'">
+            <td>
+              <strong>{{ member.displayName || member.email }}</strong>
+              @if (isMe) {
+                <span class="me">({{ structure.you }})</span>
+              }
+              <span class="sub">{{ member.email }}</span>
+            </td>
+            <td class="role-cell center" [attr.data-role]="member.role">
+              <mat-select
+                class="role-select"
+                [value]="member.role"
+                [disabled]="isMe || isPending()"
+                (selectionChange)="roleChanged.emit({ uid: member.id, role: $event.value })"
+                [attr.aria-label]="structure.role"
+              >
+                @for (role of roles; track role.value) {
+                  <mat-option [value]="role.value">{{ role.label }}</mat-option>
+                }
+              </mat-select>
+            </td>
+            <td>
+              <div class="device">
+              @let devices = devicesOf(member);
+              @if (devices.length) {
+                @for (device of devices; track device.id) {
+                  <div class="bound-device">
+                    <strong>{{ device.label || structure.columns.device }}</strong>
+                    @if (device.boundAt) {
+                      <span class="sub">{{ structure.deviceSince }} {{ device.boundAt.toMillis() | date: 'd MMM y' }}</span>
+                    }
+                  </div>
+                }
+                @if (member.session?.lastSeen; as lastSeen) {
+                  <span class="sub">{{ structure.lastSeen }} {{ lastSeen.toMillis() | date: 'd MMM HH:mm' }}</span>
+                }
+                @if (isMe) {
+                  <span class="sub">{{ structure.resetSelfHint }}</span>
+                } @else if (confirmingResetUid() === member.id) {
+                  <button mat-button [disabled]="isPending()" (click)="confirmReset(member.id)">{{ structure.confirmReset }}</button>
+                  <button mat-button (click)="confirmingResetUid.set(null)">{{ structure.cancelReset }}</button>
+                } @else {
+                  <button mat-button [disabled]="isPending() || resetsExhausted()" (click)="confirmingResetUid.set(member.id)">
+                    {{ devices.length > 1 ? structure.resetDevices : structure.resetDevice }}
+                  </button>
+                }
+              } @else {
+                <span class="sub">{{ structure.noDevice }}</span>
+              }
+              </div>
+            </td>
+            <td class="center">
+              <span class="status" [class.disabled]="member.status === 'disabled'">
+                {{ member.status === 'active' ? structure.active : structure.disabled }}
+              </span>
+            </td>
+            <td class="right">
+              @if (!isMe) {
+                @let next = member.status === 'active' ? 'disabled' : 'active';
+                <button mat-button [disabled]="isPending()" (click)="statusChanged.emit({ uid: member.id, status: next })">
+                  {{ member.status === 'active' ? structure.disable : structure.enable }}
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (invitations().length) {
+    <h3>{{ structure.pendingTitle }}</h3>
+    <ul class="pending">
+      @for (invitation of invitations(); track invitation.id) {
+        <li>
+          <div>
+            <span>{{ invitation.email }}</span>
+            <span class="sub">
+              {{ roleLabel(invitation.role) }} · {{ structure.expiresOn }}
+              {{ invitation.expiresAt.toMillis() | date: 'd MMMM' }}
+            </span>
+          </div>
+          <button mat-button [disabled]="isPending()" (click)="invitationCancelled.emit(invitation.id)">
+            {{ structure.cancelInvitation }}
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</section>

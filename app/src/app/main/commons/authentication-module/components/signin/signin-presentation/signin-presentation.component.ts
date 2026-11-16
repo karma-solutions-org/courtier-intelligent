@@ -6,14 +6,14 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
-import { LogoComponent } from '../../../../../../core/components/logo/logo.component';
+import { LogoPresentationComponent } from '../../../../../../core/components/logo/logo-presentation/logo-presentation.component';
 import { CredentialsModel } from '../../../models/credentials.model';
 import { SIGNIN_PAGE_STRUCTURE } from './signin-page.structure';
 
 @Component({
   selector: 'app-signin-presentation',
   imports: [
-    LogoComponent,
+    LogoPresentationComponent,
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
@@ -23,7 +23,7 @@ import { SIGNIN_PAGE_STRUCTURE } from './signin-page.structure';
     MatProgressSpinnerModule,
   ],
   templateUrl: './signin-presentation.component.html',
-  styleUrl: '../../auth-layout.scss',
+  styleUrls: ['../../auth-layout.scss', './signin-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SigninPresentationComponent {

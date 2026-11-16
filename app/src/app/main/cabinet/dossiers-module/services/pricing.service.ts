@@ -4,6 +4,8 @@ import { Observable } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseProvider } from '../../../../core/providers/database.provider';
 import { StorageProvider } from '../../../../core/providers/storage.provider';
+import { OfferModel } from '../models/entities/offer.model';
+import { QuoteJobModel } from '../models/entities/quote-job.model';
 
 /** Devis joint à une offre saisie à la main (déjà envoyé dans Storage). */
 export interface QuoteDocumentRef {
@@ -20,15 +22,11 @@ export class PricingService {
 
   /** Jobs du dossier, un par assureur (statut écrit par l'extension, en temps réel). */
   watchJobs(cabinetId: string, dossierId: string): Observable<QuoteJob[]> {
-    return this._database.watchCollection<QuoteJob>(
-      `ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_quoteJobs`,
-    );
+    return this._database.list(QuoteJobModel.entity(cabinetId, dossierId));
   }
 
   watchOffers(cabinetId: string, dossierId: string): Observable<Offer[]> {
-    return this._database.watchCollection<Offer>(
-      `ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_offers`,
-    );
+    return this._database.list(OfferModel.entity(cabinetId, dossierId));
   }
 
   /** Annule une tarification en cours (bloquée, ou devenue inutile) : elle pourra être relancée. */
@@ -73,7 +71,7 @@ export class PricingService {
    * les règles Firestore n'y autorisent que l'état de vérification, son auteur et sa date.
    */
   validateOffer(cabinetId: string, dossierId: string, insurerId: string, uid: string): Observable<void> {
-    return this._database.update(`ci_cabinets/${cabinetId}/ci_dossiers/${dossierId}/ci_offers/${insurerId}`, {
+    return this._database.updateById(OfferModel.entity(cabinetId, dossierId), insurerId, {
       review: 'validated',
       reviewedBy: uid,
       reviewedAt: this._database.serverTimestamp(),

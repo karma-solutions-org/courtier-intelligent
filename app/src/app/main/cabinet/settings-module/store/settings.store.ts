@@ -74,6 +74,19 @@ export const SettingsStore = signalStore(
     }),
   })),
   withMethods((store, service = inject(SettingsService), authStore = inject(AuthStore)) => {
+    /**
+     * Écoute isolée : un refus (droits, réseau) sur l'une n'arrête pas les autres. L'erreur est affichée, et la
+     * collection en cause est indiquée dans la console (le message affiché, lui, reste générique).
+     */
+    const guarded = <T>(source: string, listener: Observable<T>): Observable<T> =>
+      listener.pipe(
+        catchError((error) => {
+          console.error(`[Paramètres] lecture « ${source} » refusée :`, error?.code ?? error);
+          patchState(store, setError(toBackendErrorMessage(error)));
+          return EMPTY;
+        }),
+      );
+
     /** Écriture sur le cabinet courant ; rien sans cabinet (session en cours de fermeture). */
     const onCabinet = (write: (cabinetId: string) => Observable<unknown>): Observable<unknown> => {
       const cabinetId = authStore.cabinetId();
@@ -161,12 +174,12 @@ export const SettingsStore = signalStore(
           switchMap((id) =>
             id
               ? merge(
-                  service.watchCabinet(id).pipe(tap((cabinet) => patchState(store, { cabinet }))),
-                  service.watchMembers(id).pipe(tap((members) => patchState(store, { members }))),
+                  guarded('cabinet', service.watchCabinet(id).pipe(tap((cabinet) => patchState(store, { cabinet })))),
+                  guarded('membres', service.watchMembers(id).pipe(tap((members) => patchState(store, { members })))),
                   // Une invitation expirée reste « pending » en base (aucune tâche planifiée ne la clôt) : on ne l'affiche plus.
-                  service
-                    .watchPendingInvitations(id)
-                    .pipe(
+                  guarded(
+                    'invitations',
+                    service.watchPendingInvitations(id).pipe(
                       tap((invitations) =>
                         patchState(store, {
                           invitations: invitations.filter(
@@ -175,14 +188,9 @@ export const SettingsStore = signalStore(
                         }),
                       ),
                     ),
-                  service.watchProducts().pipe(tap((products) => patchState(store, { products }))),
-                  service.watchInsurers().pipe(tap((insurers) => patchState(store, { insurers }))),
-                ).pipe(
-                  // Écoute en échec (droits, réseau) : on affiche l'erreur au lieu de l'avaler.
-                  catchError((error) => {
-                    patchState(store, setError(toBackendErrorMessage(error)));
-                    return EMPTY;
-                  }),
+                  ),
+                  guarded('produits', service.watchProducts().pipe(tap((products) => patchState(store, { products })))),
+                  guarded('assureurs', service.watchInsurers().pipe(tap((insurers) => patchState(store, { insurers })))),
                 )
               : EMPTY,
           ),

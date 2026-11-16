@@ -240,6 +240,8 @@ export const AuthStore = signalStore(
     setRedirectUrl: (url: string | null) =>
       patchState(store, { redirectUrl: url && url.startsWith('/') && !url.startsWith('//') ? url : null }),
     refreshClaims: rxMethod<void>(pipe(exhaustMap(() => authService.refreshToken()))),
+    /** Nom de cabinet saisi à l'inscription, pas encore créé (inscription interrompue avant la vérification). */
+    pendingCabinetName: (): string => authService.pendingCabinetName(),
     resetStatus: () => patchState(store, resetRequestStatus(), { resetEmailSent: false, verificationEmailSent: false }),
     _listenUser: rxMethod<void>(
       pipe(

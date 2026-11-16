@@ -1,0 +1,9 @@
+<img
+  class="symbol"
+  [src]="inverse() ? 'logo/logo-symbol-white.svg' : 'logo/logo-symbol.svg'"
+  [style.height.px]="size()"
+  alt=""
+/>
+@if (withName()) {
+  <span class="name" [class.inverse]="inverse()" [style.font-size.px]="size() * 0.4">Courtier<br />Intelligent</span>
+}

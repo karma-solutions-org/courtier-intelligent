@@ -1,0 +1,51 @@
+:host {
+  display: grid;
+  gap: 20px;
+}
+
+.page-head {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--ci-border);
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ci-pink);
+}
+
+h1 {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ci-navy-900);
+}
+
+.count {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ci-pink);
+}
+
+.hint {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--ci-text-muted);
+}
+
+.ref {
+  font-weight: 700;
+  color: var(--ci-navy-700);
+}
+
+.error {
+  margin: 0;
+  color: var(--ci-danger);
+}

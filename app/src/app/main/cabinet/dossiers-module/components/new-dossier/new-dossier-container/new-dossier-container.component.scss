@@ -1,0 +1,89 @@
+:host {
+  display: block;
+}
+
+h1 {
+  margin: 0 0 20px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  margin: 0 0 16px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.card {
+  padding: 24px;
+  border: 1px solid var(--ci-border);
+  border-radius: 8px;
+  background: var(--ci-surface);
+  box-shadow: var(--ci-shadow-sm);
+}
+
+.search {
+  width: 100%;
+  max-width: 480px;
+  margin-bottom: 12px;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+
+.sub {
+  margin-left: 8px;
+  font-size: 13px;
+  color: var(--ci-text-muted);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.error {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: var(--mat-sys-on-error-container);
+  background: var(--mat-sys-error-container);
+}
+
+.card {
+  box-shadow: var(--ci-shadow-sm);
+}
+
+.choices {
+  gap: 6px;
+}
+
+/* Produits : noms courts, côte à côte plutôt qu'une ligne pleine largeur chacun (en colonne sur mobile). */
+.choices.products {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.choices mat-radio-button {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--ci-border);
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover {
+    border-color: var(--border-strong);
+    background: var(--ci-surface-2);
+  }
+}
+
+@media (max-width: 600px) {
+  .card {
+    padding: 18px 16px;
+  }
+}

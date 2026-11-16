@@ -1,0 +1,20 @@
+@if (store.error()) {
+  <p class="error" role="alert">{{ store.error() }}</p>
+}
+<app-assures-list
+  [assures]="store.filtered()"
+  [total]="store.total()"
+  [query]="store.query()"
+  [filters]="store.filters()"
+  [hasFilters]="store.hasFilters()"
+  [hasMore]="store.hasMore()"
+  [loadingMore]="store.loadingMore()"
+  [loadedCount]="store.assures().length"
+  [loaded]="store.loaded()"
+  [createUrl]="createUrl"
+  [detailBaseUrl]="detailBaseUrl"
+  (queryChanged)="store.setQuery($event)"
+  (filtersChanged)="store.setFilters($event)"
+  (filtersCleared)="store.clearFilters()"
+  (loadMore)="store.loadMore()"
+/>

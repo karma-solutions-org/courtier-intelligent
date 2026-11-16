@@ -1,4 +1,8 @@
-import { CanonicalData, CanonicalPath, CanonicalValue, isKnownValue, OCR_CONFIDENCE_THRESHOLD, OcrField } from '@shared';
+import { CanonicalData, CanonicalPath, CanonicalValue, isAnalyzableDocumentType, isKnownValue, OCR_CONFIDENCE_THRESHOLD, OcrField } from '@shared';
+import { PickedDocumentType } from '../models/document-import.model';
+
+/** Le fichier sera lu par l'IA : type reconnu automatiquement, ou type qui s'y prête. */
+export const willAnalyze = (type: PickedDocumentType): boolean => type === 'auto' || isAnalyzableDocumentType(type);
 
 /** Valeur lue à confirmer par le courtier : confiance sous le seuil. */
 export const needsConfirmation = (field: OcrField): boolean => field.confidence < OCR_CONFIDENCE_THRESHOLD;

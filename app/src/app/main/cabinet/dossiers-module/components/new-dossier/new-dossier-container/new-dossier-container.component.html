@@ -1,0 +1,47 @@
+<h1>{{ structure.title }}</h1>
+<app-dossier-stepper-header [current]="step()" />
+
+@if (store.error()) {
+  <p class="error" role="alert">{{ store.error() }}</p>
+}
+
+<section class="card">
+  @if (step() === 1) {
+    <h2>{{ structure.assureTitle }}</h2>
+    <mat-form-field appearance="outline" class="search" subscriptSizing="dynamic">
+      <mat-label>{{ structure.assureSearch }}</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput type="search" [value]="store.assureQuery()" (input)="store.setAssureQuery($any($event.target).value)" />
+      <mat-hint>{{ structure.assureHint }}</mat-hint>
+    </mat-form-field>
+
+    <mat-radio-group class="choices" [value]="assureId()" (change)="assureId.set($event.value)" [attr.aria-label]="structure.assureTitle">
+      @for (assure of store.assureResults(); track assure.id) {
+        <mat-radio-button [value]="assure.id">
+          {{ nameOf(assure) }}
+          <span class="sub">{{ assure.email || assure.phone || assure.address?.city || '' }}</span>
+        </mat-radio-button>
+      } @empty {
+        <p class="sub">{{ structure.noAssure }}</p>
+      }
+    </mat-radio-group>
+    <a mat-button [routerLink]="newAssureUrl"><mat-icon>person_add</mat-icon>{{ structure.createAssure }}</a>
+  } @else {
+    <h2>{{ structure.productTitle }}</h2>
+    <mat-radio-group class="choices products" [value]="productId()" (change)="productId.set($event.value)" [attr.aria-label]="structure.productTitle">
+      @for (product of store.availableProducts(); track product.id) {
+        <mat-radio-button [value]="product.id">{{ product.name }}</mat-radio-button>
+      } @empty {
+        <p class="sub">{{ structure.noProduct }}</p>
+      }
+    </mat-radio-group>
+    <p class="sub">{{ structure.draftNote }}</p>
+  }
+
+  <div class="actions">
+    <button mat-button type="button" (click)="back()">{{ step() === 1 || assure() ? structure.cancel : structure.back }}</button>
+    <button mat-flat-button type="button" [disabled]="!canContinue() || store.isPending()" (click)="next()">
+      {{ store.isPending() ? structure.creating : structure.next }}
+    </button>
+  </div>
+</section>

@@ -1,9 +1,14 @@
 export type SessionIssueKind = 'device_not_authorized' | 'session_replaced';
 
-export const SESSION_ISSUE_PAGE_STRUCTURE: Record<
-  SessionIssueKind,
-  { title: string; explanation: string; steps: string[]; icon: string }
-> = {
+/** Contenu de l'écran pour un type de déconnexion. */
+export interface SessionIssueContent {
+  title: string;
+  explanation: string;
+  steps: string[];
+  icon: string;
+}
+
+export const SESSION_ISSUE_PAGE_STRUCTURE: Record<SessionIssueKind, SessionIssueContent> = {
   device_not_authorized: {
     title: 'Appareil non autorisé',
     icon: 'devices_off',

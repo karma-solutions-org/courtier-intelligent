@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.js",
+    "build:dev": "node build.js --dev",
     "build:emulators": "node build.js --emulators",
     "build:demo": "node build.js --demo",
     "watch": "node build.js --watch --demo",
