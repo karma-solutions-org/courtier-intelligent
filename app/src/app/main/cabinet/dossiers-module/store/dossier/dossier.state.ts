@@ -1,4 +1,4 @@
-import { Assure, CanonicalData, Dossier, DossierEvent, Insurer, Member, Product } from '@shared';
+import { Assure, CanonicalData, CanonicalPath, Dossier, DossierEvent, Insurer, Member, Product } from '@shared';
 import { NoticeState } from '../../../../../core/store-features/with-notice';
 import { AnswerPatch } from '../../services/dossiers.service';
 
@@ -52,6 +52,8 @@ export interface DossierState {
   clientPiecesReading: boolean;
   /** Ajout d'assureurs pendant la tarification en file ou en cours : le bouton reste grisé. */
   addingInsurers: boolean;
+  /** Réponses reprises confirmées par le courtier (« C'est à jour »), en attendant la mise à jour du dossier. */
+  confirmed: CanonicalPath[];
 }
 
 /** État complet vu par les features du dossier (le message ponctuel vient de `withNotice`). */
@@ -84,4 +86,5 @@ export const initialDossierState: DossierState = {
   removeStatus: 'idle',
   clientPiecesReading: false,
   addingInsurers: false,
+  confirmed: [],
 };

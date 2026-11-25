@@ -115,6 +115,14 @@
   } @else if (constraintError(); as error) {
     <span class="missing" role="alert">{{ error }}</span>
   }
+  @if (toVerify()) {
+    <span class="to-verify">
+      Repris du dossier précédent : à vérifier.
+      @if (!readonly()) {
+        <button type="button" class="confirm" (click)="verified.emit()">C'est à jour</button>
+      }
+    </span>
+  }
   @if (prefilled()) {
     <span class="prefilled">Pré-rempli d'après l'immatriculation : vérifiez et corrigez si besoin.</span>
   }

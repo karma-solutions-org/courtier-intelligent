@@ -38,7 +38,13 @@ export class QuestionnaireFormPresentationComponent {
   readonly readonly = input(false);
   /** Signale les champs obligatoires vides (après un clic sur « Suivant », par exemple). */
   readonly showMissing = input(false);
+  /** Réponses reprises du dossier précédent encore à vérifier. */
+  readonly toVerify = input<CanonicalPath[]>([]);
+  /** Référence du dossier dont les réponses ont été reprises (bandeau d'information), null sinon. */
+  readonly reusedFrom = input<string | null>(null);
   readonly answerChanged = output<AnswerChange>();
+  /** Réponse reprise confirmée telle quelle (« C'est à jour »). */
+  readonly answerVerified = output<CanonicalPath>();
 
   protected readonly structure = DOSSIERS_STRUCTURE.questionnaire;
   protected readonly regularSections = computed(() => this.sections().filter((section) => !section.optional));
@@ -52,6 +58,12 @@ export class QuestionnaireFormPresentationComponent {
         filled: section.questions.filter((question) => isAnswered(this.data()[question.canonicalPath], question)).length,
       })),
   );
+
+  /** Réponses à vérifier dans les sections affichées (le bandeau les compte). */
+  protected readonly shownToVerify = computed(() => {
+    const paths = new Set(this.sections().flatMap((section) => section.questions.map((question) => question.canonicalPath)));
+    return this.toVerify().filter((path) => paths.has(path));
+  });
 
   /** Une question conditionnelle n'apparaît que si sa condition est remplie par les réponses actuelles. */
   protected isVisible(question: Question): boolean {

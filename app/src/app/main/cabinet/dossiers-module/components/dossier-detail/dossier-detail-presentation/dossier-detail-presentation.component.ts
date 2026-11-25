@@ -93,6 +93,8 @@ export class DossierDetailPresentationComponent {
 
   readonly schema = input<QuestionnaireSection[]>([]);
   readonly answers = input<CanonicalData>({});
+  /** Réponses reprises du dossier précédent encore à vérifier. */
+  readonly toVerify = input<CanonicalPath[]>([]);
   readonly missing = input<CanonicalPath[]>([]);
   readonly missingLabels = input('');
   readonly isComplete = input(false);
@@ -120,6 +122,7 @@ export class DossierDetailPresentationComponent {
   readonly confirmingDeleteChanged = output<boolean>();
   readonly removeRequested = output<string>();
   readonly answerChanged = output<AnswerChange>();
+  readonly answerVerified = output<CanonicalPath>();
   readonly saveRequested = output<void>();
   readonly needSaved = output<NeedInput>();
   readonly needValidated = output<void>();

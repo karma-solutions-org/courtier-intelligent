@@ -83,11 +83,11 @@ export class DossierTimelinePresentationComponent {
   private describe(event: DossierEvent): Pick<TimelineItem, 'title' | 'detail'> {
     const data = event.data ?? {};
     switch (event.type) {
-      case 'created':
-        return {
-          title: this.structure.created,
-          detail: typeof data['reference'] === 'string' ? data['reference'] : null,
-        };
+      case 'created': {
+        const reference = typeof data['reference'] === 'string' ? data['reference'] : null;
+        const reused = typeof data['reusedFrom'] === 'string' ? this.structure.reusedFrom(data['reusedFrom']) : null;
+        return { title: this.structure.created, detail: [reference, reused].filter(Boolean).join(' · ') || null };
+      }
       case 'data_updated': {
         const count = Array.isArray(data['fields']) ? data['fields'].length : 0;
         return { title: this.structure.dataUpdated, detail: count ? `${count} champ(s)` : null };

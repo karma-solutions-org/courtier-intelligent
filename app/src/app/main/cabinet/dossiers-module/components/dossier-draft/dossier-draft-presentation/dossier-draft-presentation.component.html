@@ -78,7 +78,10 @@
       [sections]="currentSection()"
       [data]="answers()"
       [showMissing]="showMissing()"
+      [toVerify]="toVerify()"
+      [reusedFrom]="dossier.reusedFrom?.reference ?? null"
       (answerChanged)="answerChanged.emit($event)"
+      (answerVerified)="answerVerified.emit($event)"
     />
     @if (showMissing() && sectionMissing().length) {
       <p class="blocked" role="alert">{{ structure.sectionIncomplete }}</p>

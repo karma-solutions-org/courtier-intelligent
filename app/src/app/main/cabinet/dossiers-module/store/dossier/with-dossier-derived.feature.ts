@@ -53,6 +53,20 @@ export function withDossierDerived() {
         chosenInsurerIds,
         /** Assureurs proposés mais pas encore choisis : ceux qu'on peut ajouter pendant la tarification. */
         addableInsurers: computed(() => availableInsurers().filter((insurer) => !chosenInsurerIds().includes(insurer.id))),
+        /**
+         * Réponses reprises du dossier précédent encore « à vérifier » : ni confirmées, ni modifiées localement (une
+         * réponse modifiée cesse de l'être, le serveur la retire au même enregistrement).
+         */
+        toVerify: computed<CanonicalPath[]>(() => {
+          const dossier = store.dossier();
+          const confirmed = store.confirmed();
+          const answers = store.answers();
+          return (dossier?.toVerify ?? []).filter(
+            (path) =>
+              !confirmed.includes(path) &&
+              JSON.stringify(answers[path] ?? null) === JSON.stringify(dossier?.data?.[path] ?? null),
+          );
+        }),
         /** Questionnaire figé à la validation de la couverture, à défaut le questionnaire calculé. */
         frozenSchema: computed(() => store.dossier()?.questionnaireSnapshot ?? schema()),
         /** Champs obligatoires manquants, calculés à chaque frappe (le serveur refait le calcul à l'enregistrement). */

@@ -23,3 +23,4 @@ export * from './vehicle-lookup';
 export * from './ai-prompts';
 export * from './extranet-profiles';
 export * from './public-suffix';
+export * from './dossier-reuse';

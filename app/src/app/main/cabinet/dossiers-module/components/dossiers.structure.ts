@@ -82,6 +82,14 @@ export const DOSSIERS_STRUCTURE = {
     notFound: 'Dossier introuvable.',
   },
   questionnaire: {
+    /** Dossier créé à partir du dernier dossier du client (véhicule, conducteur, antécédents repris). */
+    reusedFrom: (reference: string) =>
+      `Véhicule, conducteur et antécédents repris du dossier ${reference} : vérifiez qu'ils sont toujours exacts.`,
+    toVerifyCount: {
+      '=0': '',
+      '=1': '1 antécédent à confirmer ou corriger.',
+      other: '# antécédents à confirmer ou corriger.',
+    } as Record<string, string>,
     /** Section des compléments qu'aucun extranet choisi ne demande (son titre vient du questionnaire). */
     optionalHint:
       "Demandées par d'autres assureurs. Facultatives ici : l'extension vous les demandera si un extranet en a besoin.",
@@ -132,6 +140,7 @@ export const DOSSIERS_STRUCTURE = {
     pricingCompleted: 'Informations manquantes complétées',
     offerEntered: 'Offre saisie manuellement',
     insurersAdded: 'Assureur(s) ajouté(s) pendant la tarification',
+    reusedFrom: (reference: string) => `véhicule, conducteur et antécédents repris du dossier ${reference}`,
     decisionMade: 'Offre retenue',
     proposalSent: 'Proposition envoyée',
     proposalResent: 'Proposition renvoyée',

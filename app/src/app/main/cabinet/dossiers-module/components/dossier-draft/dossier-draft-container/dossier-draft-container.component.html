@@ -15,6 +15,7 @@
   [isLastSection]="isLastSection()"
   [sectionMissing]="sectionMissing()"
   [answers]="store.answers()"
+  [toVerify]="store.toVerify()"
   [showMissing]="showMissing()"
   [validating]="validating()"
   (viewChanged)="view.set($event)"
@@ -22,6 +23,7 @@
   (insurersValidated)="validateInsurers()"
   (saveAndQuitRequested)="saveAndQuit()"
   (answerChanged)="onAnswer($event)"
+  (answerVerified)="store.confirmVerified($event)"
   (sectionRequested)="goTo($event)"
   (nextRequested)="next()"
 />

@@ -103,7 +103,7 @@ export class DossiersService {
   save(
     dossierId: string,
     patch: AnswerPatch,
-    options: { sectionIndex?: number; event?: boolean; insurerIds?: string[] } = {},
+    options: { sectionIndex?: number; event?: boolean; insurerIds?: string[]; verified?: CanonicalPath[] } = {},
   ): Observable<SaveResult> {
     return this._backend.call('dossiers-sauvegarder', { dossierId, patch, ...options });
   }

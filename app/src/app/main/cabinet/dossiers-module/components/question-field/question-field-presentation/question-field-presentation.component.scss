@@ -38,3 +38,25 @@ mat-button-toggle-group {
 .invalid .label {
   color: var(--mat-sys-error);
 }
+
+.to-verify {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--ci-radius-sm);
+  background: var(--ci-warning-soft);
+  font-size: 12px;
+  color: var(--ci-text);
+}
+
+.confirm {
+  padding: 2px 8px;
+  border: 1px solid var(--ci-warning);
+  border-radius: var(--ci-radius-pill);
+  background: var(--ci-surface);
+  color: var(--ci-text);
+  font: inherit;
+  cursor: pointer;
+}

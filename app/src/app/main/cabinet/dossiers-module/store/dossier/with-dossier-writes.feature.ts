@@ -40,7 +40,7 @@ function addInsurersErrorMessage(error: unknown): string {
 
 /** Écritures en file : exécutées l'une après l'autre, pour qu'un changement de statut voie toujours les dernières réponses. */
 type OperationInput =
-  | { kind: 'save'; event?: boolean; sectionIndex?: number; insurerIds?: string[]; patch?: AnswerPatch }
+  | { kind: 'save'; event?: boolean; sectionIndex?: number; insurerIds?: string[]; verified?: CanonicalPath[]; patch?: AnswerPatch }
   | { kind: 'addInsurers'; input: AddInsurersInput }
   | { kind: 'status'; status: DossierStatus }
   | { kind: 'assign'; uid: string }
@@ -61,7 +61,7 @@ export function withDossierWrites() {
       /** Envoie les réponses en attente (rien à faire s'il n'y en a pas). Une erreur les remet en attente. */
       const persist = (
         dossierId: string,
-        options: { event?: boolean; sectionIndex?: number; insurerIds?: string[] },
+        options: { event?: boolean; sectionIndex?: number; insurerIds?: string[]; verified?: CanonicalPath[] },
         snapshot?: AnswerPatch,
       ): Observable<boolean> =>
         defer(() => {
@@ -70,7 +70,12 @@ export function withDossierWrites() {
           const current = store.selectedId() === dossierId;
           const patch = snapshot ?? (current ? store.pending() : {});
           const hasPatch = Object.keys(patch).length > 0;
-          if (!hasPatch && options.sectionIndex === undefined && options.insurerIds === undefined) {
+          if (
+            !hasPatch &&
+            options.sectionIndex === undefined &&
+            options.insurerIds === undefined &&
+            options.verified === undefined
+          ) {
             return of(true);
           }
           if (current) {
@@ -116,6 +121,7 @@ export function withDossierWrites() {
                 ...(operation.event !== undefined ? { event: operation.event } : {}),
                 ...(operation.sectionIndex !== undefined ? { sectionIndex: operation.sectionIndex } : {}),
                 ...(operation.insurerIds !== undefined ? { insurerIds: operation.insurerIds } : {}),
+                ...(operation.verified !== undefined ? { verified: operation.verified } : {}),
               },
               operation.patch,
             );
@@ -200,6 +206,7 @@ export function withDossierWrites() {
             pending: {},
             saveStatus: 'idle',
             error: null,
+            confirmed: [],
           }),
         setAutosave: (autosave: boolean) => patchState(store, { autosave }),
         clearMessages: () => patchState(store, { error: null, successMessage: null }),
@@ -282,6 +289,11 @@ export function withDossierWrites() {
           if (!store.selectedId() || !authStore.cabinetId()) return;
           patchState(store, { addingInsurers: true });
           enqueue({ kind: 'addInsurers', input });
+        },
+        /** Réponse reprise d'un dossier précédent confirmée telle quelle : elle n'est plus « à vérifier ». */
+        confirmVerified: (path: CanonicalPath) => {
+          patchState(store, { confirmed: [...store.confirmed(), path] });
+          enqueue({ kind: 'save', verified: [path] });
         },
         /** Passe à une section et mémorise où le courtier s'est arrêté. */
         goToSection: (sectionIndex: number) => {

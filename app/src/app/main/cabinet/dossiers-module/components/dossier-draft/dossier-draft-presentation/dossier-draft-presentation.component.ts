@@ -57,6 +57,8 @@ export class DossierDraftPresentationComponent {
   /** Champs obligatoires encore vides de la section affichée. */
   readonly sectionMissing = input<CanonicalPath[]>([]);
   readonly answers = input<CanonicalData>({});
+  /** Réponses reprises du dossier précédent encore à vérifier. */
+  readonly toVerify = input<CanonicalPath[]>([]);
   /** Signale les champs obligatoires vides (et l'absence d'extranet coché). */
   readonly showMissing = input(false);
   readonly validating = input(false);
@@ -66,6 +68,7 @@ export class DossierDraftPresentationComponent {
   readonly insurersValidated = output<void>();
   readonly saveAndQuitRequested = output<void>();
   readonly answerChanged = output<AnswerChange>();
+  readonly answerVerified = output<CanonicalPath>();
   readonly sectionRequested = output<number>();
   readonly nextRequested = output<void>();
 

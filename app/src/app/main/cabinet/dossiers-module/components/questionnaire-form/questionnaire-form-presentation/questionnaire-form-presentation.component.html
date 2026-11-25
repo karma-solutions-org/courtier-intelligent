@@ -1,3 +1,11 @@
+@if (reusedFrom(); as reference) {
+  <p class="reused" role="note">
+    {{ structure.reusedFrom(reference) }}
+    @if (shownToVerify().length) {
+      <strong>{{ shownToVerify().length | i18nPlural: structure.toVerifyCount }}</strong>
+    }
+  </p>
+}
 @for (section of regularSections(); track section.title) {
   <section class="card">
     <h2><span class="section-index" aria-hidden="true">{{ $index + 1 }}</span>{{ section.title }}</h2>
@@ -32,7 +40,9 @@
           [value]="data()[question.canonicalPath]"
           [readonly]="readonly()"
           [showMissing]="showMissing()"
+          [toVerify]="toVerify().includes(question.canonicalPath)"
           (changed)="answerChanged.emit({ path: question.canonicalPath, value: $event })"
+          (verified)="answerVerified.emit(question.canonicalPath)"
         />
       }
     }

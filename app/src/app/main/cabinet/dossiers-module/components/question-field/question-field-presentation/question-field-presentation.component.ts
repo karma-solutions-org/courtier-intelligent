@@ -36,8 +36,12 @@ export class QuestionFieldPresentationComponent {
   readonly showMissing = input(false);
   /** Valeur remplie par la recherche du véhicule (signalée au courtier, qui peut la corriger). */
   readonly prefilled = input(false);
+  /** Réponse reprise du dossier précédent qui a pu changer (antécédents) : à confirmer ou corriger. */
+  readonly toVerify = input(false);
   /** Nouvelle valeur ; `null` efface la réponse. */
   readonly changed = output<CanonicalValue | null>();
+  /** Le courtier confirme la réponse reprise telle quelle. */
+  readonly verified = output<void>();
 
   protected readonly knowledgeOptions = KNOWLEDGE_OPTIONS;
   protected readonly labelText = computed(() =>

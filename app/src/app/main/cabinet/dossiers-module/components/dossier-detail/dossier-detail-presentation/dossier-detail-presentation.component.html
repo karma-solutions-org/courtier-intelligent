@@ -135,7 +135,10 @@
             [data]="answers()"
             [readonly]="!answersEditable()"
             [showMissing]="true"
+            [toVerify]="toVerify()"
+            [reusedFrom]="dossier.reusedFrom?.reference ?? null"
             (answerChanged)="answerChanged.emit($event)"
+            (answerVerified)="answerVerified.emit($event)"
           />
           @if (answersEditable()) {
             <div class="actions">

@@ -3,6 +3,16 @@
   gap: 20px;
 }
 
+.reused {
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--ci-warning);
+  border-radius: 8px;
+  background: var(--ci-warning-soft);
+  font-size: 14px;
+  color: var(--ci-text);
+}
+
 .card {
   padding: 24px;
   border: 1px solid var(--ci-border);

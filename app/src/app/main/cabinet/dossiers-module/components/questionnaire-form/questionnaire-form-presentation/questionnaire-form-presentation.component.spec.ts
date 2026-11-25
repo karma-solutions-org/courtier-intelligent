@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
-import { CanonicalData, QuestionnaireSection } from '@shared';
+import { CanonicalData, CanonicalPath, QuestionnaireSection } from '@shared';
 import { page } from 'vitest/browser';
 import { AnswerChange, QuestionnaireFormPresentationComponent } from './questionnaire-form-presentation.component';
 
@@ -51,7 +51,14 @@ class QuestionnaireTester {
     this.setInputs({ sections: SCHEMA });
   }
 
-  setInputs(inputs: { sections?: QuestionnaireSection[]; data?: CanonicalData; readonly?: boolean; showMissing?: boolean }): void {
+  setInputs(inputs: {
+    sections?: QuestionnaireSection[];
+    data?: CanonicalData;
+    readonly?: boolean;
+    showMissing?: boolean;
+    toVerify?: CanonicalPath[];
+    reusedFrom?: string | null;
+  }): void {
     for (const [name, value] of Object.entries(inputs)) {
       this.fixture.componentRef.setInput(name, value);
     }
@@ -75,6 +82,39 @@ describe('QuestionnaireFormPresentationComponent', () => {
     await expect.element(tester.root.getByRole('spinbutton', { name: 'Puissance fiscale *' })).toBeVisible();
     // Facultatif : pas d'astérisque.
     await expect.element(tester.root.getByLabelText('Mise en circulation', { exact: true })).toBeVisible();
+  });
+
+  describe('réponses reprises du dossier précédent', () => {
+    beforeEach(() => {
+      tester.setInputs({
+        data: { 'insuranceHistory.currentlyInsured': true, 'insuranceHistory.previousInsurer': 'MAAF' },
+        toVerify: ['insuranceHistory.previousInsurer'],
+        reusedFrom: '2026-000003',
+      });
+    });
+
+    it('signale le dossier repris et les réponses à vérifier', async () => {
+      const note = tester.root.getByRole('note');
+      await expect.element(note).toBeVisible();
+      expect(note.element().textContent).toContain('repris du dossier 2026-000003');
+      expect(note.element().textContent).toContain('1 antécédent à confirmer ou corriger.');
+      await expect.element(tester.root.getByText(/Repris du dossier précédent : à vérifier/)).toBeVisible();
+    });
+
+    it('émet la confirmation de la réponse reprise', async () => {
+      const verified: CanonicalPath[] = [];
+      tester.fixture.componentInstance.answerVerified.subscribe((path) => verified.push(path));
+
+      await tester.root.getByRole('button', { name: "C'est à jour" }).click();
+
+      expect(verified).toEqual(['insuranceHistory.previousInsurer']);
+    });
+
+    it('ne propose pas de confirmer en lecture seule', async () => {
+      tester.setInputs({ readonly: true });
+
+      await expect.element(tester.root.getByRole('button', { name: "C'est à jour" })).not.toBeInTheDocument();
+    });
   });
 
   it('affiche la réponse déjà enregistrée', async () => {

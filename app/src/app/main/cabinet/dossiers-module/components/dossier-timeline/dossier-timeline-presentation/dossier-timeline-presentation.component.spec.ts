@@ -27,6 +27,14 @@ describe('DossierTimelinePresentationComponent', () => {
     expect(text).toContain('Horizon Assurances · 2 question(s) ajoutée(s)');
   });
 
+  it('signale un dossier créé à partir du dossier précédent du client', () => {
+    const text = render([
+      { id: 'c', type: 'created', by: 'u1', data: { reference: '2026-000009', reusedFrom: '2026-000003' } } as unknown as DossierEvent,
+    ]);
+
+    expect(text).toContain('2026-000009 · véhicule, conducteur et antécédents repris du dossier 2026-000003');
+  });
+
   describe('changement de statut automatique', () => {
     it("n'explique pas le passage normal en tarification par une information retirée", () => {
       const text = render([statusChange('besoin_valide', 'tarification')]);
