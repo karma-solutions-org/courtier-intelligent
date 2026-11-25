@@ -9,6 +9,7 @@ import { withDossierSync } from './dossier/with-dossier-sync.feature';
 import { withDossierWrites } from './dossier/with-dossier-writes.feature';
 
 export type { SaveStatus } from './dossier/dossier.state';
+export type { AddInsurersInput } from './dossier/with-dossier-writes.feature';
 
 /**
  * Store d'un dossier (fourni par la route), composé d'une feature par responsabilité (voir `store/dossier/`) :

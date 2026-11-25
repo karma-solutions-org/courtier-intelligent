@@ -1,0 +1,30 @@
+<h2 mat-dialog-title>{{ text.title }}</h2>
+<mat-dialog-content>
+  @if (step() === 'choose') {
+    <p class="intro">{{ text.chooseIntro }}</p>
+    <app-extranet-picker [insurers]="data.candidates" [checked]="chosen()" (toggled)="toggle($event)" />
+  } @else if (questions().length) {
+    <p class="intro">{{ text.questionsIntro }}</p>
+    <div class="questions">
+      @for (question of questions(); track question.canonicalPath) {
+        <app-question-field
+          [question]="question"
+          [value]="answers()[question.canonicalPath]"
+          [showMissing]="touched()"
+          (changed)="set(question.canonicalPath, $event)"
+        />
+      }
+    </div>
+  } @else {
+    <p class="intro" role="status">{{ text.noQuestion }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  @if (step() === 'choose') {
+    <button mat-button type="button" mat-dialog-close>{{ text.cancel }}</button>
+    <button mat-flat-button type="button" [disabled]="!chosen().length" (click)="next()">{{ text.next }}</button>
+  } @else {
+    <button mat-button type="button" (click)="back()">{{ text.back }}</button>
+    <button mat-flat-button type="button" (click)="submit()">{{ text.submit }}</button>
+  }
+</mat-dialog-actions>

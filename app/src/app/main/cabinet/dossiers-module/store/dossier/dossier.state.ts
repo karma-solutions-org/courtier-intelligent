@@ -50,6 +50,8 @@ export interface DossierState {
   removeStatus: 'idle' | 'pending' | 'done' | 'failed';
   /** Pièces du client en cours de lecture : un écran couvre le formulaire du brouillon jusqu'au remplissage. */
   clientPiecesReading: boolean;
+  /** Ajout d'assureurs pendant la tarification en file ou en cours : le bouton reste grisé. */
+  addingInsurers: boolean;
 }
 
 /** État complet vu par les features du dossier (le message ponctuel vient de `withNotice`). */
@@ -81,4 +83,5 @@ export const initialDossierState: DossierState = {
   closing: false,
   removeStatus: 'idle',
   clientPiecesReading: false,
+  addingInsurers: false,
 };

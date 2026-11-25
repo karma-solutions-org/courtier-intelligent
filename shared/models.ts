@@ -157,6 +157,12 @@ export interface Question {
   label: string;
   type: QuestionType;
   required: boolean;
+  /**
+   * Question du socle : posée pour tout dossier, quels que soient les extranets choisis (identité, véhicule, conducteur,
+   * antécédents). Les autres questions du catalogue sont des compléments, posés seulement si un extranet choisi les
+   * demande (voir schemaWithComplements).
+   */
+  core?: boolean;
   choices?: QuestionChoice[];
   /** Longueur maximale de la réponse imposée par l'extranet (champ texte ou nombre). */
   maxLength?: number;
@@ -198,6 +204,11 @@ export interface QuestionnaireSection {
   questions: Question[];
   /** Section des questions ajoutées automatiquement depuis les extranets : conservée par seed-catalog. */
   discovered?: boolean;
+  /**
+   * Section « Informations complémentaires (facultatif) » : les compléments qu'aucun extranet choisi ne demande. Jamais
+   * obligatoires ; affichée repliée. L'extension les demandera si un extranet en a finalement besoin.
+   */
+  optional?: boolean;
 }
 
 export type GuaranteeType = 'included' | 'limit' | 'deductible';
@@ -379,7 +390,9 @@ export type DossierEventType =
   | 'proposal_sent'
   | 'outcome_recorded'
   | 'pricing_cancelled'
-  | 'offers_stale';
+  | 'offers_stale'
+  /** Assureurs ajoutés pendant la tarification (data : { insurers: ids ajoutés, questions: nombre de questions ajoutées }). */
+  | 'insurers_added';
 
 export interface DossierEvent {
   id: string;

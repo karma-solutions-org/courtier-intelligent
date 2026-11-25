@@ -67,6 +67,9 @@ export const DOSSIERS_STRUCTURE = {
     importDocument: 'Importer un document',
     section: 'Section',
     of: 'sur',
+    /** Mesure de la saisie demandée (pipe i18nPlural, `#` = nombre). */
+    askedCount: { '=1': '1 question à remplir', other: '# questions à remplir' } as Record<string, string>,
+    optionalCount: { '=1': '1 facultative', other: '# facultatives' } as Record<string, string>,
     previous: 'Précédent',
     next: 'Suivant',
     finish: 'Terminer le dossier',
@@ -77,6 +80,13 @@ export const DOSSIERS_STRUCTURE = {
     dirty: 'Modifications non enregistrées',
     error: "Échec de l'enregistrement",
     notFound: 'Dossier introuvable.',
+  },
+  questionnaire: {
+    /** Section des compléments qu'aucun extranet choisi ne demande (son titre vient du questionnaire). */
+    optionalHint:
+      "Demandées par d'autres assureurs. Facultatives ici : l'extension vous les demandera si un extranet en a besoin.",
+    questionCount: { '=0': 'aucune question', '=1': '1 question', other: '# questions' } as Record<string, string>,
+    filledCount: { '=0': 'aucune remplie', '=1': '1 remplie', other: '# remplies' } as Record<string, string>,
   },
   detail: {
     back: "Retour à l'espace client",
@@ -121,6 +131,7 @@ export const DOSSIERS_STRUCTURE = {
     pricingRetried: 'Tarification relancée',
     pricingCompleted: 'Informations manquantes complétées',
     offerEntered: 'Offre saisie manuellement',
+    insurersAdded: 'Assureur(s) ajouté(s) pendant la tarification',
     decisionMade: 'Offre retenue',
     proposalSent: 'Proposition envoyée',
     proposalResent: 'Proposition renvoyée',

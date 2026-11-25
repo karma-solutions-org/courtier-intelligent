@@ -14,12 +14,13 @@ import {
 } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
+import { askedQuestionCount } from '@shared';
 import { HasUnsavedChanges } from '../../../../../../core/routing/guards/unsaved-changes.guard';
 import { CabinetRouteContainerModel } from '../../../../../../core/routing/cabinet-routes/cabinet-route-container.model';
 import { DraftView } from '../../../models/dossier-draft.model';
 import { DossierStore } from '../../../store/dossier.store';
 import { sectionIndexOf } from '../../../util/dossiers.utils';
-import { boundedSectionIndex, missingInSection } from '../../../util/draft.utils';
+import { boundedSectionIndex, missingInSection, sectionsAtStep, stepSections } from '../../../util/draft.utils';
 import { DOSSIERS_STRUCTURE } from '../../dossiers.structure';
 import { AnswerChange } from '../../questionnaire-form/questionnaire-form-presentation/questionnaire-form-presentation.component';
 import { DossierDraftPresentationComponent } from '../dossier-draft-presentation/dossier-draft-presentation.component';
@@ -28,7 +29,8 @@ import { DossierDraftPresentationComponent } from '../dossier-draft-presentation
  * « Nouveau dossier », étapes 3 à 5 : extranets à utiliser, documents, puis questionnaire section par section
  * (enregistré automatiquement, reprise exacte là où le courtier s'était arrêté). Le questionnaire ne pose que les
  * questions des extranets choisis. Une section ne se quitte qu'une fois ses champs obligatoires remplis ; la dernière
- * fait passer le dossier en « complet ».
+ * fait passer le dossier en « complet ». La section facultative n'est pas une étape : repliée sous la dernière, elle
+ * n'empêche pas de terminer.
  */
 @Component({
   selector: 'app-dossier-draft-container',
@@ -54,14 +56,14 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
   protected readonly showMissing = signal(false);
   protected readonly validating = signal(false);
 
-  /** Section affichée, bornée au questionnaire (la reprise peut venir d'un ancien enregistrement). */
-  protected readonly sectionIndex = computed(() => boundedSectionIndex(this.store.sectionIndex(), this.store.schema().length));
-  protected readonly currentSection = computed(() =>
-    this.store.schema().slice(this.sectionIndex(), this.sectionIndex() + 1),
-  );
-  protected readonly isLastSection = computed(
-    () => this.sectionIndex() >= this.store.schema().length - 1,
-  );
+  /** Étapes du questionnaire : ses sections hors section facultative (affichée repliée sous la dernière étape). */
+  protected readonly steps = computed(() => stepSections(this.store.schema()));
+  /** Étape affichée, bornée au questionnaire (la reprise peut venir d'un ancien enregistrement). */
+  protected readonly sectionIndex = computed(() => boundedSectionIndex(this.store.sectionIndex(), this.steps().length));
+  protected readonly currentSection = computed(() => sectionsAtStep(this.store.schema(), this.sectionIndex()));
+  protected readonly isLastSection = computed(() => this.sectionIndex() >= this.steps().length - 1);
+  /** Mesure de la saisie demandée : questions posées, et facultatives à part. */
+  protected readonly questionCount = computed(() => askedQuestionCount(this.store.schema()));
   /** Champs obligatoires encore vides de la section affichée : « Suivant » reste bloqué tant qu'il y en a. */
   protected readonly sectionMissing = computed(() => missingInSection(this.currentSection(), this.store.missing()));
 
@@ -199,7 +201,7 @@ export class DossierDraftContainerComponent implements OnInit, OnDestroy, HasUns
     }
     const missing = this.store.missing();
     if (missing.length) {
-      this.goTo(sectionIndexOf(this.store.schema(), missing[0]));
+      this.goTo(sectionIndexOf(this.steps(), missing[0]));
       this.showMissing.set(true);
       return;
     }

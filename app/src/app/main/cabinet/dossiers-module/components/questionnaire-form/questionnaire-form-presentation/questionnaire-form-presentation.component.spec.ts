@@ -241,6 +241,57 @@ describe('QuestionnaireFormPresentationComponent', () => {
     });
   });
 
+  describe('Section facultative (compléments)', () => {
+    const OPTIONAL: QuestionnaireSection = {
+      title: 'Informations complémentaires (facultatif)',
+      optional: true,
+      questions: [
+        { canonicalPath: 'driver.birthCountry', label: 'Pays de naissance', type: 'text', required: false },
+        { canonicalPath: 'vehicle.model', label: 'Modèle', type: 'text', required: false },
+      ],
+    };
+    const header = () => tester.root.getByRole('button', { name: /Informations complémentaires \(facultatif\)/ });
+
+    beforeEach(() => tester.setInputs({ sections: [SCHEMA[0], OPTIONAL] }));
+
+    it('est repliée par défaut, avec son explication et le nombre de questions remplies', async () => {
+      await expect.element(header()).toBeVisible();
+      await expect.element(header()).toHaveAttribute('aria-expanded', 'false');
+      await expect
+        .element(tester.root.getByText("Demandées par d'autres assureurs. Facultatives ici : l'extension vous les demandera si un extranet en a besoin."))
+        .toBeVisible();
+      await expect.element(tester.root.getByText('2 questions · aucune remplie')).toBeVisible();
+      await expect.element(tester.root.getByRole('textbox', { name: 'Pays de naissance' })).not.toBeInTheDocument();
+      // La section normale reste affichée comme avant.
+      await expect.element(tester.root.getByRole('heading', { name: 'Véhicule' })).toBeVisible();
+    });
+
+    it('compte les réponses déjà données', async () => {
+      tester.setInputs({ data: { 'vehicle.model': 'Clio' } });
+
+      await expect.element(tester.root.getByText('2 questions · 1 remplie')).toBeVisible();
+    });
+
+    it('une fois ouverte, ses questions se remplissent comme les autres', async () => {
+      await header().click();
+
+      await expect.element(header()).toHaveAttribute('aria-expanded', 'true');
+      const field = tester.root.getByRole('textbox', { name: 'Pays de naissance' });
+      await expect.element(field).toBeVisible();
+      await field.fill('Maroc');
+      expect(tester.changes.at(-1)).toEqual({ path: 'driver.birthCountry', value: 'Maroc' });
+    });
+
+    it("n'ajoute aucun champ obligatoire signalé", async () => {
+      tester.setInputs({ showMissing: true });
+      await header().click();
+
+      // Seuls les 3 obligatoires vides de « Véhicule » sont signalés.
+      await expect.element(tester.root.getByText('Ce champ est obligatoire').first()).toBeVisible();
+      expect(tester.root.getByText('Ce champ est obligatoire').elements()).toHaveLength(3);
+    });
+  });
+
   it('ne permet aucune saisie en lecture seule', async () => {
     tester.setInputs({ readonly: true, data: { 'vehicle.registration': 'AB-123-CD' } });
 

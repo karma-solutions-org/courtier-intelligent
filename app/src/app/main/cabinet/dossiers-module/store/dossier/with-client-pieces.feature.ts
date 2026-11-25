@@ -8,7 +8,7 @@ import { AuthStore } from '../../../../commons/authentication-module/store/auth.
 import { DOSSIERS_STRUCTURE } from '../../components/dossiers.structure';
 import { AnswerPatch } from '../../services/dossiers.service';
 import { DocumentsService } from '../../services/documents.service';
-import { boundedSectionIndex, clientPieceAnswers } from '../../util/draft.utils';
+import { boundedSectionIndex, clientPieceAnswers, stepSections } from '../../util/draft.utils';
 import { DossierStoreState } from './dossier.state';
 
 /** Pièces importées à la création du client (carte grise, permis…) : reprises dans le dossier, lues, rangées dans les champs vides. */
@@ -63,7 +63,7 @@ export function withClientPieces() {
                 const toFill = clientPieceAnswers(fields, store.answers(), store.schema());
                 if (!toFill.length) return;
                 for (const field of toFill) store.edit(field.canonicalPath, field.value);
-                store.saveNow({ event: true, sectionIndex: boundedSectionIndex(store.sectionIndex(), store.schema().length) });
+                store.saveNow({ event: true, sectionIndex: boundedSectionIndex(store.sectionIndex(), stepSections(store.schema()).length) });
                 patchState(store, setNotice(`${toFill.length} ${DOSSIERS_STRUCTURE.draft.clientPiecesApplied}`, 6000));
               }),
             );

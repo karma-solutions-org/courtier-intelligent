@@ -57,10 +57,18 @@
     </div>
   } @else {
     <div class="progress-row">
-      <p class="progress">
-        {{ structure.section }} {{ sectionIndex() + 1 }} {{ structure.of }}
-        {{ sectionCount() }}
-      </p>
+      <div class="progress-info">
+        <p class="progress">
+          {{ structure.section }} {{ sectionIndex() + 1 }} {{ structure.of }}
+          {{ sectionCount() }}
+        </p>
+        <p class="question-count">
+          {{ questionCount().asked | i18nPlural: structure.askedCount }}
+          @if (questionCount().optional > 0) {
+            · {{ questionCount().optional | i18nPlural: structure.optionalCount }}
+          }
+        </p>
+      </div>
       <!-- Toujours visible : on peut importer un document à tout moment du questionnaire. -->
       <button mat-stroked-button type="button" (click)="viewChanged.emit('documents')">
         <mat-icon>upload_file</mat-icon>{{ structure.importDocument }}

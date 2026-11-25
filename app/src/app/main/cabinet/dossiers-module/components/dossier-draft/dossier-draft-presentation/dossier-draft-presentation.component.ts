@@ -1,3 +1,4 @@
+import { I18nPluralPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -21,6 +22,7 @@ import { ReadingOverlayPresentationComponent } from '../../reading-overlay/readi
 @Component({
   selector: 'app-dossier-draft-presentation',
   imports: [
+    I18nPluralPipe,
     MatButtonModule,
     MatIconModule,
     DocumentImportContainerComponent,
@@ -48,6 +50,8 @@ export class DossierDraftPresentationComponent {
   /** Section affichée (bornée au questionnaire) et nombre de sections. */
   readonly sectionIndex = input(0);
   readonly sectionCount = input(0);
+  /** Questions posées (hors section facultative) et questions facultatives : mesure de la saisie demandée. */
+  readonly questionCount = input<{ asked: number; optional: number }>({ asked: 0, optional: 0 });
   readonly currentSection = input<QuestionnaireSection[]>([]);
   readonly isLastSection = input(false);
   /** Champs obligatoires encore vides de la section affichée. */

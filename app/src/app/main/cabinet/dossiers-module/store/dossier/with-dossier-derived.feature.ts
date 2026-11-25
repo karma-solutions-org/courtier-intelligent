@@ -8,7 +8,7 @@ import {
   EDITABLE_DOSSIER_STATUSES,
   insurersForProduct,
   NeedAnalysis,
-  schemaForInsurers,
+  schemaWithComplements,
   suggestNeed,
 } from '@shared';
 import { CabinetStatusStore } from '../../../../commons/main-module/store/cabinet-status.store';
@@ -26,13 +26,14 @@ export function withDossierDerived() {
         insurersForProduct(store.insurers(), store.dossier()?.productId ?? '', cabinetStatus.cabinet()?.enabledInsurers ?? []),
       );
       /**
-       * Seulement les questions des extranets choisis pour le dossier (leur liste de questions connues et celles
-       * découvertes chez eux), à défaut de ceux du cabinet qui proposent le produit.
+       * Questionnaire en deux niveaux : le socle, plus les compléments demandés par les extranets choisis pour le
+       * dossier (à défaut, ceux du cabinet qui proposent le produit) et les questions découvertes chez eux. Les autres
+       * compléments forment une dernière section facultative (`optional`), jamais obligatoire.
        */
       const schema = computed(() => {
         const selected = store.selectedInsurers();
         const insurers = selected.length ? store.insurers().filter((insurer) => selected.includes(insurer.id)) : availableInsurers();
-        return schemaForInsurers(
+        return schemaWithComplements(
           product()?.questionnaireSchema ?? [],
           insurers,
           store.dossier()?.productId ?? '',
@@ -40,10 +41,20 @@ export function withDossierDerived() {
         );
       });
       const missing = computed<CanonicalPath[]>(() => computeMissing(schema(), store.answers()));
+      /** Assureurs du dossier : ceux choisis à l'étape « Extranets », à défaut tous ceux proposés. */
+      const chosenInsurerIds = computed(() => {
+        const chosen = store.dossier()?.insurerIds ?? [];
+        return chosen.length ? chosen : availableInsurers().map((insurer) => insurer.id);
+      });
       return {
         product,
         availableInsurers,
         schema,
+        chosenInsurerIds,
+        /** Assureurs proposés mais pas encore choisis : ceux qu'on peut ajouter pendant la tarification. */
+        addableInsurers: computed(() => availableInsurers().filter((insurer) => !chosenInsurerIds().includes(insurer.id))),
+        /** Questionnaire figé à la validation de la couverture, à défaut le questionnaire calculé. */
+        frozenSchema: computed(() => store.dossier()?.questionnaireSnapshot ?? schema()),
         /** Champs obligatoires manquants, calculés à chaque frappe (le serveur refait le calcul à l'enregistrement). */
         missing,
         isComplete: computed(() => schema().length > 0 && missing().length === 0),

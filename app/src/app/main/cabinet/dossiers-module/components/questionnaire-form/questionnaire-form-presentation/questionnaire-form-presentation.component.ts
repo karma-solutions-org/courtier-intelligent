@@ -1,5 +1,16 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { CanonicalData, CanonicalPath, CanonicalValue, isQuestionVisible, Question, QuestionnaireSection } from '@shared';
+import { I18nPluralPipe, NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { MatExpansionModule } from '@angular/material/expansion';
+import {
+  CanonicalData,
+  CanonicalPath,
+  CanonicalValue,
+  isAnswered,
+  isQuestionVisible,
+  Question,
+  QuestionnaireSection,
+} from '@shared';
+import { DOSSIERS_STRUCTURE } from '../../dossiers.structure';
 import { QuestionFieldPresentationComponent } from '../../question-field/question-field-presentation/question-field-presentation.component';
 
 export interface AnswerChange {
@@ -11,10 +22,11 @@ export interface AnswerChange {
 /**
  * Moteur de questionnaire dynamique : génère le formulaire d'un produit depuis son JSON (sections, types,
  * obligatoires, conditions d'affichage, niveau de connaissance). Ne garde aucun état : les réponses viennent de `data`.
+ * Une section facultative (`optional`, compléments qu'aucun extranet choisi ne demande) est repliée par défaut.
  */
 @Component({
   selector: 'app-questionnaire-form',
-  imports: [QuestionFieldPresentationComponent],
+  imports: [I18nPluralPipe, MatExpansionModule, NgTemplateOutlet, QuestionFieldPresentationComponent],
   templateUrl: './questionnaire-form-presentation.component.html',
   styleUrl: './questionnaire-form-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -27,6 +39,19 @@ export class QuestionnaireFormPresentationComponent {
   /** Signale les champs obligatoires vides (après un clic sur « Suivant », par exemple). */
   readonly showMissing = input(false);
   readonly answerChanged = output<AnswerChange>();
+
+  protected readonly structure = DOSSIERS_STRUCTURE.questionnaire;
+  protected readonly regularSections = computed(() => this.sections().filter((section) => !section.optional));
+  /** Sections facultatives, avec leur nombre de questions et de réponses déjà données. */
+  protected readonly optionalSections = computed(() =>
+    this.sections()
+      .filter((section) => section.optional)
+      .map((section) => ({
+        section,
+        total: section.questions.length,
+        filled: section.questions.filter((question) => isAnswered(this.data()[question.canonicalPath], question)).length,
+      })),
+  );
 
   /** Une question conditionnelle n'apparaît que si sa condition est remplie par les réponses actuelles. */
   protected isVisible(question: Question): boolean {

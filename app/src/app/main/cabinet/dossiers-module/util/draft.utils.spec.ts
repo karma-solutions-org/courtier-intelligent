@@ -1,5 +1,5 @@
 import { OcrField, QuestionnaireSection } from '@shared';
-import { boundedSectionIndex, clientPieceAnswers, missingInSection } from './draft.utils';
+import { boundedSectionIndex, clientPieceAnswers, missingInSection, sectionsAtStep, stepSections } from './draft.utils';
 
 describe('boundedSectionIndex', () => {
   it('borne la reprise au questionnaire', () => {
@@ -35,5 +35,27 @@ describe('clientPieceAnswers', () => {
   it("ignore les champs absents du questionnaire (question d'un extranet non choisi)", () => {
     const paths = clientPieceAnswers(fields, {}, sections).map((field) => field.canonicalPath);
     expect(paths).not.toContain('extra.numero_permis');
+  });
+});
+
+describe('stepSections / sectionsAtStep (section facultative)', () => {
+  const sections = [
+    { title: 'Conducteur', questions: [] },
+    { title: 'Véhicule', questions: [] },
+    { title: 'Informations complémentaires (facultatif)', questions: [], optional: true },
+  ] as unknown as QuestionnaireSection[];
+  const titles = (list: QuestionnaireSection[]) => list.map((section) => section.title);
+
+  it("la section facultative n'est pas une étape", () => {
+    expect(titles(stepSections(sections))).toEqual(['Conducteur', 'Véhicule']);
+  });
+
+  it('elle s’affiche seulement sous la dernière étape', () => {
+    expect(titles(sectionsAtStep(sections, 0))).toEqual(['Conducteur']);
+    expect(titles(sectionsAtStep(sections, 1))).toEqual(['Véhicule', 'Informations complémentaires (facultatif)']);
+  });
+
+  it('questionnaire sans section facultative : rien ne change', () => {
+    expect(titles(sectionsAtStep(sections.slice(0, 2), 1))).toEqual(['Véhicule']);
   });
 });

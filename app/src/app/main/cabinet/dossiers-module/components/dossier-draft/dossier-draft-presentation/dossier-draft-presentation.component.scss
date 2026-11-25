@@ -59,6 +59,17 @@ h2 {
   }
 }
 
+.progress-info {
+  display: grid;
+  gap: 2px;
+}
+
+.question-count {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ci-text-muted);
+}
+
 .progress {
   margin: 0 0 12px;
   color: var(--ci-text-muted);

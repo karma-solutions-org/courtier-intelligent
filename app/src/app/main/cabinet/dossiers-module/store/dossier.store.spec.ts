@@ -468,4 +468,74 @@ describe('DossierStore', () => {
       expect(suggestion).not.toHaveProperty('budgetMax');
     });
   });
+
+  describe('Ajout d’un assureur pendant la tarification', () => {
+    const input = { insurerIds: ['alpha', 'beta'], patch: { 'vehicle.fiscalPower': 7 } };
+
+    beforeEach(() => {
+      dossier$.next(dossier({ status: 'tarification', insurerIds: ['alpha'] }));
+      TestBed.tick();
+    });
+
+    it('envoie assureurs et réponses en un seul enregistrement, puis invite à tarifer le nouvel assureur', () => {
+      store.addInsurers(input);
+
+      expect(service.save).toHaveBeenCalledExactlyOnceWith('d1', input.patch, { insurerIds: ['alpha', 'beta'] });
+      expect(store.notice()?.text).toBe('Assureur ajouté : lancez sa tarification.');
+      expect(store.selectedInsurers()).toEqual(['alpha', 'beta']);
+      expect(store.answers()['vehicle.fiscalPower']).toBe(7);
+      expect(store.addingInsurers()).toBe(false);
+    });
+
+    it("les réponses en attente partent d'abord, dans leur propre enregistrement", () => {
+      store.edit('vehicle.brand', 'Peugeot');
+      store.addInsurers(input);
+
+      expect(service.save).toHaveBeenCalledTimes(2);
+      expect(service.save).toHaveBeenNthCalledWith(1, 'd1', { 'vehicle.brand': 'Peugeot' }, {});
+      expect(service.save).toHaveBeenNthCalledWith(2, 'd1', input.patch, { insurerIds: ['alpha', 'beta'] });
+    });
+
+    it('refus de retirer un assureur : message clair', () => {
+      service.save.mockReturnValueOnce(
+        throwError(() => ({ code: 'functions/failed-precondition', message: 'Refusé.', details: { reason: 'pricing_remove' } })),
+      );
+      store.addInsurers({ insurerIds: ['beta'], patch: {} });
+
+      expect(store.notice()?.text).toBe('Un assureur choisi ne peut pas être retiré pendant la tarification.');
+      expect(store.selectedInsurers()).not.toContain('beta');
+      expect(store.addingInsurers()).toBe(false);
+    });
+
+    it('réponses manquantes : le message du serveur liste les champs', () => {
+      service.save.mockReturnValueOnce(
+        throwError(() => ({
+          code: 'functions/invalid-argument',
+          message: 'Renseignez : Puissance fiscale.',
+          details: { reason: 'incomplete' },
+        })),
+      );
+      store.addInsurers({ insurerIds: ['alpha', 'beta'], patch: {} });
+
+      expect(store.notice()?.text).toBe('Renseignez : Puissance fiscale.');
+      expect(store.selectedInsurers()).not.toContain('beta');
+    });
+
+    it('réponses manquantes sans message du serveur : message de repli en français', () => {
+      service.save.mockReturnValueOnce(
+        throwError(() => ({ code: 'functions/invalid-argument', details: { reason: 'incomplete' } })),
+      );
+      store.addInsurers({ insurerIds: ['alpha', 'beta'], patch: {} });
+
+      expect(store.notice()?.text).toBe('Renseignez les informations demandées par le nouvel assureur.');
+    });
+
+    it('questionnaire figé : celui du dossier quand il existe', () => {
+      const snapshot = [{ title: 'Figé', questions: [] }];
+      dossier$.next(dossier({ status: 'tarification', insurerIds: ['alpha'], questionnaireSnapshot: snapshot }));
+      TestBed.tick();
+
+      expect(store.frozenSchema()).toBe(snapshot);
+    });
+  });
 });

@@ -34,3 +34,8 @@
   margin: 0;
   color: var(--ci-text-muted);
 }
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+}

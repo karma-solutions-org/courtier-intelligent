@@ -1,19 +1,40 @@
-@for (section of sections(); track section.title) {
+@for (section of regularSections(); track section.title) {
   <section class="card">
     <h2><span class="section-index" aria-hidden="true">{{ $index + 1 }}</span>{{ section.title }}</h2>
-    <div class="grid">
-      @for (question of section.questions; track question.canonicalPath) {
-        @if (isVisible(question)) {
-          <app-question-field
-            [class.wide]="question.type === 'boolean' || question.withKnowledge"
-            [question]="question"
-            [value]="data()[question.canonicalPath]"
-            [readonly]="readonly()"
-            [showMissing]="showMissing()"
-            (changed)="answerChanged.emit({ path: question.canonicalPath, value: $event })"
-          />
-        }
-      }
-    </div>
+    <ng-container *ngTemplateOutlet="questionsGrid; context: { $implicit: section }" />
   </section>
 }
+@for (item of optionalSections(); track item.section.title) {
+  <!-- Compléments facultatifs : repliés, jamais bloquants ; les réponses s'enregistrent comme les autres. -->
+  <mat-expansion-panel class="optional">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        <span class="optional-title">{{ item.section.title }}</span>
+        <span class="optional-hint">{{ structure.optionalHint }}</span>
+      </mat-panel-title>
+      <mat-panel-description class="optional-count">
+        {{ item.total | i18nPlural: structure.questionCount }} · {{ item.filled | i18nPlural: structure.filledCount }}
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      <ng-container *ngTemplateOutlet="questionsGrid; context: { $implicit: item.section }" />
+    </ng-template>
+  </mat-expansion-panel>
+}
+
+<ng-template #questionsGrid let-section>
+  <div class="grid">
+    @for (question of section.questions; track question.canonicalPath) {
+      @if (isVisible(question)) {
+        <app-question-field
+          [class.wide]="question.type === 'boolean' || question.withKnowledge"
+          [question]="question"
+          [value]="data()[question.canonicalPath]"
+          [readonly]="readonly()"
+          [showMissing]="showMissing()"
+          (changed)="answerChanged.emit({ path: question.canonicalPath, value: $event })"
+        />
+      }
+    }
+  </div>
+</ng-template>

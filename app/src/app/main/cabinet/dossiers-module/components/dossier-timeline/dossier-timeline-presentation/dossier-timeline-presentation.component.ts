@@ -123,6 +123,15 @@ export class DossierTimelinePresentationComponent {
         return { title: this.structure.pricingCompleted, detail: this.insurerOf(data) };
       case 'offer_entered':
         return { title: this.structure.offerEntered, detail: this.insurerOf(data) };
+      case 'insurers_added': {
+        const ids = Array.isArray(data['insurers']) ? (data['insurers'] as unknown[]).filter((id): id is string => typeof id === 'string') : [];
+        const names = ids.map((insurerId) => this.insurerOf({ insurerId })).join(', ');
+        const questions = typeof data['questions'] === 'number' ? data['questions'] : 0;
+        return {
+          title: this.structure.insurersAdded,
+          detail: questions ? `${names} · ${questions} question(s) ajoutée(s)` : names || null,
+        };
+      }
       case 'decision_made':
         return {
           title: `${this.structure.decisionMade} : ${this.insurerOf(data) ?? ''}`,

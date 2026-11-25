@@ -9,10 +9,13 @@
   [questions]="questions()"
   [answers]="dossierStore.answers()"
   [hasInsurers]="dossierStore.insurers().length > 0"
+  [canAddInsurer]="canAddInsurer()"
+  [addingInsurer]="dossierStore.addingInsurers()"
   (launch)="launch($event)"
   (cancel)="cancel($event)"
   (openExtranet)="openExtranet($event)"
   (answered)="complete($event.card, $event.answers)"
   (manualEntry)="openManualEntry($event)"
   (validate)="store.validateOffer($event.insurer.id)"
+  (addInsurer)="openAddInsurer()"
 />

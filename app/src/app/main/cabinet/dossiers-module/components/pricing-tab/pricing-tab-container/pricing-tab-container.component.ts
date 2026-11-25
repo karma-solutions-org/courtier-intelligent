@@ -5,7 +5,11 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { CanonicalData, questionsOf } from '@shared';
 import { openConfirmDialog } from '../../../../../../core/components/confirm-dialog/util/confirm-dialog.util';
 import { ExtensionStore } from '../../../../../commons/extension-module/store/extension.store';
-import { DossierStore } from '../../../store/dossier.store';
+import { AddInsurersInput, DossierStore } from '../../../store/dossier.store';
+import {
+  AddInsurerDialogData,
+  AddInsurerDialogPresentationComponent,
+} from '../../add-insurer-dialog/add-insurer-dialog-presentation/add-insurer-dialog-presentation.component';
 import { ManualOfferSubmission, PricingCard, PricingStore } from '../../../store/pricing.store';
 import {
   ManualOfferDialogData,
@@ -45,6 +49,10 @@ export class PricingTabContainerComponent {
   /** La couverture n'est pas encore validée : la tarification attend. */
   protected readonly awaitingCoverage = computed(() =>
     ['brouillon', 'complet'].includes(this.dossierStore.dossier()?.status ?? ''),
+  );
+  /** Pendant la tarification, un assureur proposé pour le produit mais pas encore choisi peut être ajouté. */
+  protected readonly canAddInsurer = computed(
+    () => this.dossierStore.dossier()?.status === 'tarification' && this.dossierStore.addableInsurers().length > 0,
   );
   protected readonly extensionMissing = computed(() =>
     ['absent', 'unsupported'].includes(this.extension.status() ?? ''),
@@ -89,5 +97,33 @@ export class PricingTabContainerComponent {
     );
     const submission = await firstValueFrom(dialog.afterClosed());
     if (submission) this.store.saveManualOffer(card.insurer.id, submission);
+  }
+
+  /** « Ajouter un assureur » : choix des assureurs et réponses demandées, enregistrés ensemble à la fermeture. */
+  protected async openAddInsurer(): Promise<void> {
+    const dossier = this.dossierStore.dossier();
+    const product = this.dossierStore.product();
+    if (!dossier) return;
+    const insurers = this.dossierStore.insurers();
+    const currentInsurerIds = this.dossierStore.chosenInsurerIds();
+    const dialog = this._dialog.open<AddInsurerDialogPresentationComponent, AddInsurerDialogData, AddInsurersInput>(
+      AddInsurerDialogPresentationComponent,
+      {
+        data: {
+          candidates: this.dossierStore.addableInsurers(),
+          currentInsurerIds,
+          currentInsurers: insurers.filter((insurer) => currentInsurerIds.includes(insurer.id)),
+          frozenSchema: this.dossierStore.frozenSchema(),
+          productSchema: product?.questionnaireSchema ?? [],
+          productId: dossier.productId,
+          learned: product?.insurerQuestions ?? {},
+          answers: this.dossierStore.answers(),
+        },
+        width: '640px',
+        maxWidth: '95vw',
+      },
+    );
+    const result = await firstValueFrom(dialog.afterClosed());
+    if (result) this.dossierStore.addInsurers(result);
   }
 }

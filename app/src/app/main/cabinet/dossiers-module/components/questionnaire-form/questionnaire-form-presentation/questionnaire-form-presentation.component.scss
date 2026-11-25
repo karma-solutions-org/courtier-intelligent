@@ -62,3 +62,41 @@ h2 {
     padding: 18px 16px;
   }
 }
+
+/* Section facultative : repliée, en-tête sur deux lignes (titre et explication). */
+.optional {
+  --mat-expansion-header-collapsed-state-height: auto;
+  --mat-expansion-header-expanded-state-height: auto;
+  border: 1px solid var(--ci-border);
+  border-radius: 8px;
+  box-shadow: var(--ci-shadow-sm);
+
+  .mat-expansion-panel-header {
+    padding-block: 16px;
+  }
+
+  mat-panel-title {
+    display: grid;
+    gap: 4px;
+  }
+
+  .grid {
+    padding-top: 8px;
+  }
+}
+
+.optional-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.optional-hint {
+  font-size: 13px;
+  color: var(--ci-text-muted);
+}
+
+.optional-count {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
+}

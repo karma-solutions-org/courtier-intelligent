@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { CanonicalData, Question } from '@shared';
 import { PricingCard } from '../../../store/pricing.store';
@@ -8,7 +9,7 @@ import { PRICING_TAB_STRUCTURE } from '../pricing-tab.structure';
 /** Onglet Tarification : bandeaux d'état, puis une carte par assureur avec le statut de son job. */
 @Component({
   selector: 'app-pricing-tab-presentation',
-  imports: [MatIconModule, QuoteCardPresentationComponent],
+  imports: [MatButtonModule, MatIconModule, QuoteCardPresentationComponent],
   templateUrl: './pricing-tab-presentation.component.html',
   styleUrl: './pricing-tab-presentation.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -28,6 +29,10 @@ export class PricingTabPresentationComponent {
   readonly answers = input<CanonicalData>({});
   /** Le cabinet a des assureurs actifs (sinon : message d'aide). */
   readonly hasInsurers = input(false);
+  /** Dossier en tarification avec des assureurs proposés pas encore choisis : « Ajouter un assureur ». */
+  readonly canAddInsurer = input(false);
+  /** Ajout d'assureurs en cours : le bouton reste grisé. */
+  readonly addingInsurer = input(false);
 
   readonly launch = output<PricingCard>();
   readonly cancel = output<PricingCard>();
@@ -37,6 +42,7 @@ export class PricingTabPresentationComponent {
   readonly manualEntry = output<PricingCard>();
   /** Validation du tarif lu par l'extension. */
   readonly validate = output<PricingCard>();
+  readonly addInsurer = output<void>();
 
   protected readonly text = PRICING_TAB_STRUCTURE;
 }

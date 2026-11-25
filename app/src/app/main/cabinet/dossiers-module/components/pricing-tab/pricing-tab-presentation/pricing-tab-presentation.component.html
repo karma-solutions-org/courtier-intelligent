@@ -8,6 +8,13 @@
 } @else if (extensionMissing()) {
   <p class="banner" role="status"><mat-icon>extension_off</mat-icon>{{ text.noExtension }}</p>
 }
+@if (canAddInsurer()) {
+  <div class="toolbar">
+    <button mat-stroked-button type="button" [disabled]="addingInsurer()" (click)="addInsurer.emit()">
+      <mat-icon>add</mat-icon>{{ text.addInsurer.button }}
+    </button>
+  </div>
+}
 @if (error()) {
   <p class="error" role="alert">{{ error() }}</p>
 }

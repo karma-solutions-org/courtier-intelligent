@@ -2,7 +2,7 @@
 // il est signalé au serveur (function champs-signaler) qui l'ajoute automatiquement au questionnaire du produit,
 // dans la section « Questions des assureurs ». Règles communes à l'extension (ce qui est signalé) et au serveur
 // (filtre, fusion des doublons, construction de la question).
-import { ExtraCanonicalPath } from './canonical-paths';
+import { CanonicalPath, ExtraCanonicalPath } from './canonical-paths';
 import { DiscoverySource, FormFieldKind, Question, QuestionChoice, QuestionnaireSection, QuestionType } from './models';
 import { findMatchingQuestion, shapeOf } from './question-matching';
 import { foldText } from './text';
@@ -422,6 +422,109 @@ export function schemaForInsurers(
       questions: section.questions.filter(question => section.discovered || known.has(question.canonicalPath)),
     }))
     .filter(section => section.questions.length > 0);
+}
+
+/** Titre de la section des compléments qu'aucun extranet choisi ne demande. */
+export const OPTIONAL_SECTION_TITLE = 'Informations complémentaires (facultatif)';
+
+/**
+ * Questionnaire d'un dossier, en deux niveaux (phase 2) :
+ * - le **socle** (questions `core` du catalogue), toujours posé ;
+ * - les **compléments** demandés par au moins un extranet choisi (liste du catalogue ou questions apprises des parcours),
+ *   et les questions découvertes sur ces extranets ;
+ * - les autres compléments, réunis à la fin dans une section `optional` (« facultatif ») : jamais obligatoires, ils
+ *   restent remplissables, et l'extension les demandera si un extranet en a finalement besoin.
+ * Un extranet sans liste connue n'impose donc plus tout le questionnaire : il reçoit le socle.
+ * Les questions qui conditionnent une question gardée (`visibleIf`) sont gardées. Catalogue sans aucune question `core`
+ * (ancien catalogue) : comportement de schemaForInsurers, inchangé.
+ */
+export function schemaWithComplements(
+  schema: QuestionnaireSection[],
+  insurers: { id: string; questions?: Record<string, string[]> }[],
+  productId: string,
+  learned: Record<string, string[]> = {},
+): QuestionnaireSection[] {
+  const byDiscovery = schemaForCabinet(
+    schema,
+    insurers.map(insurer => insurer.id),
+  );
+  if (!byDiscovery.some(section => section.questions.some(question => question.core))) {
+    return schemaForInsurers(schema, insurers, productId, learned);
+  }
+  const all = byDiscovery.flatMap(section => section.questions);
+  const kept = new Set<string>(
+    all
+      .filter(question => question.core)
+      .map(question => question.canonicalPath as string)
+      .concat(insurers.flatMap(insurer => [...(insurer.questions?.[productId] ?? []), ...(learned[insurer.id] ?? [])])),
+  );
+  for (const section of byDiscovery) if (section.discovered) section.questions.forEach(question => kept.add(question.canonicalPath));
+  // Parents des conditions d'affichage, de proche en proche (une condition peut dépendre d'une autre).
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const question of all) {
+      if (kept.has(question.canonicalPath) && question.visibleIf && !kept.has(question.visibleIf.path)) {
+        kept.add(question.visibleIf.path);
+        grew = true;
+      }
+    }
+  }
+  const main = byDiscovery
+    .map(section => ({ ...section, questions: section.questions.filter(question => kept.has(question.canonicalPath)) }))
+    .filter(section => section.questions.length > 0);
+  const optional = byDiscovery
+    .filter(section => !section.discovered)
+    .flatMap(section => section.questions.filter(question => !kept.has(question.canonicalPath)))
+    .map(question => ({ ...question, required: false, ...(question.withKnowledge ? { mustBeKnown: false } : {}) }));
+  return optional.length ? [...main, { title: OPTIONAL_SECTION_TITLE, questions: optional, optional: true }] : main;
+}
+
+/**
+ * Assureur ajouté pendant la tarification (lot B) : le questionnaire figé du dossier (`snapshot`) reçoit les questions
+ * que le questionnaire recalculé pour les nouveaux extranets (`fresh`, voir schemaWithComplements) pose en dehors de la
+ * section facultative et qui manquent au questionnaire figé ou n'y sont que facultatives. Elles prennent la définition de
+ * `fresh` (donc leur caractère obligatoire) et rejoignent la section de même titre (créée avant la section facultative
+ * au besoin). Le reste du questionnaire figé ne change pas. Renvoie aussi les chemins ajoutés. Pure.
+ */
+export function withAddedComplements(
+  snapshot: QuestionnaireSection[],
+  fresh: QuestionnaireSection[],
+): { schema: QuestionnaireSection[]; added: CanonicalPath[] } {
+  const asked = new Set(
+    snapshot.filter(section => !section.optional).flatMap(section => section.questions.map(question => question.canonicalPath as string)),
+  );
+  const additions = fresh
+    .filter(section => !section.optional)
+    .map(section => ({ section, questions: section.questions.filter(question => !asked.has(question.canonicalPath)) }))
+    .filter(group => group.questions.length > 0);
+  if (!additions.length) return { schema: snapshot, added: [] };
+
+  const added = additions.flatMap(group => group.questions.map(question => question.canonicalPath));
+  const addedSet = new Set<string>(added);
+  // Retire les questions promues de la section facultative (supprimée si elle se vide).
+  let schema = snapshot
+    .map(section => (section.optional ? { ...section, questions: section.questions.filter(question => !addedSet.has(question.canonicalPath)) } : section))
+    .filter(section => !section.optional || section.questions.length > 0);
+  for (const { section, questions } of additions) {
+    const index = schema.findIndex(existing => !existing.optional && existing.title === section.title);
+    if (index >= 0) {
+      schema = schema.map((existing, i) => (i === index ? { ...existing, questions: [...existing.questions, ...questions] } : existing));
+    } else {
+      const optional = schema.findIndex(existing => existing.optional);
+      const created = { ...section, questions };
+      schema = optional < 0 ? [...schema, created] : [...schema.slice(0, optional), created, ...schema.slice(optional)];
+    }
+  }
+  return { schema, added };
+}
+
+/** Nombre de questions posées au courtier (hors section facultative), pour mesurer la saisie demandée. */
+export function askedQuestionCount(schema: QuestionnaireSection[]): { asked: number; optional: number } {
+  const count = (sections: QuestionnaireSection[]) => sections.reduce((total, section) => total + section.questions.length, 0);
+  return {
+    asked: count(schema.filter(section => !section.optional)),
+    optional: count(schema.filter(section => section.optional)),
+  };
 }
 
 /** Forme de champ équivalente à une question (pour la comparer avec les règles des champs découverts). */
