@@ -1,3 +1,5 @@
+/* Un élément masqué (attribut hidden) le reste, même si sa classe impose un display. */
+[hidden] { display: none !important; }
 /* Horizon Assurances (démo locale) : charte sombre bleu nuit / corail, volontairement différente de l'Assureur Test. */
 :root { --night: #14213d; --night-2: #1f3160; --coral: #ef6f4f; --sand: #faf6f0; --ink: #1b1b1f; --grey: #6b6f7b; --line: #e3ddd2; --ok: #19734a; --ko: #a8322a; }
 * { box-sizing: border-box; }

@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { MatIconModule } from '@angular/material/icon';
 import {
   DOSSIER_STATUS_LABELS,
+  DOSSIER_STATUSES,
   DossierEvent,
   DossierStatus,
   NEED_FIELD_LABELS,
@@ -65,6 +66,15 @@ export class DossierTimelinePresentationComponent {
     return (uid && this.memberNames().get(uid)) || this.structure.unknownMember;
   }
 
+  /**
+   * Le serveur marque `automatic` aussi bien les retours en arrière (information retirée, couverture modifiée) que les
+   * passages à l'étape suivante (tarification lancée, offre retenue) : seul le retour en arrière a besoin d'une raison.
+   */
+  private automaticDetail(from: unknown, to: unknown): string {
+    const rank = (status: unknown) => DOSSIER_STATUSES.indexOf(status as DossierStatus);
+    return rank(to) >= 0 && rank(to) < rank(from) ? this.structure.automaticBack : this.structure.automatic;
+  }
+
   private insurerOf(data: Record<string, unknown>): string | null {
     const id = data['insurerId'];
     return typeof id === 'string' ? (this.insurerNames().get(id) ?? id) : null;
@@ -87,7 +97,7 @@ export class DossierTimelinePresentationComponent {
           DOSSIER_STATUS_LABELS[status as DossierStatus] ?? (status === 'sans_suite' ? 'Sans suite' : String(status));
         return {
           title: `${this.structure.statusChanged} : ${label(data['from'])} → ${label(data['to'])}`,
-          detail: data['automatic'] === true ? this.structure.automatic : null,
+          detail: data['automatic'] === true ? this.automaticDetail(data['from'], data['to']) : null,
         };
       }
       case 'assigned':

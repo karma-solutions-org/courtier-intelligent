@@ -109,7 +109,10 @@ export const DOSSIERS_STRUCTURE = {
     created: 'Dossier créé',
     dataUpdated: 'Informations modifiées',
     statusChanged: 'Statut',
-    automatic:
+    /** Passage automatique à l'étape suivante (tarification lancée, offre retenue pendant la tarification). */
+    automatic: 'changement automatique',
+    /** Retour automatique à une étape précédente. */
+    automaticBack:
       'changement automatique (une information obligatoire a été retirée, ou la couverture souhaitée a été modifiée)',
     assigned: 'Assigné à',
     needUpdated: 'Couverture modifiée',

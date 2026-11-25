@@ -18,18 +18,27 @@
   box-shadow: var(--ci-shadow-sm);
 }
 
+/* Le nom de l'assureur passe à la ligne s'il est long ; l'étiquette de statut reste en haut à droite sur toutes les cartes. */
 header {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
 h3 {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
   margin: 0;
   font-size: 17px;
   font-weight: 600;
+}
+
+header .status {
+  flex-shrink: 0;
 }
 
 .insurer-logo {

@@ -1,3 +1,5 @@
+/* Un élément masqué (attribut hidden) le reste, même si sa classe impose un display. */
+[hidden] { display: none !important; }
 :root { --brand: #0b5c8a; --brand-dark: #08415f; --accent: #f2a900; --bg: #f3f6f9; --text: #1d2733; --muted: #5d6b7a; --border: #d4dde6; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); }

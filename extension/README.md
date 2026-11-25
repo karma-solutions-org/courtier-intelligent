@@ -1,7 +1,7 @@
 # Extension Chrome « Courtier Intelligent – Remplissage auto »
 
 Extension MV3 (TypeScript) : elle remplit les extranets des assureurs à partir des tarifications demandées dans l'app.
-**Elle ne soumet jamais seule** : elle ne clique sur aucun bouton (ni « Suivant », ni « Obtenir mon tarif »), le courtier avance et valide lui-même.
+**Elle ne soumet jamais seule** : elle remplit chaque étape et passe à la suivante (« Suivant », « Étape suivante »), mais ne clique jamais sur le bouton final de tarification (« Obtenir mon tarif », « Calculer ») : c'est le courtier qui le fait, puis l'extension lit le tarif affiché.
 
 ## Installer et tester
 
@@ -12,7 +12,7 @@ npm run build:demo         # idem, avec les faux extranets (npm run demo:extrane
 npm run build:emulators    # idem, mais vise les emulators Firebase locaux (auth 9099, firestore 8080, functions 5001)
 npm run watch              # build de développement reconstruit à chaque modification
 npm run build              # build de PRODUCTION (paquet à publier) : sans localhost ni sourcemaps
-npm test                   # 297 tests (Vitest + jsdom)
+npm test                   # 615 tests (Vitest + jsdom)
 npm run typecheck
 ```
 

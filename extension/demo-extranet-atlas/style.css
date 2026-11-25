@@ -1,3 +1,5 @@
+/* Un élément masqué (attribut hidden) le reste, même si sa classe impose un display. */
+[hidden] { display: none !important; }
 /* Atlas Mutuelle (démo locale) : charte verte et claire, cartes arrondies, assistant en 4 étapes. */
 :root { --vert: #0f7b5f; --vert-fonce: #0a5240; --menthe: #e3f4ee; --or: #e0b13a; --fond: #f6f8f7; --texte: #22302b; --gris: #66756f; --bord: #cfdcd6; --rouge: #b3261e; }
 * { box-sizing: border-box; }
