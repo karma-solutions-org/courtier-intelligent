@@ -1,5 +1,16 @@
 import { inject, Injectable } from '@angular/core';
-import { AuditLogEntry, Cabinet, CabinetRole, Insurer, Invitation, Member, MemberStatus, Product } from '@shared';
+import {
+  AuditLogEntry,
+  Cabinet,
+  CabinetRole,
+  ExtranetReliabilityReport,
+  Insurer,
+  Invitation,
+  Member,
+  MemberStatus,
+  Product,
+  ReliabilityPeriod,
+} from '@shared';
 import { map, Observable, switchMap } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
 import { DatabaseQueryBuilder, FilterOperator, OrderByDirection } from '../../../../core/providers/database-query.builder';
@@ -85,6 +96,11 @@ export class SettingsService {
 
   setStatus(uid: string, status: MemberStatus): Observable<{ success: boolean }> {
     return this._backend.call('equipe-activerMembre', { uid, status });
+  }
+
+  /** Fiabilité des extranets sur les `days` derniers jours : bilan calculé par le serveur (admins du cabinet). */
+  extranetReliability(days: ReliabilityPeriod): Observable<ExtranetReliabilityReport> {
+    return this._backend.call('fiabilite-extranets', { days });
   }
 }
 

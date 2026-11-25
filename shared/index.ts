@@ -18,6 +18,7 @@ export * from './assure-format';
 export * from './assure-documents';
 export * from './discovered-fields';
 export * from './extension-reports';
+export * from './extranet-reliability';
 export * from './vehicle-lookup';
 export * from './ai-prompts';
 export * from './extranet-profiles';

@@ -44,6 +44,14 @@
       />
     </div>
   </mat-tab>
+  <mat-tab [label]="structure.tabs.reliability">
+    <!-- Contenu créé à la première ouverture de l'onglet : le bilan n'est calculé que s'il est consulté. -->
+    <ng-template matTabContent>
+      <div class="tab">
+        <app-reliability-panel-container />
+      </div>
+    </ng-template>
+  </mat-tab>
   <mat-tab [label]="structure.tabs.audit">
     <div class="tab">
       <app-audit-log-panel

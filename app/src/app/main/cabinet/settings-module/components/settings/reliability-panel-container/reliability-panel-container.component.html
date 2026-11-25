@@ -1,0 +1,9 @@
+<app-reliability-panel
+  [report]="store.report()"
+  [insurers]="settingsStore.insurers()"
+  [period]="store.period()"
+  [isPending]="store.isPending()"
+  [error]="store.error()"
+  (periodChanged)="store.load($event)"
+  (refresh)="store.load()"
+/>

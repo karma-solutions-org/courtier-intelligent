@@ -1,0 +1,154 @@
+<app-card [heading]="structure.title" [subtitle]="structure.hint" [padded]="false">
+  <div class="toolbar">
+    <mat-button-toggle-group
+      hideSingleSelectionIndicator
+      [value]="period()"
+      [disabled]="isPending()"
+      [attr.aria-label]="structure.periodLabel"
+      (change)="onPeriodChange($event.value)"
+    >
+      @for (days of periods; track days) {
+        <mat-button-toggle [value]="days">{{ days }} {{ structure.periodDays }}</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+    <button mat-stroked-button type="button" class="refresh" [disabled]="isPending()" (click)="refresh.emit()">
+      <mat-icon>refresh</mat-icon>
+      {{ structure.refresh }}
+    </button>
+    @if (report(); as current) {
+      <span class="generated">{{ structure.generatedAt }} {{ current.generatedAt | date: "d MMM y 'à' HH:mm" }}</span>
+    }
+  </div>
+
+  @if (error()) {
+    <p class="message error" role="alert">{{ error() }}</p>
+  }
+
+  @if (isPending()) {
+    <p class="message" role="status">{{ structure.loading }}</p>
+  } @else if (report(); as current) {
+    @if (current.truncated) {
+      <p class="partial" role="note">
+        <mat-icon aria-hidden="true">info</mat-icon>
+        {{ structure.truncated }}
+      </p>
+    }
+    @if (rows().length) {
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{{ structure.columns.insurer }}</th>
+              <th scope="col" data-align="end">{{ structure.columns.launched }}</th>
+              <th scope="col" data-align="end">{{ structure.columns.captured }}</th>
+              <th scope="col" data-align="end">{{ structure.columns.failed }}</th>
+              <th scope="col" data-align="end">{{ structure.columns.needsInfo }}</th>
+              <th scope="col" data-align="end">{{ structure.columns.inProgress }}</th>
+              <th scope="col" data-align="end">{{ structure.columns.median }}</th>
+              <th scope="col" data-align="end">{{ structure.columns.attempts }}</th>
+            </tr>
+          </thead>
+          @for (row of rows(); track row.insurerId) {
+            @let open = expanded().has(row.insurerId);
+            <tbody class="insurer-group" [class.weak]="row.level === 'weak'" [class.strong]="row.level === 'strong'">
+              <tr class="summary">
+                <th scope="row">
+                  <span class="insurer">
+                    @if (row.hasDetail) {
+                      <button
+                        mat-icon-button
+                        type="button"
+                        class="expand"
+                        [attr.aria-expanded]="open"
+                        [attr.aria-controls]="'reliability-detail-' + row.insurerId"
+                        [attr.aria-label]="(open ? structure.hideDetail : structure.showDetail) + ' ' + row.name"
+                        (click)="toggle(row.insurerId)"
+                      >
+                        <mat-icon>{{ open ? 'expand_less' : 'expand_more' }}</mat-icon>
+                      </button>
+                    } @else {
+                      <span class="expand-placeholder" aria-hidden="true"></span>
+                    }
+                    @if (row.logo) {
+                      <img class="logo" [src]="row.logo" alt="" loading="lazy" />
+                    } @else {
+                      <span class="logo initial" aria-hidden="true">{{ row.initial }}</span>
+                    }
+                    <span class="name">{{ row.name }}</span>
+                  </span>
+                </th>
+                <td data-align="end">{{ row.launched }}</td>
+                <td data-align="end">
+                  {{ row.captured }}
+                  @if (row.rate) {
+                    <span
+                      class="rate"
+                      [class.weak]="row.level === 'weak'"
+                      [class.strong]="row.level === 'strong'"
+                      [attr.title]="row.level === 'weak' ? structure.weak : row.level === 'strong' ? structure.strong : null"
+                    >
+                      @if (row.level === 'weak') {
+                        <mat-icon aria-hidden="true">warning</mat-icon>
+                      }
+                      {{ row.rate }}
+                    </span>
+                    @if (row.level === 'weak') {
+                      <span class="visually-hidden">{{ structure.weak }}</span>
+                    }
+                  }
+                  @if (row.manual) {
+                    <span class="sub">{{ row.manual }}</span>
+                  }
+                </td>
+                <td data-align="end">{{ row.failed }}</td>
+                <td data-align="end">{{ row.needsInfo }}</td>
+                <td data-align="end">{{ row.inProgress }}</td>
+                <td data-align="end">{{ row.median }}</td>
+                <td data-align="end">{{ row.attempts }}</td>
+              </tr>
+              @if (open) {
+                <tr class="detail" [id]="'reliability-detail-' + row.insurerId">
+                  <td colspan="8">
+                    <div class="detail-grid">
+                      <section>
+                        <h3>{{ structure.missingTitle }}</h3>
+                        @if (row.missing.length) {
+                          <ul>
+                            @for (field of row.missing; track field.label) {
+                              <li>
+                                {{ field.label }} <span class="count">× {{ field.count }}</span>
+                              </li>
+                            }
+                          </ul>
+                        } @else {
+                          <p class="hint">{{ structure.noMissing }}</p>
+                        }
+                      </section>
+                      <section>
+                        <h3>{{ structure.issuesTitle }}</h3>
+                        @if (row.issues.length) {
+                          <ul>
+                            @for (issue of row.issues; track issue.label) {
+                              <li>
+                                {{ issue.label }} <span class="count">× {{ issue.count }}</span>
+                              </li>
+                            }
+                          </ul>
+                          <p class="hint">{{ row.issuesTotal }} {{ structure.issuesTotal }}</p>
+                        } @else {
+                          <p class="hint">{{ structure.noIssues }}</p>
+                        }
+                      </section>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          }
+        </table>
+      </div>
+    } @else {
+      <p class="message">{{ structure.empty }}</p>
+    }
+  }
+</app-card>

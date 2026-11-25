@@ -9,10 +9,14 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
 import { AuditLogPanelPresentationComponent } from '../audit-log-panel-presentation/audit-log-panel-presentation.component';
 import { CatalogPanelPresentationComponent } from '../catalog-panel-presentation/catalog-panel-presentation.component';
 import { CabinetFormPresentationComponent } from '../cabinet-form-presentation/cabinet-form-presentation.component';
+import { ReliabilityPanelContainerComponent } from '../reliability-panel-container/reliability-panel-container.component';
+import { ExtranetReliabilityStore } from '../../../store/extranet-reliability.store';
 
 @Component({
   selector: 'app-settings-container',
-  imports: [MatTabsModule, TabQueryParamDirective, CabinetFormPresentationComponent, MembersPanelPresentationComponent, CatalogPanelPresentationComponent, AuditLogPanelPresentationComponent],
+  imports: [MatTabsModule, TabQueryParamDirective, CabinetFormPresentationComponent, MembersPanelPresentationComponent, CatalogPanelPresentationComponent, ReliabilityPanelContainerComponent, AuditLogPanelPresentationComponent],
+  // Bilan de fiabilité : gardé par la page, calculé à la première ouverture de son onglet.
+  providers: [ExtranetReliabilityStore],
   templateUrl: './settings-container.component.html',
   styleUrl: './settings-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

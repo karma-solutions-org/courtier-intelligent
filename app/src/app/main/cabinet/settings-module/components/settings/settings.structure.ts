@@ -1,6 +1,12 @@
 export const SETTINGS_STRUCTURE = {
   title: 'Paramètres du cabinet',
-  tabs: { cabinet: 'Cabinet', members: 'Membres', catalog: 'Assureurs et produits', audit: 'Connexions' },
+  tabs: {
+    cabinet: 'Cabinet',
+    members: 'Membres',
+    catalog: 'Assureurs et produits',
+    reliability: 'Fiabilité des extranets',
+    audit: 'Connexions',
+  },
 
   cabinet: {
     logoTitle: 'Logo',
@@ -62,6 +68,42 @@ export const SETTINGS_STRUCTURE = {
     questionsCount: 'question(s)',
     openExtranet: "Ouvrir l'extranet de",
     save: 'Enregistrer',
+  },
+
+  reliability: {
+    title: 'Fiabilité des extranets',
+    hint:
+      "Pour chaque assureur, ce que donnent les tarifications de votre cabinet, et les incidents signalés par l'extension sur son extranet (tous cabinets, sans donnée client).",
+    periodLabel: 'Période',
+    periodDays: 'jours',
+    refresh: 'Actualiser',
+    generatedAt: 'Calculé le',
+    truncated: 'Bilan partiel : les 500 dossiers les plus récents de la période.',
+    loading: 'Calcul du bilan…',
+    empty: 'Aucune tarification ni incident sur la période.',
+    columns: {
+      insurer: 'Assureur',
+      launched: 'Tarifications lancées',
+      captured: 'Obtenues',
+      failed: 'Échecs',
+      needsInfo: 'Infos manquantes',
+      inProgress: 'En cours',
+      median: 'Délai médian',
+      attempts: 'Tentatives moyennes',
+    },
+    manualPrefix: 'dont',
+    manualOne: 'saisie à la main',
+    manualMany: 'saisies à la main',
+    minutes: 'min',
+    weak: 'Extranet fragile : moins d’un tarif sur deux obtenu',
+    strong: 'Extranet fiable',
+    showDetail: 'Afficher le détail de',
+    hideDetail: 'Masquer le détail de',
+    missingTitle: 'Questions souvent manquantes',
+    noMissing: 'Aucune question manquante.',
+    issuesTitle: 'Incidents signalés (tous cabinets)',
+    noIssues: 'Aucun incident signalé.',
+    issuesTotal: 'incident(s) au total',
   },
 
   audit: {
