@@ -42,7 +42,8 @@ export interface FormAnalysis {
   fingerprint: string;
 }
 
-const IGNORED_INPUT_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image', 'file', 'password', 'range', 'color']);
+// `range` (curseur) n'est pas ignoré : il se remplit comme un nombre (« Ancienneté d'assurance », « Kilométrage annuel »).
+const IGNORED_INPUT_TYPES = new Set(['hidden', 'submit', 'button', 'reset', 'image', 'file', 'password', 'color']);
 // Les <legend> ne comptent pas ici : ils ne titrent que les champs de leur propre fieldset.
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6, [role="heading"]';
 
@@ -325,7 +326,7 @@ function kindOf(element: HTMLElement): { kind: FieldKind; inputType: string } {
   if (type === 'radio') return { kind: 'radio', inputType: type };
   if (type === 'checkbox') return { kind: 'checkbox', inputType: type };
   if (type === 'date' || type === 'month') return { kind: 'date', inputType: type };
-  if (type === 'number') return { kind: 'number', inputType: type };
+  if (type === 'number' || type === 'range') return { kind: 'number', inputType: type };
   const isCombobox =
     input.getAttribute('role') === 'combobox' || input.hasAttribute('list') || input.getAttribute('aria-autocomplete') === 'list';
   return { kind: isCombobox ? 'autocomplete' : 'text', inputType: type };

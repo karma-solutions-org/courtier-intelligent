@@ -66,6 +66,9 @@ const QUOTE_DATA: CanonicalData = {
   'insuranceHistory.bonusMalus': { value: 0.85, knowledge: 'KNOWN' },
   'insuranceHistory.claimsCount': { value: 1, knowledge: 'KNOWN' },
   'insuranceHistory.wasTerminated': false,
+  // Ancienneté présente : « Êtes-vous assuré actuellement ? » (Oui / Non) ne doit pas recevoir les 48 mois.
+  'insuranceHistory.seniority': { value: 48, knowledge: 'KNOWN' },
+  'driver.licenseType': 'B',
 };
 
 const job: JobContext = {
@@ -122,6 +125,8 @@ describe('Extranet de démonstration Horizon Assurances', () => {
         'driver.birthDate',
         'driver.licenseDate',
         'driver.profession',
+        'driver.licenseType',
+        'insuranceHistory.seniority',
         'insuranceHistory.currentlyInsured',
         'insuranceHistory.previousInsurer',
         'insuranceHistory.bonusMalus',
@@ -137,7 +142,7 @@ describe('Extranet de démonstration Horizon Assurances', () => {
         'client.address.city',
       ].sort(),
     );
-    expect(analyzeForm(document).fields).toHaveLength(29);
+    expect(analyzeForm(document).fields).toHaveLength(31);
     // Saisies en plusieurs cases, et liste déroulante maison.
     expect(byPath['vehicle.registration'].inputType).toBe('segmented');
     expect(byPath['vehicle.registration'].segments).toEqual([2, 3, 2]);
@@ -148,6 +153,9 @@ describe('Extranet de démonstration Horizon Assurances', () => {
     expect(byPath['vehicle.firstRegistrationDate'].kind).toBe('text');
     expect(byPath['insuranceHistory.claimsCount'].kind).toBe('select');
     expect(byPath['vehicle.vehicleType'].options.map(o => o.value)).toEqual(['VP', 'VU', '2R']);
+    // Curseur (type range) rempli comme un nombre ; liste à choix multiples comme une liste.
+    expect(byPath['insuranceHistory.seniority']).toMatchObject({ kind: 'number', inputType: 'range' });
+    expect(byPath['driver.licenseType']).toMatchObject({ kind: 'select', label: 'Permis détenus' });
     // Pas d'indicateur d'étape : le bouton « Calculer la cotisation » fait de la page la dernière.
     const hint = detectStepHint(document);
     expect(hint).toEqual({ current: null, total: null });
@@ -201,6 +209,9 @@ describe('Extranet de démonstration Horizon Assurances', () => {
     expect(['cond_naiss_jour', 'cond_naiss_mois', 'cond_naiss_annee'].map(name => byName(name).value)).toEqual(['18', '04', '1990']);
     expect(byId('hz-permis').value).toBe('2009-09-01');
     expect(checkedValue('assureActuel')).toBe('O');
+    expect(byId('hz-anciennete').value).toBe('48');
+    expect(byId('hz-anciennete-val').textContent).toBe('48 mois');
+    expect([...byId<HTMLSelectElement>('hz-permis-detenus').selectedOptions].map(o => o.value)).toEqual(['B']);
     expect(byId('hz-crm').value).toBe('0.85');
     expect(byId<HTMLSelectElement>('hz-sinistres').value).toBe('1');
     expect(checkedValue('resiliation')).toBe('N');
@@ -214,7 +225,7 @@ describe('Extranet de démonstration Horizon Assurances', () => {
     vi.useFakeTimers();
     document.querySelector<HTMLButtonElement>('#hz-projet button[type="submit"]')!.click();
     const saved = JSON.parse(sessionStorage.getItem('horizon-projet-auto') ?? '{}');
-    expect(saved).toMatchObject({ immatriculation: 'AB-123-CD', dmec: '2021-06-15', condNaissance: '1990-04-18', garage: 'RUE', crm: '0.85', telephone: '0612345678' });
+    expect(saved).toMatchObject({ ancienneteMois: '48', permisDetenus: ['B'], immatriculation: 'AB-123-CD', dmec: '2021-06-15', condNaissance: '1990-04-18', garage: 'RUE', crm: '0.85', telephone: '0612345678' });
     vi.clearAllTimers();
     vi.useRealTimers();
 

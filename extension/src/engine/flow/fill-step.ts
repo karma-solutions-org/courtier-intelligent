@@ -60,7 +60,9 @@ export async function fillPlan(plan: FillPlan, analysis: FormAnalysis, written: 
  */
 function withSeniority(path: CanonicalPath, field: FormAnalysis['fields'][number], planned: FillValue, quoteData: CanonicalData): FillValue {
   if (path !== 'insuranceHistory.currentlyInsured' || planned !== true) return planned;
-  if (!field.options.some(option => parseRange(option.label) !== null)) return planned;
+  // Une vraie liste de durées a au moins une option chiffrée : « Non » seul se lit « 0 mois », mais un simple Oui / Non
+  // n'est pas une liste de durées (sinon l'ancienneté en mois y serait écrite et aucune option ne correspondrait).
+  if (!field.options.some(option => /\d/.test(option.label) && parseRange(option.label) !== null)) return planned;
   const months = valueOf(quoteData['insuranceHistory.seniority']);
   return typeof months === 'number' ? months : planned;
 }

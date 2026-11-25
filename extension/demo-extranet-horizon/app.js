@@ -70,6 +70,19 @@
       }
       return String(el.value || '').trim();
     };
+    // Curseur d'ancienneté : la valeur affichée suit le curseur.
+    var anciennete = document.getElementById('hz-anciennete');
+    var ancienneteVal = document.getElementById('hz-anciennete-val');
+    if (anciennete && ancienneteVal) {
+      var majAnciennete = function () { ancienneteVal.textContent = anciennete.value + ' mois'; };
+      anciennete.addEventListener('input', majAnciennete);
+      anciennete.addEventListener('change', majAnciennete);
+    }
+    /** Valeurs cochées d'une liste à choix multiples. */
+    var selected = function (name) {
+      var el = form.elements[name];
+      return el ? Array.prototype.filter.call(el.options, function (o) { return o.selected; }).map(function (o) { return o.value; }) : [];
+    };
     form.addEventListener('submit', function (event) {
       event.preventDefault();
       var combos = Array.prototype.slice.call(form.querySelectorAll('[role="combobox"][aria-required="true"]'));
@@ -97,6 +110,8 @@
         condNaissance: iso(val('cond_naiss_jour'), val('cond_naiss_mois'), val('cond_naiss_annee')),
         permis: val('obtentionPermis'),
         profession: val('professionExercee'),
+        ancienneteMois: val('ancienneteMois'),
+        permisDetenus: selected('permisDetenus'),
         assure: val('assureActuel'),
         compagnie: val('compagnie'),
         crm: val('crm').replace(',', '.'),

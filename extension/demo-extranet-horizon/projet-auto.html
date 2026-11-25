@@ -111,6 +111,9 @@
             </div>
             <div class="row"><label for="hz-permis">Date d'obtention du permis B <span class="req">*</span></label><input id="hz-permis" name="obtentionPermis" type="date" required></div>
             <div class="row"><label for="hz-profession">Profession exercée</label><input id="hz-profession" name="professionExercee" type="text"></div>
+            <!-- Champs « difficiles » pour l'extension : un curseur et une liste à choix multiples. -->
+            <div class="row"><label for="hz-anciennete">Ancienneté d'assurance (mois)</label><span class="curseur"><input id="hz-anciennete" name="ancienneteMois" type="range" min="0" max="120" step="1" value="0"> <output id="hz-anciennete-val" for="hz-anciennete">0 mois</output></span></div>
+            <div class="row"><label for="hz-permis-detenus">Permis détenus</label><select id="hz-permis-detenus" name="permisDetenus" multiple size="4"><option value="B">Permis B (voiture)</option><option value="A">Permis A (moto)</option><option value="AM">Permis AM (cyclomoteur)</option><option value="C">Permis C (poids lourd)</option></select></div>
           </fieldset>
           <fieldset class="bloc">
             <legend>Antécédents d'assurance</legend>
