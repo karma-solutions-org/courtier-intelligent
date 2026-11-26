@@ -1,7 +1,13 @@
 import { inject, Injectable } from '@angular/core';
 import { catchError, from, Observable, of, switchMap } from 'rxjs';
 import { BackendProvider } from '../../../../core/providers/backend.provider';
-import { ExtensionConnectResult, ExtensionPing, ExtensionProvider } from '../../../../core/providers/extension.provider';
+import {
+  ExtensionConnectResult,
+  ExtensionOpenResult,
+  ExtensionPing,
+  ExtensionProvider,
+  ExtranetToOpen,
+} from '../../../../core/providers/extension.provider';
 import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
 import { SessionService } from '../../authentication-module/services/session.service';
 
@@ -35,5 +41,10 @@ export class ExtensionService {
       ),
       catchError(error => of<ExtensionConnectResult>({ ok: false, message: toBackendErrorMessage(error) })),
     );
+  }
+
+  /** L'extension ouvre l'extranet de chaque assureur, chaque onglet rattaché au job du dossier. Ne lève jamais. */
+  openExtranets(dossierId: string, extranets: ExtranetToOpen[]): Observable<ExtensionOpenResult> {
+    return this._extension.openExtranets(dossierId, extranets);
   }
 }

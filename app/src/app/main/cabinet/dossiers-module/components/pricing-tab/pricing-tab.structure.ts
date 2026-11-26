@@ -7,6 +7,16 @@ export const PRICING_TAB_STRUCTURE = {
   loading: 'Chargement des tarifications…',
   noInsurer:
     'Aucun assureur ne tarifie ce produit pour votre cabinet. Un administrateur peut en activer dans Paramètres.',
+  /** « Tarifer sur tous les extranets » (phase 3) : le bouton et le bandeau d'avancement. */
+  launchAll: {
+    button: (count: number) => `Tarifer sur tous les extranets (${count})`,
+    hint: "L'extension ouvre l'extranet de chaque assureur et le remplit. Vous validez vous-même chaque formulaire.",
+    obtained: (obtained: number, total: number) => `${obtained}/${total} tarif${obtained > 1 ? 's' : ''} obtenu${obtained > 1 ? 's' : ''}`,
+    toReview: (n: number) => `${n} à vérifier`,
+    inProgress: (n: number) => `${n} en cours`,
+    needsAction: (n: number) => `${n} attend${n > 1 ? 'ent' : ''} votre action`,
+    failed: (n: number) => `${n} en échec`,
+  },
   /** Ajout d'un assureur pendant la tarification (bouton, boîte de dialogue, messages du store). */
   addInsurer: {
     button: 'Ajouter un assureur',

@@ -9,18 +9,39 @@ import {
 } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import {
+  ACTIVE_QUOTE_JOB_STATUSES,
+  canLaunchQuoteJob,
   CanonicalData,
   Insurer,
   insurersForProduct,
+  isOfferToReview,
   ManualOfferInput,
   Offer,
   PRICING_DOSSIER_STATUSES,
   quoteDocumentsFolder,
   QuoteJob,
 } from '@shared';
-import { catchError, EMPTY, filter, map, merge, mergeMap, Observable, of, pipe, switchMap, tap } from 'rxjs';
+import {
+  catchError,
+  concatMap,
+  EMPTY,
+  exhaustMap,
+  filter,
+  from,
+  map,
+  merge,
+  mergeMap,
+  Observable,
+  of,
+  pipe,
+  switchMap,
+  tap,
+  toArray,
+} from 'rxjs';
+import { ExtranetToOpen } from '../../../../core/providers/extension.provider';
 import { toBackendErrorMessage } from '../../../../core/utils/backend-error.utils';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
+import { ExtensionService } from '../../../commons/extension-module/services/extension.service';
 import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-status.store';
 import { PricingService, QuoteDocumentRef } from '../services/pricing.service';
 import { DossierStore } from './dossier.store';
@@ -33,6 +54,55 @@ export interface PricingCard {
   insurer: Insurer;
   job: QuoteJob | null;
   offer: Offer | null;
+}
+
+/**
+ * La carte peut être (re)lancée : pas encore lancée, échouée ou annulée ; ou tarif obtenu mais périmé (données du
+ * dossier modifiées depuis) et aucune tarification en cours.
+ */
+export function canLaunchCard({ job, offer }: Pick<PricingCard, 'job' | 'offer'>): boolean {
+  if (offer) return !!offer.stale && (!job || !ACTIVE_QUOTE_JOB_STATUSES.includes(job.status));
+  return canLaunchQuoteJob(job);
+}
+
+/** Avancement de la tarification du dossier, tous assureurs confondus (« 2/3 tarifs obtenus »). */
+export interface PricingSummary {
+  total: number;
+  /** Tarifs obtenus et à jour (validés ou à vérifier). */
+  obtained: number;
+  toReview: number;
+  inProgress: number;
+  /** Champs à compléter, ou formulaire rempli à valider sur l'extranet. */
+  needsAction: number;
+  failed: number;
+}
+
+export function pricingSummary(cards: Pick<PricingCard, 'job' | 'offer'>[]): PricingSummary | null {
+  if (!cards.some((card) => card.job || card.offer)) return null;
+  const summary: PricingSummary = { total: cards.length, obtained: 0, toReview: 0, inProgress: 0, needsAction: 0, failed: 0 };
+  for (const { job, offer } of cards) {
+    // Un tarif périmé ne compte pas comme obtenu : sa relance éventuelle est suivie par le statut du job.
+    if (offer && !offer.stale) {
+      summary.obtained++;
+      if (isOfferToReview(offer)) summary.toReview++;
+      continue;
+    }
+    switch (job?.status) {
+      case 'requested':
+      case 'analyzing':
+      case 'filling':
+        summary.inProgress++;
+        break;
+      case 'needs_info':
+      case 'awaiting_submit':
+        summary.needsAction++;
+        break;
+      case 'failed':
+        summary.failed++;
+        break;
+    }
+  }
+  return summary;
 }
 
 /** Saisie manuelle : l'offre et, éventuellement, le devis à joindre. */
@@ -55,6 +125,8 @@ interface PricingState {
   busy: string[];
   /** Vrai dès la première réponse (ou erreur) de l'écoute : distingue chargement, liste vide et erreur. */
   loaded: boolean;
+  /** « Tarifer sur tous les extranets » en cours (jobs écrits puis onglets ouverts par l'extension). */
+  launchingAll: boolean;
   error: string | null;
   successMessage: string | null;
 }
@@ -66,6 +138,7 @@ export const PricingStore = signalStore(
     offers: [],
     busy: [],
     loaded: false,
+    launchingAll: false,
     error: null,
     successMessage: null,
   }),
@@ -82,6 +155,19 @@ export const PricingStore = signalStore(
           offer: store.offers().find((o) => o.id === insurer.id) ?? null,
         }));
       }),
+    }),
+  ),
+  withComputed((store) => ({
+    /** Cartes que « Tarifer sur tous les extranets » lancerait : à (re)lancer, avec un extranet, sans action en cours. */
+    launchable: computed(() =>
+      store
+        .cards()
+        .filter((card) => canLaunchCard(card) && !!card.insurer.extranetUrl && !store.busy().includes(card.insurer.id)),
+    ),
+    summary: computed(() => pricingSummary(store.cards())),
+  })),
+  withComputed(
+    (store, dossierStore = inject(DossierStore)) => ({
       /** On tarifie une fois le besoin validé (le serveur refait le contrôle). */
       canPrice: computed(() => {
         const dossier = dossierStore.dossier();
@@ -99,6 +185,7 @@ export const PricingStore = signalStore(
       service = inject(PricingService),
       authStore = inject(AuthStore),
       dossierStore = inject(DossierStore),
+      extensionService = inject(ExtensionService),
     ) => {
       const setBusy = (insurerId: string, busy: boolean) =>
         patchState(store, {
@@ -202,6 +289,69 @@ export const PricingStore = signalStore(
           ),
         ),
 
+        /**
+         * « Tarifer sur tous les extranets » : les jobs sont écrits l'un après l'autre (chacun met à jour le dossier,
+         * en parallèle ils se gêneraient), puis l'extension ouvre en une fois l'extranet de chaque assureur lancé.
+         * Un refus du serveur pour un assureur n'empêche pas les autres.
+         */
+        _launchAll: rxMethod<string[]>(
+          pipe(
+            exhaustMap((insurerIds) => {
+              const dossierId = dossierStore.selectedId();
+              if (!dossierId || !insurerIds.length) return EMPTY;
+              const errors: string[] = [];
+              const nameOf = (id: string) =>
+                store.cards().find((card) => card.insurer.id === id)?.insurer.name ?? id;
+              patchState(store, { launchingAll: true, error: null, busy: [...store.busy(), ...insurerIds] });
+              return from(insurerIds).pipe(
+                concatMap((insurerId) =>
+                  service.launch(dossierId, insurerId).pipe(
+                    map(({ extranetUrl }): ExtranetToOpen | null =>
+                      extranetUrl ? { insurerId, url: extranetUrl } : null,
+                    ),
+                    catchError((error) => {
+                      errors.push(`${nameOf(insurerId)} : ${toBackendErrorMessage(error)}`);
+                      return of(null);
+                    }),
+                    tap({ finalize: () => setBusy(insurerId, false) }),
+                  ),
+                ),
+                toArray(),
+                switchMap((launched) => {
+                  const extranets = launched.filter((extranet): extranet is ExtranetToOpen => !!extranet);
+                  if (!extranets.length) return of(null);
+                  return extensionService.openExtranets(dossierId, extranets).pipe(
+                    tap((result) => {
+                      if (!result.ok) {
+                        errors.push(result.message);
+                        return;
+                      }
+                      if (result.refused.length) {
+                        errors.push(
+                          `Extranet non ouvert pour ${result.refused.map(nameOf).join(', ')} : utilisez « Ouvrir l'extranet ».`,
+                        );
+                      }
+                      if (result.opened.length) {
+                        patchState(store, {
+                          successMessage: `Tarification lancée chez ${result.opened.length} assureur${result.opened.length > 1 ? 's' : ''} : l'extension remplit leurs extranets.`,
+                        });
+                      }
+                    }),
+                  );
+                }),
+                tap({
+                  finalize: () =>
+                    patchState(store, {
+                      launchingAll: false,
+                      busy: store.busy().filter((id) => !insurerIds.includes(id)),
+                      error: errors.length ? errors.join(' ') : null,
+                    }),
+                }),
+              );
+            }),
+          ),
+        ),
+
         /** Écoute relancée quand le dossier ou le cabinet change (cabinet connu après le dossier au démarrage). */
         _listen: rxMethod<{ id: string | null; cabinetId: string | null }>(
           pipe(
@@ -230,22 +380,33 @@ export const PricingStore = signalStore(
       };
     },
   ),
-  withMethods((store, dossierStore = inject(DossierStore)) => ({
+  withMethods((store, dossierStore = inject(DossierStore)) => {
+    /** Une question obligatoire sans réponse bloque le lancement (message affiché) : l'extension resterait bloquée. */
+    const blockedByMissing = (): boolean => {
+      const missing = dossierStore.missing();
+      if (!missing.length) return false;
+      const labels = dossierStore.labels();
+      const names = missing.map((path) => labels.get(path) ?? path).join(', ');
+      patchState(store, { error: `Complétez d'abord le dossier (onglet Informations) : ${names}.` });
+      return true;
+    };
+    return {
     /**
      * « Tarifer » ou « Relancer » : écrit le job puis ouvre l'extranet dans `target`, un onglet ouvert au clic
      * (ouvert après la réponse du serveur, il serait bloqué par le navigateur). Refusé tant qu'une question obligatoire
      * est sans réponse (dossier commencé avant qu'elle le devienne) : l'extension resterait bloquée sur l'extranet.
      */
     launch: (insurerId: string, target: Window | null) => {
-      const missing = dossierStore.missing();
-      if (missing.length) {
+      if (blockedByMissing()) {
         target?.close();
-        const labels = dossierStore.labels();
-        const names = missing.map((path) => labels.get(path) ?? path).join(', ');
-        patchState(store, { error: `Complétez d'abord le dossier (onglet Informations) : ${names}.` });
         return;
       }
       store._act({ kind: 'launch', insurerId, target });
+    },
+    /** « Tarifer sur tous les extranets » : chaque assureur à (re)lancer, ses extranets ouverts par l'extension. */
+    launchAll: () => {
+      if (store.launchingAll() || blockedByMissing()) return;
+      store._launchAll(store.launchable().map((card) => card.insurer.id));
     },
     cancel: (insurerId: string) => store._act({ kind: 'cancel', insurerId }),
     complete: (insurerId: string, answers: CanonicalData) =>
@@ -254,7 +415,8 @@ export const PricingStore = signalStore(
       store._act({ kind: 'manual', insurerId, submission }),
     /** Tarif lu par l'extension, vérifié par le courtier : il entre dans le comparatif. */
     validateOffer: (insurerId: string) => store._act({ kind: 'validate', insurerId }),
-  })),
+    };
+  }),
   withHooks({
     onInit: (store) => {
       const dossierStore = inject(DossierStore);

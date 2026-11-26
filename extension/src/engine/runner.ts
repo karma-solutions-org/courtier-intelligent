@@ -17,7 +17,10 @@ import { applyOverrides, fillPlan } from './flow/fill-step';
 import { MemorySession, StepSnapshot } from './flow/memory-session';
 import { panelFields, progressSignature, progressUpdate } from './flow/run-report';
 import { JobUpdateError, RunnerPorts } from './runner-ports';
-import { clickRow, detectStepHint, findRadioResultRows, findResultRows, pickResultRow, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
+import { clickRow, detectStepHint, findCalculateButton, findRadioResultRows, findResultRows, pickResultRow, isFinalStep, isNewStep, StepHint, waitForSettled } from './steps';
+
+export const SUBMIT_REFUSED_MESSAGE =
+  'L’extranet n’a pas lancé le calcul : vérifiez la page, puis cliquez vous-même sur le bouton du tarif.';
 
 /** Relances maximales dans une étape quand le remplissage révèle de nouveaux champs. */
 const MAX_FOLLOW_UPS = 3;
@@ -80,6 +83,11 @@ export class FormRunner {
   /** L'étape affichée est remplie sans manque ni échec, et ce n'est pas la dernière. */
   private stepReady = false;
   private readonly advanceGuard = new AdvanceGuard();
+  // ── Clic final automatique ──
+  /** La dernière étape est remplie sans manque ni échec : le calcul peut être lancé (job `autoSubmit`). */
+  private submitReady = false;
+  /** Étapes finales où le bouton de calcul a déjà été cliqué : un seul essai. */
+  private readonly submitTried = new Set<string>();
   // ── Règles propres à l'extranet (extranets/) ──
   private readonly adapter: ExtranetAdapter;
   private readonly claimRows: ClaimRows;
@@ -301,6 +309,7 @@ export class FormRunner {
   /** `depth` borne les relances quand le remplissage fait apparaître d'autres champs (réponse « Oui » → champ en plus). */
   private async runStep(newStep: boolean, depth = 0): Promise<void> {
     this.stepReady = false;
+    this.submitReady = false;
     if (this.stopped || this.capturing || this.paused) return;
     let analysis = this.analyze();
     // Le courtier a soumis le formulaire et l'extranet affiche le tarif sans recharger la page.
@@ -451,8 +460,10 @@ export class FormRunner {
         el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox') ? el.checked : (el as HTMLInputElement).value?.trim() !== '',
       );
     const required = new Set(analysis.fields.filter(f => f.required && !(results.get(f.key)?.status === 'failed' && handFilled(f.key))).map(f => f.key));
-    this.stepReady =
-      plan.missing.length === 0 && !finalStep && ![...results.values()].some(r => r.status === 'failed' && required.has(r.fieldKey));
+    const noRequiredFailure = ![...results.values()].some(r => r.status === 'failed' && required.has(r.fieldKey));
+    this.stepReady = plan.missing.length === 0 && !finalStep && noRequiredFailure;
+    // Dernière étape complète : le clic final automatique peut lancer le calcul (si le job l'autorise).
+    this.submitReady = plan.missing.length === 0 && finalStep && noRequiredFailure;
 
     console.info(
       '[Courtier Intelligent] étape :',
@@ -497,8 +508,36 @@ export class FormRunner {
     if (depth === 0 && !this.stepReady && !finalStep && this.formReachedSent) {
       await this.reportBlocked('step_blocked', (this.analysis ?? analysis).fingerprint, this.blockedPhoto(this.analysis ?? analysis, hint));
     }
-    // Toute l'étape est remplie (relances comprises) : on passe à la suivante.
+    // Toute l'étape est remplie (relances comprises) : on passe à la suivante, ou on lance le calcul (clic automatique).
     if (depth === 0) await this.maybeAdvance();
+    if (depth === 0) await this.maybeSubmit();
+  }
+
+  /**
+   * Clic final automatique (job `autoSubmit` : CGU de l'extranet et réglage du cabinet) : la dernière étape remplie sans
+   * manque ni échec, l'extension clique une seule fois sur le bouton de calcul du tarif. Le tarif lu reste « à vérifier »
+   * dans l'application. Sans bouton de calcul sans ambiguïté, ou si l'extranet ne lance pas le calcul, la main revient
+   * au courtier.
+   */
+  private async maybeSubmit(): Promise<void> {
+    if (!this.job.autoSubmit || !this.ports.autoAdvance || !this.submitReady || this.stopped || this.capturing || this.paused || !this.analysis) return;
+    await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
+    if (this.stopped || this.capturing || this.paused) return;
+    const key = stepKey(this.analysis, this.ports.doc);
+    const button = findCalculateButton(this.ports.doc);
+    if (!button || this.submitTried.has(key)) return;
+    this.submitTried.add(key);
+    console.info('[Courtier Intelligent] clic final automatique :', JSON.stringify({ bouton: button.textContent?.trim() ?? null }));
+    // Le dernier champ saisi garde le focus : l'extranet ne valide ses valeurs qu'à la sortie du champ.
+    (this.ports.doc.activeElement as HTMLElement | null)?.blur?.();
+    button.click();
+    await waitForSettled(this.ports.doc, { quietMs: this.ports.quietMs, timeoutMs: this.ports.settleTimeoutMs });
+    if (this.stopped || this.capturing) return;
+    // Page de résultat affichée sans rechargement : le tarif est lu tout de suite.
+    if (await this.tryCapture(false)) return;
+    if (button.isConnected && stepKey(this.analyze(), this.ports.doc) === key && this.lastState) {
+      this.ports.publish({ ...this.lastState, phase: 'waiting_user', message: SUBMIT_REFUSED_MESSAGE });
+    }
   }
 
   private blockedPhoto(analysis: FormAnalysis, hint: StepHint): BlockedStepSnapshot {

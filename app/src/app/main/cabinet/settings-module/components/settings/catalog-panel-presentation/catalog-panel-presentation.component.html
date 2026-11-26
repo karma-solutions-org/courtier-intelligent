@@ -15,6 +15,9 @@
   }
 
   <h3>{{ structure.insurersTitle }}</h3>
+  @if (hasAutoSubmitInsurer()) {
+    <p class="hint">{{ structure.autoSubmitHint }}</p>
+  }
   @for (insurer of insurers(); track insurer.id) {
     <div class="row">
       <mat-checkbox [checked]="selectedInsurers().includes(insurer.id)" (change)="toggleInsurer(insurer.id, $event.checked)">
@@ -28,6 +31,15 @@
         </span>
       </mat-checkbox>
       <span class="spacer"></span>
+      @if (canAutoSubmit(insurer)) {
+        <mat-slide-toggle
+          class="auto-submit"
+          [checked]="selectedAutoSubmit().includes(insurer.id)"
+          (change)="toggleAutoSubmit(insurer.id, $event.checked)"
+        >
+          {{ structure.autoSubmit }}
+        </mat-slide-toggle>
+      }
       <a
         mat-icon-button
         [href]="insurer.extranetUrl"

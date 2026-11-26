@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { buttonLabels, detectStepHint, findNextButton, findResultRows, findSearchButton, isFinalStep, isLoading, isNewStep, pickResultRow, waitForSettled } from './steps';
+import { buttonLabels, detectStepHint, findCalculateButton, findNextButton, findResultRows, findSearchButton, isFinalStep, isLoading, isNewStep, pickResultRow, waitForSettled } from './steps';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -34,6 +34,34 @@ describe('detectStepHint', () => {
   it('ignore une barre de progression indéterminée ou d’un chargement', () => {
     document.body.innerHTML = '<div role="progressbar"></div><div role="progressbar" aria-valuenow="50" aria-valuemax="100"></div>';
     expect(detectStepHint(document)).toEqual({ current: null, total: null });
+  });
+});
+
+describe('findCalculateButton (clic final automatique)', () => {
+  it.each(['Obtenir mon tarif', 'Calculer la cotisation', 'Découvrir mon tarif', 'Calculer mon tarif', '› Voir mon devis', 'Calculer'])(
+    'reconnaît le bouton de calcul « %s »',
+    label => {
+      document.body.innerHTML = `<button type="button">Précédent</button><button type="submit">${label}</button>`;
+      expect(findCalculateButton(document)?.textContent).toBe(label);
+    },
+  );
+
+  it.each(['Souscrire', 'Valider mon devis', 'Obtenir et valider mon tarif', 'Envoyer la demande', 'Calculer et souscrire', 'Confirmer', 'Suivant', 'Obtenir mon tarif et payer'])(
+    'ne clique jamais « %s »',
+    label => {
+      document.body.innerHTML = `<button type="submit">${label}</button>`;
+      expect(findCalculateButton(document)).toBeNull();
+    },
+  );
+
+  it('deux boutons de calcul : ambigu, aucun clic', () => {
+    document.body.innerHTML = '<button>Obtenir mon tarif</button><button>Calculer la cotisation</button>';
+    expect(findCalculateButton(document)).toBeNull();
+  });
+
+  it('ignore un bouton masqué ou désactivé', () => {
+    document.body.innerHTML = '<button disabled>Obtenir mon tarif</button><div hidden><button>Calculer</button></div>';
+    expect(findCalculateButton(document)).toBeNull();
   });
 });
 

@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, input, linkedSignal, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Insurer, Product } from '@shared';
 import { CatalogChoicesModel } from '../../../models/catalog-choices.model';
 import { SETTINGS_STRUCTURE } from '../settings.structure';
@@ -12,7 +13,7 @@ import { SETTINGS_STRUCTURE } from '../settings.structure';
  */
 @Component({
   selector: 'app-catalog-panel',
-  imports: [MatButtonModule, MatCheckboxModule, MatIconModule],
+  imports: [MatButtonModule, MatCheckboxModule, MatIconModule, MatSlideToggleModule],
   templateUrl: './catalog-panel-presentation.component.html',
   styleUrls: ['../settings.scss', './catalog-panel-presentation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -23,6 +24,7 @@ export class CatalogPanelPresentationComponent {
   /** Choix actuels du cabinet. */
   readonly enabledProducts = input<string[]>([]);
   readonly enabledInsurers = input<string[]>([]);
+  readonly autoSubmitInsurers = input<string[]>([]);
   readonly isPending = input(false);
   readonly saved = output<CatalogChoicesModel>();
 
@@ -31,6 +33,19 @@ export class CatalogPanelPresentationComponent {
   /** Sélection en cours d'édition : repart des choix du cabinet quand ils changent. */
   protected readonly selectedProducts = linkedSignal(() => this.enabledProducts());
   protected readonly selectedInsurers = linkedSignal(() => this.enabledInsurers());
+  protected readonly selectedAutoSubmit = linkedSignal(() => this.autoSubmitInsurers());
+
+  /** Un assureur du catalogue autorise le clic final automatique : l'explication s'affiche au-dessus de la liste. */
+  protected readonly hasAutoSubmitInsurer = computed(() => this.insurers().some(insurer => insurer.autoSubmitAllowed === true));
+
+  /** Le clic final automatique se propose pour un assureur actif dont le catalogue l'autorise (CGU). */
+  protected canAutoSubmit(insurer: Insurer): boolean {
+    return insurer.autoSubmitAllowed === true && this.selectedInsurers().includes(insurer.id);
+  }
+
+  protected toggleAutoSubmit(id: string, checked: boolean): void {
+    this.selectedAutoSubmit.update(ids => toggle(ids, id, checked));
+  }
 
   protected questionCount(product: Product): number {
     return product.questionnaireSchema.reduce((count, section) => count + section.questions.length, 0);
@@ -49,6 +64,11 @@ export class CatalogPanelPresentationComponent {
     this.saved.emit({
       enabledProducts: inCatalog(this.selectedProducts(), this.products()),
       enabledInsurers: inCatalog(this.selectedInsurers(), this.insurers()),
+      // Seulement pour un assureur actif que le catalogue autorise : décocher l'assureur retire aussi le clic automatique.
+      autoSubmitInsurers: this.selectedAutoSubmit().filter(id => {
+        const insurer = this.insurers().find(item => item.id === id);
+        return !!insurer && this.canAutoSubmit(insurer);
+      }),
     });
   }
 }

@@ -49,6 +49,10 @@ function fakePricingStore() {
     loaded: signal(true),
     cards: signal([]),
     busy: signal<string[]>([]),
+    launchable: signal([]),
+    launchingAll: signal(false),
+    summary: signal(null),
+    launchAll: vi.fn(),
     successMessage: signal<string | null>(null),
     clearSuccess: vi.fn(),
   };

@@ -1,6 +1,6 @@
 import { ExtensionUser, JobContext, TabMessage } from '../shared/messages';
-import { findJobForOrigin, watchJob } from './jobs-service';
-import { JobRef } from './origin-match';
+import { findJobForOrigin, loadInsurers, watchJob } from './jobs-service';
+import { InsurerInfo, JobRef, pinStillOnExtranet } from './origin-match';
 import { jobByTab, runByTab } from './worker-state';
 
 /** Suivi du dossier de chaque onglet qui remplit un extranet. */
@@ -42,23 +42,33 @@ async function clearPins(): Promise<void> {
   await chrome.storage.session.remove([...pins.keys()].map(tabId => `${PIN_PREFIX}${tabId}`)).catch(() => undefined);
 }
 
+/** Épingle un job à un onglet qui vient d'être ouvert sur son extranet (« Tarifer sur tous les extranets »). */
+export function pinJob(tabId: number, ref: JobRef): Promise<void> {
+  return withPinLock(() => chrome.storage.session.set({ [`${PIN_PREFIX}${tabId}`]: { dossierId: ref.dossierId, insurerId: ref.insurerId } }));
+}
+
 /**
  * Jobs que d'autres onglets tiennent encore : seulement ceux d'un onglet toujours ouvert sur cet extranet. Un onglet
- * parti ailleurs (site public de l'assureur, autre page) ne bloque plus son job : sans cela, l'extranet rouvert dans un
- * nouvel onglet ne trouvait plus « aucun job » et rien ne démarrait.
+ * fermé ou parti ailleurs (site public de l'assureur, autre page) libère son job : sans cela, l'extranet rouvert dans
+ * un nouvel onglet ne trouvait plus « aucun job » et rien ne démarrait. Un onglet resté sur l'extranet de SON assureur
+ * garde son épingle, même s'il est sur un autre extranet que celui-ci (plusieurs extranets remplis en parallèle).
  */
 async function heldElsewhere(pins: Map<number, JobRef>, origin: string): Promise<JobRef[]> {
+  if (!pins.size) return [];
+  const insurers = await loadInsurers().catch((): InsurerInfo[] => []);
   const held: JobRef[] = [];
   for (const [otherTab, ref] of pins) {
     const tab = await chrome.tabs.get(otherTab).catch(() => null);
+    // Onglet tout juste ouvert : son adresse est encore « en attente ».
+    const tabUrl = tab ? tab.url || tab.pendingUrl || null : null;
     let tabOrigin: string | null = null;
     try {
-      tabOrigin = tab?.url ? new URL(tab.url).origin : null;
+      tabOrigin = tabUrl ? new URL(tabUrl).origin : null;
     } catch {
       tabOrigin = null;
     }
     if (tabOrigin === origin) held.push(ref);
-    else await unpinJob(otherTab);
+    else if (!pinStillOnExtranet(ref, tabUrl, insurers)) await unpinJob(otherTab);
   }
   return held;
 }

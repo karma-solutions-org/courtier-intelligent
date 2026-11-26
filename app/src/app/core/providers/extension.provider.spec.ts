@@ -1,6 +1,6 @@
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { ChromeExtensionProvider } from './extension.provider';
+import { ChromeExtensionProvider, OPEN_FAILED_MESSAGE } from './extension.provider';
 
 type Callback = (response?: { type?: string; version?: string; signedIn?: boolean; uid?: string | null; message?: string }) => void;
 
@@ -78,6 +78,33 @@ describe('ChromeExtensionProvider', () => {
       await vi.advanceTimersByTimeAsync(20_100);
 
       expect(await result).toMatchObject({ ok: false });
+    });
+  });
+
+  describe('openExtranets', () => {
+    const extranets = [{ insurerId: 'oyat', url: 'https://www.oyat.fr/' }];
+
+    it("demande à l'extension d'ouvrir les extranets du dossier et lit ceux ouverts", async () => {
+      const sent: unknown[] = [];
+      stubChrome((_id, message, callback) => {
+        sent.push(message);
+        (callback as (response: unknown) => void)({ type: 'EXTRANETS_OPENED', opened: ['oyat'], refused: [] });
+      });
+
+      expect(await firstValueFrom(provider.openExtranets('d1', extranets))).toEqual({ ok: true, opened: ['oyat'], refused: [] });
+      expect(sent).toEqual([{ type: 'OPEN_EXTRANETS', dossierId: 'd1', extranets }]);
+    });
+
+    it("rapporte le refus de l'extension (non connectée)", async () => {
+      stubChrome((_id, _message, callback) => callback({ type: 'OPEN_FAILED', message: "Connectez l'extension." }));
+
+      expect(await firstValueFrom(provider.openExtranets('d1', extranets))).toEqual({ ok: false, message: "Connectez l'extension." });
+    });
+
+    it("une extension trop ancienne (réponse inconnue) : échec expliqué", async () => {
+      stubChrome((_id, _message, callback) => callback(undefined));
+
+      expect(await firstValueFrom(provider.openExtranets('d1', extranets))).toEqual({ ok: false, message: OPEN_FAILED_MESSAGE });
     });
   });
 

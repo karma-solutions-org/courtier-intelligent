@@ -2,6 +2,7 @@ import { AuthState, ConnectResponse, ExternalMessage, PongResponse } from '../sh
 import { MESSAGES, toUserMessage, UserFacingError } from './auth-controller';
 import { syncContentScripts } from './content-scripts';
 import { APP_DEVICE_KEY } from './firebase-adapters';
+import { openExtranets } from './open-extranets';
 import { externalOriginsFromMatches } from './sender-guard';
 import { auth, originOnly } from './worker-state';
 
@@ -44,6 +45,14 @@ export function onExternalMessage(message: ExternalMessage, sender: chrome.runti
         return false;
       }
       void connectFromApp(message.token, message.deviceId).then(sendResponse);
+      return true;
+
+    case 'OPEN_EXTRANETS':
+      void auth
+        .getState()
+        .catch((): AuthState => ({ status: 'signed_out', notice: null }))
+        .then(state => openExtranets(state.status === 'signed_in' ? state.user : null, message))
+        .then(sendResponse);
       return true;
   }
   return false;

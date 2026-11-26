@@ -53,6 +53,49 @@ describe('CatalogPanelPresentationComponent', () => {
     fixture.componentInstance.saved.subscribe(choices => sent.push(choices));
     (fixture.componentInstance as unknown as { save(): void }).save();
 
-    expect(sent).toEqual([{ enabledInsurers: ['allianz'], enabledProducts: ['auto'] }]);
+    expect(sent).toEqual([{ enabledInsurers: ['allianz'], enabledProducts: ['auto'], autoSubmitInsurers: [] }]);
+  });
+
+  describe('clic final automatique', () => {
+    const DEMO: Insurer = { ...ALLIANZ, id: 'demo', name: 'Démo', logo: null, autoSubmitAllowed: true };
+
+    async function withDemo(enabled: string[], autoSubmit: string[] = []) {
+      const { fixture, element } = await setup();
+      fixture.componentRef.setInput('insurers', [ALLIANZ, DEMO]);
+      fixture.componentRef.setInput('enabledInsurers', enabled);
+      fixture.componentRef.setInput('autoSubmitInsurers', autoSubmit);
+      await fixture.whenStable();
+      const sent: CatalogChoicesModel[] = [];
+      fixture.componentInstance.saved.subscribe(choices => sent.push(choices));
+      const save = () => (fixture.componentInstance as unknown as { save(): void }).save();
+      return { fixture, element, sent, save };
+    }
+
+    it("proposé seulement pour un assureur actif dont le catalogue l'autorise (CGU)", async () => {
+      const { element } = await withDemo(['allianz', 'demo']);
+
+      const toggles = element.querySelectorAll('mat-slide-toggle');
+      expect(toggles).toHaveLength(1);
+      expect(toggles[0].closest('.row')?.textContent).toContain('Démo');
+      expect(element.textContent).toContain('conditions d\'utilisation');
+    });
+
+    it("un assureur inactif n'a pas d'interrupteur, et son réglage n'est pas réenregistré", async () => {
+      const { element, sent, save } = await withDemo(['allianz'], ['demo']);
+
+      expect(element.querySelector('mat-slide-toggle')).toBeNull();
+      save();
+      expect(sent[0].autoSubmitInsurers).toEqual([]);
+    });
+
+    it("enregistre le choix de l'admin", async () => {
+      const { fixture, element, sent, save } = await withDemo(['allianz', 'demo']);
+
+      element.querySelector<HTMLButtonElement>('mat-slide-toggle button')!.click();
+      await fixture.whenStable();
+      save();
+
+      expect(sent).toEqual([{ enabledInsurers: ['allianz', 'demo'], enabledProducts: [], autoSubmitInsurers: ['demo'] }]);
+    });
   });
 });

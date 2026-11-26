@@ -37,5 +37,26 @@
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+.summary {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container);
+}
+
+.summary-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.summary-details {
+  color: var(--ci-text-muted);
 }

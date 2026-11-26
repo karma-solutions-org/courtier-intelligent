@@ -252,6 +252,7 @@ export function watchJob(user: ExtensionUser, dossierId: string, insurerId: stri
         quoteData: data['quoteData'] ?? {},
         missingFields: data['missingFields'] ?? [],
         ...(Array.isArray(data['productPaths']) && data['productPaths'].length ? { productPaths: data['productPaths'] } : {}),
+        ...(data['autoSubmit'] === true ? { autoSubmit: true } : {}),
       });
     }
     lastQuoteData = quoteData;

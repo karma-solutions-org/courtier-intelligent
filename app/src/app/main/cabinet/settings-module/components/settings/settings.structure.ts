@@ -67,6 +67,9 @@ export const SETTINGS_STRUCTURE = {
     noInsurers: 'Aucun assureur au catalogue pour le moment.',
     questionsCount: 'question(s)',
     openExtranet: "Ouvrir l'extranet de",
+    autoSubmit: 'Clic final automatique',
+    autoSubmitHint:
+      "L'extension clique elle-même sur « Obtenir mon tarif » une fois le formulaire rempli. Proposé seulement pour les extranets dont les conditions d'utilisation l'autorisent ; le tarif lu reste à vérifier.",
     save: 'Enregistrer',
   },
 

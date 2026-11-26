@@ -63,7 +63,7 @@
         }
       }
       @case ('awaiting_submit') {
-        <p class="hint">{{ text.awaitingSubmit }}</p>
+        <p class="hint">{{ card().job?.autoSubmit ? text.autoSubmitting : text.awaitingSubmit }}</p>
       }
       @case ('failed') {
         <p class="error" role="alert">{{ text.failed }} {{ job.error }}</p>

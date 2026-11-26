@@ -35,15 +35,34 @@ export abstract class ExtensionProvider {
    * elle s'y connecte avec le compte de l'app, sans mot de passe.
    */
   abstract connect(token: string, deviceId: string): Observable<ExtensionConnectResult>;
+
+  /**
+   * « Tarifer sur tous les extranets » : l'extension ouvre l'extranet de chaque assureur (une page web ne peut ouvrir
+   * qu'un onglet par clic) et rattache chaque onglet au job du dossier. Ne lève jamais : un refus est un résultat.
+   */
+  abstract openExtranets(dossierId: string, extranets: ExtranetToOpen[]): Observable<ExtensionOpenResult>;
 }
 
-/** Réponse brute de l'extension (PONG, CONNECTED ou CONNECT_FAILED). */
+/** Extranet à ouvrir pour un assureur dont le job vient d'être écrit. */
+export interface ExtranetToOpen {
+  insurerId: string;
+  url: string;
+}
+
+/** Assureurs dont l'extranet est ouvert, et ceux refusés par l'extension ; ou la raison de l'échec. */
+export type ExtensionOpenResult =
+  | { ok: true; opened: string[]; refused: string[] }
+  | { ok: false; message: string };
+
+/** Réponse brute de l'extension (PONG, CONNECTED, CONNECT_FAILED, EXTRANETS_OPENED ou OPEN_FAILED). */
 interface ExtensionResponse {
   type?: string;
   version?: string;
   signedIn?: boolean;
   uid?: string | null;
   message?: string;
+  opened?: string[];
+  refused?: string[];
 }
 
 /** Surface de `chrome.runtime` utilisée depuis une page web (autorisée par `externally_connectable`). */
@@ -57,6 +76,10 @@ const PING_TIMEOUT_MS = 2000;
 /** La connexion passe par Firebase Auth puis une function : délai plus large que le simple PING. */
 const CONNECT_TIMEOUT_MS = 20_000;
 const CONNECT_FAILED_MESSAGE = "L'extension n'a pas pu se connecter. Ouvrez-la et connectez-vous manuellement.";
+/** Ouvrir les onglets est immédiat ; l'extension relit au plus le catalogue des assureurs. */
+const OPEN_TIMEOUT_MS = 10_000;
+export const OPEN_FAILED_MESSAGE =
+  "L'extension n'a pas ouvert les extranets (absente ou trop ancienne : mettez-la à jour). Ouvrez-les un par un avec « Ouvrir l'extranet ».";
 
 @Injectable()
 export class ChromeExtensionProvider extends ExtensionProvider {
@@ -93,6 +116,23 @@ export class ChromeExtensionProvider extends ExtensionProvider {
         return { ok: false, message: response?.type === 'CONNECT_FAILED' && response.message ? response.message : CONNECT_FAILED_MESSAGE };
       }),
       timeout({ first: CONNECT_TIMEOUT_MS, with: () => of<ExtensionConnectResult>({ ok: false, message: CONNECT_FAILED_MESSAGE }) }),
+    );
+  }
+
+  openExtranets(dossierId: string, extranets: ExtranetToOpen[]): Observable<ExtensionOpenResult> {
+    const extensionId = environment.extensionId;
+    const runtime = chromeRuntime();
+    if (!extensionId || !runtime?.sendMessage) {
+      return of({ ok: false, message: OPEN_FAILED_MESSAGE });
+    }
+    return send(runtime, extensionId, { type: 'OPEN_EXTRANETS', dossierId, extranets }).pipe(
+      map((response): ExtensionOpenResult => {
+        if (response?.type === 'EXTRANETS_OPENED') {
+          return { ok: true, opened: response.opened ?? [], refused: response.refused ?? [] };
+        }
+        return { ok: false, message: response?.type === 'OPEN_FAILED' && response.message ? response.message : OPEN_FAILED_MESSAGE };
+      }),
+      timeout({ first: OPEN_TIMEOUT_MS, with: () => of<ExtensionOpenResult>({ ok: false, message: OPEN_FAILED_MESSAGE }) }),
     );
   }
 }

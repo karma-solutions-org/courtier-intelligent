@@ -128,6 +128,13 @@ describe('pickJobForOrigin', () => {
     expect(pickJobForOrigin([job('assureur-a', status)], INSURERS, 'https://extranet.assureur-a.fr')).not.toBeNull();
   });
 
+  it('transmet le clic final automatique décidé par le serveur, seulement s’il vaut true', () => {
+    const origin = 'https://extranet.assureur-a.fr';
+    const auto: JobRecord = { ...job('assureur-a', 'requested'), data: { ...job('assureur-a', 'requested').data, autoSubmit: true } };
+    expect(pickJobForOrigin([auto], INSURERS, origin)?.autoSubmit).toBe(true);
+    expect(pickJobForOrigin([job('assureur-a', 'requested')], INSURERS, origin)).not.toHaveProperty('autoSubmit');
+  });
+
   it.each(['captured', 'failed'] as const)('ne touche pas un job « %s »', status => {
     expect(pickJobForOrigin([job('assureur-a', status)], INSURERS, 'https://extranet.assureur-a.fr')).toBeNull();
   });

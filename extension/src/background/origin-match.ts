@@ -30,6 +30,8 @@ export interface JobRecord {
     quoteData?: JobContext['quoteData'];
     missingFields?: JobContext['missingFields'];
     productPaths?: string[];
+    /** Clic final automatique, décidé par le serveur au lancement (catalogue et réglage du cabinet). */
+    autoSubmit?: boolean;
   };
 }
 
@@ -152,6 +154,16 @@ export interface PickOptions extends MatchOptions {
 const sameJob = (a: JobRef, b: JobRef) => a.dossierId === b.dossierId && a.insurerId === b.insurerId;
 
 /**
+ * L'onglet épinglé à `ref` est-il toujours sur l'extranet de son assureur ? Non (onglet fermé, parti sur le site public
+ * ou ailleurs) : son épingle est libérée. Les onglets ouverts ensemble sur des extranets différents (« Tarifer sur tous
+ * les extranets ») gardent chacun la leur.
+ */
+export function pinStillOnExtranet(ref: JobRef, tabUrl: string | null | undefined, insurers: InsurerInfo[], options: MatchOptions = {}): boolean {
+  if (!tabUrl) return false;
+  return insurersForOrigin(tabUrl, insurers, options).some(insurer => insurer.id === ref.insurerId);
+}
+
+/**
  * Le job à exécuter sur cette page. Si l'onglet a déjà un job épinglé (rechargement, étape suivante) et qu'il est
  * toujours à faire sur cet extranet, c'est lui : jamais le dossier d'un autre client parce qu'il est plus récent.
  * Sinon, le plus récent (la liste arrive du plus récent au plus ancien) qui est encore à faire, vise l'assureur de
@@ -178,6 +190,7 @@ export function pickJobForOrigin(jobs: JobRecord[], insurers: InsurerInfo[], ori
     quoteData: job.data.quoteData ?? {},
     missingFields: job.data.missingFields ?? [],
     ...(job.data.productPaths?.length ? { productPaths: job.data.productPaths } : {}),
+    ...(job.data.autoSubmit === true ? { autoSubmit: true } : {}),
   };
 }
 

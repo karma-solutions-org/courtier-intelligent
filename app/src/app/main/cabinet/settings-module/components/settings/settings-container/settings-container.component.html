@@ -39,6 +39,7 @@
         [insurers]="store.insurers()"
         [enabledProducts]="store.cabinet()?.enabledProducts ?? []"
         [enabledInsurers]="store.cabinet()?.enabledInsurers ?? []"
+        [autoSubmitInsurers]="store.cabinet()?.autoSubmitInsurers ?? []"
         [isPending]="store.isPending()"
         (saved)="store.saveCatalogChoices($event)"
       />

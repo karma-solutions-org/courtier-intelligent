@@ -63,6 +63,12 @@ export interface JobContext {
   productQuestions?: ProductQuestion[];
   /** Produit du dossier : choisit le profil d'extranet (chemin d'accès propre à chaque produit). */
   productId?: string | null;
+  /**
+   * Clic final automatique (écrit par le serveur au lancement : CGU de l'extranet et réglage du cabinet). La dernière
+   * étape remplie sans manque, l'extension clique elle-même sur le bouton de calcul du tarif, jamais sur un bouton qui
+   * engage le client (souscrire, valider, envoyer).
+   */
+  autoSubmit?: boolean;
 }
 
 /**
@@ -309,7 +315,21 @@ export type ExternalMessage =
       type: 'CONNECT';
       token: string;
       deviceId: string;
+    }
+  | {
+      /**
+       * « Tarifer sur tous les extranets » : l'app a écrit un job par assureur, l'extension ouvre leurs extranets (une
+       * page web ne peut ouvrir qu'un onglet par clic). Chaque onglet est rattaché à son job dès l'ouverture.
+       */
+      type: 'OPEN_EXTRANETS';
+      dossierId: string;
+      extranets: { insurerId: string; url: string }[];
     };
+
+/** Réponse à `OPEN_EXTRANETS` : assureurs dont l'extranet est ouvert, et ceux refusés (adresse hors catalogue). */
+export type OpenExtranetsResponse =
+  | { type: 'EXTRANETS_OPENED'; opened: string[]; refused: string[] }
+  | { type: 'OPEN_FAILED'; message: string };
 
 /** Réponse à `PING` : l'extension est là, et connectée (à quel compte) ou non. */
 export interface PongResponse {

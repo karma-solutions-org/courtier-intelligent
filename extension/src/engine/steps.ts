@@ -41,6 +41,23 @@ export function findNextButton(doc: Document): HTMLElement | null {
   return candidates.length === 1 ? candidates[0] : null;
 }
 
+/** Bouton qui lance le calcul du tarif (« Obtenir mon tarif », « Calculer la cotisation », « Découvrir mon tarif »). */
+const CALCULATE_BUTTON =
+  /^((obtenir|calculer|voir|decouvrir|découvrir|connaitre|connaître)\b.{0,25}(tarif|devis|prix|offre|cotisation)|calculer)\b/i;
+
+/**
+ * Bouton de calcul du tarif de la dernière étape, pour le clic final automatique (assureurs dont les CGU l'autorisent,
+ * activé par le cabinet) : un seul candidat sans ambiguïté, et jamais un bouton qui engage le client ou transmet une
+ * demande (souscrire, valider, envoyer, signer, payer… voir FORBIDDEN_NAV_LABEL).
+ */
+export function findCalculateButton(doc: Document): HTMLElement | null {
+  const candidates = visibleButtons(doc).filter(el => {
+    const label = labelOf(el);
+    return CALCULATE_BUTTON.test(label) && !FORBIDDEN_NAV_LABEL.test(label) && !NEXT_BUTTON.test(label);
+  });
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
 const SEARCH_BUTTON = /^(rechercher|recherche|chercher|trouver|valider la recherche|search)$/i;
 
 /**

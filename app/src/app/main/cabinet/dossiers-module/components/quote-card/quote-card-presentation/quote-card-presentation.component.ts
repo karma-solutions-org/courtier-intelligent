@@ -6,13 +6,12 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
   ACTIVE_QUOTE_JOB_STATUSES,
-  canLaunchQuoteJob,
   CanonicalData,
   isOfferToReview,
   QUOTE_JOB_STATUS_LABELS,
   Question,
 } from '@shared';
-import { PRICING_CANCELLED_TEXT, PricingCard } from '../../../store/pricing.store';
+import { canLaunchCard, PRICING_CANCELLED_TEXT, PricingCard } from '../../../store/pricing.store';
 import { MissingFieldsFormPresentationComponent } from '../../missing-fields-form/missing-fields-form-presentation/missing-fields-form-presentation.component';
 
 const TEXT = {
@@ -31,6 +30,8 @@ const TEXT = {
   requested: "Ouvrez l'extranet de l'assureur : l'extension prend le relais.",
   resuming: "Informations enregistrées : l'extension reprend le remplissage.",
   awaitingSubmit: "Formulaire rempli : vérifiez-le et validez-le vous-même sur l'extranet.",
+  autoSubmitting:
+    "Formulaire rempli : l'extension lance le calcul du tarif (clic final automatique). S'il ne démarre pas, cliquez vous-même sur l'extranet.",
   failed: 'La tarification a échoué.',
   cancelled: PRICING_CANCELLED_TEXT,
   cancel: 'Annuler la tarification',
@@ -81,11 +82,7 @@ export class QuoteCardPresentationComponent {
   protected readonly toReview = computed(() => isOfferToReview(this.card().offer));
 
   /** Pas encore lancée, échouée ou annulée ; ou tarif obtenu mais périmé (données du dossier modifiées depuis). */
-  protected readonly canLaunch = computed(() => {
-    const { job, offer } = this.card();
-    if (offer) return !!offer.stale && (!job || !ACTIVE_QUOTE_JOB_STATUSES.includes(job.status));
-    return canLaunchQuoteJob(job);
-  });
+  protected readonly canLaunch = computed(() => canLaunchCard(this.card()));
   protected readonly active = computed(() => {
     const status = this.card().job?.status;
     return !!status && ACTIVE_QUOTE_JOB_STATUSES.includes(status) && (!this.card().offer || !!this.card().offer?.stale);

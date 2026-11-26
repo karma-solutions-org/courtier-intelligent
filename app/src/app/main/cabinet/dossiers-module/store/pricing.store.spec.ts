@@ -1,12 +1,13 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Cabinet, Dossier, Insurer, QuoteJob } from '@shared';
+import { Cabinet, Dossier, Insurer, Offer, QuoteJob } from '@shared';
 import { of, Subject, throwError } from 'rxjs';
 import { AuthStore } from '../../../commons/authentication-module/store/auth.store';
+import { ExtensionService } from '../../../commons/extension-module/services/extension.service';
 import { CabinetStatusStore } from '../../../commons/main-module/store/cabinet-status.store';
 import { PricingService } from '../services/pricing.service';
 import { DossierStore } from './dossier.store';
-import { PricingStore } from './pricing.store';
+import { pricingSummary, PricingStore } from './pricing.store';
 
 const insurer = (id: string, productsSupported = ['auto']): Insurer => ({
   id,
@@ -28,6 +29,7 @@ describe('PricingStore', () => {
     launch: ReturnType<typeof vi.fn>;
     complete: ReturnType<typeof vi.fn>;
   };
+  let extension: { openExtranets: ReturnType<typeof vi.fn> };
   let store: InstanceType<typeof PricingStore>;
 
   const fakeWindow = () =>
@@ -56,10 +58,12 @@ describe('PricingStore', () => {
       ),
       complete: vi.fn(() => of({ success: true })),
     };
+    extension = { openExtranets: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         PricingStore,
         { provide: PricingService, useValue: service },
+        { provide: ExtensionService, useValue: extension },
         { provide: AuthStore, useValue: { cabinetId: signal('c1') } },
         { provide: CabinetStatusStore, useValue: { cabinet } },
         {
@@ -140,6 +144,102 @@ describe('PricingStore', () => {
     pending.next({ dossierStatus: 'tarification', attempts: 1, extranetUrl: 'https://a.example' });
     pending.complete();
     expect(store.busy()).toEqual([]);
+  });
+
+  describe('Tarifer sur tous les extranets', () => {
+    beforeEach(() => {
+      // Aucun job : les deux assureurs du produit sont à lancer.
+      service.watchJobs.mockReturnValue(of([]));
+      (TestBed.inject(DossierStore).selectedId as ReturnType<typeof signal<string>>).set('d1-bis');
+      TestBed.tick();
+      service.launch.mockImplementation((_dossierId: string, insurerId: string) =>
+        of({ dossierStatus: 'tarification', attempts: 1, extranetUrl: `https://${insurerId}.example/connexion` }),
+      );
+    });
+
+    it("écrit un job par assureur à lancer, l'un après l'autre, puis l'extension ouvre leurs extranets", () => {
+      expect(store.launchable().map((card) => card.insurer.id)).toEqual(['a', 'b']);
+      extension.openExtranets.mockReturnValue(of({ ok: true, opened: ['a', 'b'], refused: [] }));
+
+      store.launchAll();
+
+      expect(service.launch.mock.calls).toEqual([
+        ['d1-bis', 'a'],
+        ['d1-bis', 'b'],
+      ]);
+      expect(extension.openExtranets).toHaveBeenCalledWith('d1-bis', [
+        { insurerId: 'a', url: 'https://a.example/connexion' },
+        { insurerId: 'b', url: 'https://b.example/connexion' },
+      ]);
+      expect(store.successMessage()).toBe("Tarification lancée chez 2 assureurs : l'extension remplit leurs extranets.");
+      expect(store.error()).toBeNull();
+      expect(store.launchingAll()).toBe(false);
+      expect(store.busy()).toEqual([]);
+    });
+
+    it("un refus du serveur pour un assureur n'empêche pas les autres", () => {
+      service.launch.mockImplementation((_dossierId: string, insurerId: string) =>
+        insurerId === 'a'
+          ? throwError(() => ({ code: 'functions/failed-precondition', message: 'Déjà en cours.' }))
+          : of({ dossierStatus: 'tarification', attempts: 1, extranetUrl: 'https://b.example' }),
+      );
+      extension.openExtranets.mockReturnValue(of({ ok: true, opened: ['b'], refused: [] }));
+
+      store.launchAll();
+
+      expect(extension.openExtranets).toHaveBeenCalledWith('d1-bis', [{ insurerId: 'b', url: 'https://b.example' }]);
+      expect(store.error()).toBe('a : Déjà en cours.');
+      expect(store.successMessage()).toContain('chez 1 assureur :');
+    });
+
+    it("l'extension n'ouvre pas les extranets : le message l'explique, les jobs restent lancés", () => {
+      extension.openExtranets.mockReturnValue(of({ ok: false, message: "Connectez l'extension." }));
+
+      store.launchAll();
+
+      expect(service.launch).toHaveBeenCalledTimes(2);
+      expect(store.error()).toBe("Connectez l'extension.");
+    });
+
+    it('refuse de lancer tant qu’une question obligatoire est sans réponse', () => {
+      missing.set(['vehicle.parkingPostalCode']);
+
+      store.launchAll();
+
+      expect(service.launch).not.toHaveBeenCalled();
+      expect(store.error()).toContain('Code postal du lieu de stationnement');
+    });
+  });
+
+  describe('pricingSummary', () => {
+    const offer = (extra: Partial<Offer> = {}) => ({ id: 'x', source: 'auto', review: 'validated', ...extra }) as Offer;
+    const job = (status: QuoteJob['status']) => ({ id: 'x', status }) as QuoteJob;
+
+    it('rien de lancé : pas de résumé', () => {
+      expect(pricingSummary([{ job: null, offer: null }])).toBeNull();
+    });
+
+    it('compte les tarifs obtenus (à vérifier compris), en cours, en attente du courtier et en échec', () => {
+      expect(
+        pricingSummary([
+          { job: job('captured'), offer: offer() },
+          { job: job('captured'), offer: offer({ review: 'pending' }) },
+          { job: job('filling'), offer: null },
+          { job: job('awaiting_submit'), offer: null },
+          { job: job('failed'), offer: null },
+          { job: null, offer: null },
+        ]),
+      ).toEqual({ total: 6, obtained: 2, toReview: 1, inProgress: 1, needsAction: 1, failed: 1 });
+    });
+
+    it("un tarif périmé n'est plus obtenu ; relancé, il est en cours", () => {
+      expect(
+        pricingSummary([
+          { job: job('captured'), offer: offer({ stale: true }) },
+          { job: job('requested'), offer: offer({ stale: true }) },
+        ]),
+      ).toMatchObject({ obtained: 0, inProgress: 1 });
+    });
   });
 
   it("une erreur d'écoute est affichée et termine le chargement", () => {

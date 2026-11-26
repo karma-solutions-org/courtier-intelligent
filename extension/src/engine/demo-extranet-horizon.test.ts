@@ -179,6 +179,33 @@ describe('Extranet de démonstration Horizon Assurances', () => {
     expect(offer.exclusions).toHaveLength(4);
   });
 
+  it('clic final automatique (job autoSubmit) : le moteur remplit la page puis lance lui-même le calcul', async () => {
+    load('projet-auto.html');
+    runApp();
+    const clicked: string[] = [];
+    document.addEventListener('click', event => {
+      const button = (event.target as HTMLElement).closest('button');
+      if (button) clicked.push(button.textContent?.trim() ?? '');
+    }, true);
+    const runner = new FormRunner({ ...job, autoSubmit: true }, {
+      doc: document,
+      report: async () => undefined,
+      publish: () => undefined,
+      askAi: async () => '{"mappings":[]}',
+      origin: 'http://localhost:8091',
+      autoAdvance: true,
+      quietMs: 40,
+      settleTimeoutMs: 1000,
+    });
+    await runner.start();
+    await until(() => sessionStorage.getItem('horizon-projet-auto') !== null);
+    runner.stop();
+
+    // Un seul clic, sur le bouton de calcul : la page a enregistré le projet rempli.
+    expect(clicked.filter(label => /cotisation/i.test(label))).toEqual(['Calculer la cotisation']);
+    expect(JSON.parse(sessionStorage.getItem('horizon-projet-auto')!)).toMatchObject({ immatriculation: 'AB-123-CD', crm: '0.85' });
+  }, 20_000);
+
   it('parcours complet : le moteur remplit la page, le courtier calcule, la cotisation calculée est lue', async () => {
     load('projet-auto.html');
     runApp();

@@ -8,11 +8,39 @@
 } @else if (extensionMissing()) {
   <p class="banner" role="status"><mat-icon>extension_off</mat-icon>{{ text.noExtension }}</p>
 }
-@if (canAddInsurer()) {
+@if (summary(); as summary) {
+  <section class="summary" role="status" aria-live="polite">
+    <div class="summary-head">
+      <strong>{{ text.launchAll.obtained(summary.obtained, summary.total) }}</strong>
+      @if (summaryDetails().length) {
+        <span class="summary-details">{{ summaryDetails().join(' · ') }}</span>
+      }
+    </div>
+    <mat-progress-bar
+      mode="determinate"
+      [value]="(summary.obtained / summary.total) * 100"
+      [attr.aria-label]="text.launchAll.obtained(summary.obtained, summary.total)"
+    />
+  </section>
+}
+@if (showLaunchAll() || canAddInsurer()) {
   <div class="toolbar">
-    <button mat-stroked-button type="button" [disabled]="addingInsurer()" (click)="addInsurer.emit()">
-      <mat-icon>add</mat-icon>{{ text.addInsurer.button }}
-    </button>
+    @if (canAddInsurer()) {
+      <button mat-stroked-button type="button" [disabled]="addingInsurer()" (click)="addInsurer.emit()">
+        <mat-icon>add</mat-icon>{{ text.addInsurer.button }}
+      </button>
+    }
+    @if (showLaunchAll()) {
+      <button
+        mat-flat-button
+        type="button"
+        [disabled]="launchingAll()"
+        [attr.title]="text.launchAll.hint"
+        (click)="launchAll.emit()"
+      >
+        <mat-icon>rocket_launch</mat-icon>{{ text.launchAll.button(launchableCount()) }}
+      </button>
+    }
   </div>
 }
 @if (error()) {
