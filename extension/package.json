@@ -15,6 +15,8 @@
     "demo:extranet": "npx --yes http-server@14.1.1 demo-extranet -p 8090 -c-1",
     "demo:horizon": "npx --yes http-server@14.1.1 demo-extranet-horizon -p 8091 -c-1",
     "demo:atlas": "npx --yes http-server@14.1.1 demo-extranet-atlas -p 8092 -c-1",
+    "demo:oyat": "npx --yes http-server@14.1.1 demo-extranet-oyat -p 8093 -c-1",
+    "demo:zephir": "npx --yes http-server@14.1.1 demo-extranet-zephir -p 8094 -c-1",
     "demo:all": "node scripts/demo-all.mjs",
     "extranet:new": "node scripts/new-extranet.mjs"
   },

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import type { FormField } from '../analyzer';
+import { analyzeForm, type FormField } from '../analyzer';
 import { genericAdapter } from '../extranets';
-import { AdvanceGuard } from './advance';
+import { AdvanceGuard, replacedByBlankStep } from './advance';
 import { ClaimRows, declaredClaims } from './claim-rows';
 
 afterEach(() => {
@@ -39,6 +39,27 @@ describe('ClaimRows', () => {
 
   it('declaredClaims plafonne à 6', () => {
     expect(declaredClaims({ 'insuranceHistory.claimsCount': 9 })).toBe(6);
+  });
+});
+
+describe('replacedByBlankStep', () => {
+  const PAGE = '<label for="bm">Bonus-malus</label><input id="bm" name="bonusMalus" />';
+
+  it('page remplacée par une étape identique encore vide : nouvelle étape', () => {
+    document.body.innerHTML = PAGE;
+    const filled = [document.querySelector<HTMLElement>('input')!];
+    (filled[0] as HTMLInputElement).value = '0,68';
+    document.body.innerHTML = PAGE;
+    expect(replacedByBlankStep(filled, analyzeForm(document))).toBe(true);
+  });
+
+  it('étape refusée puis réaffichée avec ses réponses, ou laissée en place : pas une nouvelle étape', () => {
+    document.body.innerHTML = PAGE;
+    const filled = [document.querySelector<HTMLElement>('input')!];
+    expect(replacedByBlankStep(filled, analyzeForm(document))).toBe(false);
+    document.body.innerHTML = PAGE.replace('/>', 'value="0,68" />');
+    expect(replacedByBlankStep(filled, analyzeForm(document))).toBe(false);
+    expect(replacedByBlankStep([], analyzeForm(document))).toBe(false);
   });
 });
 

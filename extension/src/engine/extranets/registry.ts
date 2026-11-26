@@ -9,6 +9,8 @@ import { oyatAdapter } from './oyat/adapter';
  */
 export const EXTRANETS: readonly ExtranetDefinition[] = [
   { insurerId: 'zephir', hosts: ['zephir.fr'], adapter: zephirAdapter },
+  { insurerId: 'assureur-zephir-local', hosts: [], adapter: zephirAdapter },
   { insurerId: 'oyat', hosts: ['oyat-assurances.fr'], adapter: oyatAdapter },
+  { insurerId: 'assureur-oyat-local', hosts: [], adapter: oyatAdapter },
   // extranet:new — nouvelles lignes au-dessus de ce repère
 ];

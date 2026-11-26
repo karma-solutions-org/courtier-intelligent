@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Démo type Zephir (locale)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Application d'une seule page : app.js remplace le contenu du formulaire à chaque « Suivant ». -->
+  <app-root>
+    <div class="ribbon">Démonstration locale – extranet fictif, aucune donnée n'est transmise.</div>
+    <header class="zp">
+      <div class="titre-app">Démo type Zephir (locale)<small>Espace courtier – projet Auto</small></div>
+      <nav>Cabinet partenaire – démo</nav>
+    </header>
+    <div class="fil" id="zp-fil"></div>
+    <div class="mise-en-page">
+      <main class="carte"><form id="zp-form" novalidate></form></main>
+      <aside class="synthese">
+        <h4>Synthèse</h4>
+        <p id="zp-syn-vehicule">Véhicule : à renseigner</p>
+        <p id="zp-syn-stationnement">Stationnement : à renseigner</p>
+        <h4>Sinistralité</h4>
+        <p id="zp-syn-sinistres">Aucun sinistre déclaré</p>
+      </aside>
+    </div>
+    <div class="zp-chargement mat-spinner-overlay" id="zp-chargement" hidden><span class="zp-rond"></span>Chargement…</div>
+    <footer class="zp">Démo type Zephir (locale) – extranet fictif pour la démonstration de Courtier Intelligent.</footer>
+  </app-root>
+  <script src="app.js"></script>
+</body>
+</html>

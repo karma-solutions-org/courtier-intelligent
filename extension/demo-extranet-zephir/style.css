@@ -1,0 +1,61 @@
+/* Un élément masqué (attribut hidden) le reste, même si sa classe impose un display. */
+[hidden] { display: none !important; }
+/* Démo type Zephir (locale) : application d'une seule page aux couleurs « Material » (bleu ardoise / sarcelle). */
+:root { --slate: #263645; --slate-2: #37506a; --teal: #00897b; --teal-pale: #e0f2f1; --paper: #f4f6f8; --ink: #1d232a; --grey: #66717d; --line: #d9dfe5; --warn: #c62828; --ok: #2e7d32; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Roboto, "Segoe UI", Arial, sans-serif; background: var(--paper); color: var(--ink); }
+.ribbon { background: #fbc02d; color: #3e2d00; text-align: center; font: 600 .8rem/1.6 Arial, sans-serif; padding: 4px 8px; }
+header.zp { background: var(--slate); color: #fff; padding: 14px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,.25); }
+header.zp .titre-app { font-size: 1.15rem; font-weight: 500; letter-spacing: .02em; }
+header.zp .titre-app small { display: block; font-size: .75rem; opacity: .7; font-weight: normal; }
+header.zp nav { font-size: .85rem; opacity: .85; }
+.fil { max-width: 1180px; margin: 18px auto 0; padding: 0 16px; font-size: .82rem; color: var(--grey); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.fil span.actif { color: var(--teal); font-weight: 600; }
+.fil span + span::before { content: "›"; margin-right: 10px; color: var(--line); }
+.mise-en-page { max-width: 1180px; margin: 14px auto 32px; padding: 0 16px; display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+main.carte, .carte { background: #fff; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.15); padding: 22px 28px; }
+h1 { font-weight: 400; font-size: 1.6rem; margin: 0 0 8px; color: var(--slate); }
+h3 { font-weight: 500; font-size: 1.2rem; color: var(--slate); margin: 0 0 16px; padding-bottom: 8px; border-bottom: 2px solid var(--teal); }
+h5 { font-weight: 500; font-size: .9rem; color: var(--slate-2); margin: 22px 0 6px; }
+.form-input { margin: 0 0 14px; }
+.form-input > label, .form-input > div > span { display: block; font-size: .85rem; color: var(--grey); margin-bottom: 4px; }
+.form-input .form-input { margin: 0; }
+input, select { font: .95rem Roboto, Arial, sans-serif; padding: 8px 10px; border: 0; border-bottom: 1px solid #9aa5b1; background: #f7f9fa; max-width: 360px; width: 100%; border-radius: 4px 4px 0 0; }
+input:focus, select:focus { outline: none; border-bottom: 2px solid var(--teal); }
+input.ng-dirty, select.ng-dirty { background: #fff; }
+td input, td select { max-width: 180px; }
+mat-button-toggle-group { display: inline-flex; border: 1px solid #b0bac4; border-radius: 4px; overflow: hidden; }
+mat-button-toggle-group.ng-invalid.ng-touched { border-color: var(--warn); }
+mat-button-toggle { display: inline-flex; }
+mat-button-toggle-group button, .mat-button-toggle-button { border: 0; border-right: 1px solid #b0bac4; background: #fff; padding: 7px 18px; font: .9rem Roboto, Arial, sans-serif; cursor: pointer; color: var(--ink); }
+mat-button-toggle-group > :last-child button, mat-button-toggle-group > button:last-child { border-right: 0; }
+mat-button-toggle-group button[aria-pressed="true"] { background: var(--teal-pale); color: var(--teal); font-weight: 600; }
+app-control-error { display: block; font-size: .78rem; color: var(--warn); margin-top: 3px; min-height: 0; }
+.zp-alerte { background: #ffebee; color: var(--warn); border-left: 4px solid var(--warn); padding: 10px 14px; margin: 0 0 16px; font-size: .9rem; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; margin: 8px 0 12px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+thead th { color: var(--grey); font-weight: 500; font-size: .8rem; }
+tbody:empty::after { content: "Aucun sinistre déclaré."; display: block; padding: 10px; color: var(--grey); font-size: .85rem; }
+.btnAjoutTable { display: inline-flex; align-items: center; color: var(--teal); cursor: pointer; font-weight: 500; font-size: .9rem; user-select: none; }
+.btnAjoutTable svg { width: 16px; height: 16px; fill: currentColor; }
+.btnAjoutTable:hover { text-decoration: underline; }
+.actions { display: flex; justify-content: space-between; margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line); }
+.boutonSubmit, .boutonAbandon, .cta { border: 0; border-radius: 4px; padding: 9px 22px; font: 500 .95rem Roboto, Arial, sans-serif; cursor: pointer; text-decoration: none; display: inline-block; }
+.boutonSubmit, .cta { background: var(--teal); color: #fff; box-shadow: 0 2px 2px rgba(0,0,0,.2); }
+.boutonSubmit:hover, .cta:hover { background: #00796b; }
+.boutonAbandon { background: transparent; color: var(--slate-2); }
+aside.synthese { background: #fff; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.15); padding: 16px 18px; font-size: .85rem; }
+aside.synthese h4 { margin: 12px 0 6px; font-weight: 500; color: var(--slate); text-transform: uppercase; font-size: .75rem; letter-spacing: .06em; }
+aside.synthese h4:first-child { margin-top: 0; }
+aside.synthese p { margin: 0 0 4px; color: var(--grey); }
+.zp-chargement { position: fixed; inset: 0; background: rgba(255,255,255,.6); display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--slate); font-weight: 500; z-index: 10; }
+.zp-rond { width: 34px; height: 34px; border-radius: 50%; border: 4px solid var(--teal-pale); border-top-color: var(--teal); animation: zp-tourne 0.8s linear infinite; }
+@keyframes zp-tourne { to { transform: rotate(360deg); } }
+.price-box { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; background: var(--teal-pale); border-radius: 4px; padding: 16px 20px; margin: 14px 0; }
+.price-box .price { font-size: 1.8rem; color: var(--teal); }
+.recap, .meta { color: var(--grey); font-size: .9rem; }
+h2 { font-weight: 500; font-size: 1.05rem; color: var(--slate); margin: 24px 0 6px; }
+.incluse { color: var(--ok); font-weight: 500; }
+.non-incluse { color: var(--warn); }
+footer.zp { text-align: center; font-size: .75rem; color: var(--grey); margin: 20px 0 36px; }
+@media (max-width: 860px) { .mise-en-page { grid-template-columns: 1fr; } main.carte, .carte { padding: 18px 16px; } }

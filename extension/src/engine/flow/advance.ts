@@ -21,6 +21,25 @@ export function leftTextPage(key: string, doc: Document): boolean {
   return key.includes('|') && !key.endsWith(`|${textHash(doc.body.textContent ?? '')}`);
 }
 
+/** Champ sans réponse : texte ou liste vide, case non cochée, bouton bascule non enfoncé. */
+function isBlank(el: HTMLElement): boolean {
+  if (el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox')) return !el.checked;
+  if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) return el.value.trim() === '';
+  return el.getAttribute('aria-pressed') !== 'true' && el.getAttribute('aria-checked') !== 'true';
+}
+
+/**
+ * Après « Suivant », l'application (d'une seule page) a-t-elle affiché une nouvelle étape de même structure ? Les
+ * champs remplis ont quitté le document et ceux affichés sont tous vides. C'est le seul signe qui distingue deux
+ * étapes identiques qui se suivent quand la première a reçu des lignes de sinistre (antécédents du conducteur
+ * principal puis du secondaire, sur Zephir) : leurs clés de champ se recouvrent trop pour `isNewStep`. Une étape
+ * refusée puis réaffichée garde ses réponses : elle n'est pas prise pour une nouvelle étape.
+ */
+export function replacedByBlankStep(filled: readonly HTMLElement[], next: FormAnalysis): boolean {
+  if (filled.length === 0 || filled.some(el => el.isConnected) || next.fields.length === 0) return false;
+  return [...next.elements.values()].every(group => group.every(isBlank));
+}
+
 /**
  * Bouton qui fait avancer l'étape : « Suivant », sinon (pas de « Suivant ») le « Rechercher » du bloc rempli
  * (véhicule par caractéristique), dont il faudra ensuite choisir un résultat.

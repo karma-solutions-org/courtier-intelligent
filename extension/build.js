@@ -12,7 +12,7 @@ const isWatch = process.argv.includes('--watch');
 const useEmulators = process.argv.includes('--emulators');
 // Build de développement (localhost autorisé, sourcemaps) : uniquement sur demande explicite.
 // Sans option, le build est celui de production : c'est ce qui part au Chrome Web Store, la sécurité est le défaut.
-// `--demo` : vrai projet Firebase de test, faux extranets sur localhost:8090-8092 ; `--emulators` l'implique aussi.
+// `--demo` : vrai projet Firebase de test, faux extranets sur localhost:8090-8094 ; `--emulators` l'implique aussi.
 const isDev = useEmulators || process.argv.includes('--dev') || process.argv.includes('--demo');
 const allowLocalhost = isDev;
 

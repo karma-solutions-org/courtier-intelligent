@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Devis automobile – Démo type Oyat (locale)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ribbon">Démonstration locale – extranet fictif, aucune donnée n'est transmise.</div>
+  <header class="oy">
+    <div class="brand">Démo type Oyat <small>(locale) – espace courtiers</small></div>
+    <nav>Cabinet partenaire – démo</nav>
+  </header>
+  <main class="page">
+  <h1>Devis automobile : Etape 2</h1>
+  <div class="onglets"><a class="onglet" href="conducteur.html">&gt; Conducteur 1</a> <a class="onglet actif">&gt; Véhicule</a></div>
+  <div class="erreurs" id="oy-erreurs" role="alert" hidden></div>
+  <!-- Étape non relevée sur l'extranet réel : construite dans le même style (div.ligne, astérisque en image, date en 3 cases). -->
+  <form id="monform_vehicule" name="monform_vehicule" data-etape="vehicule">
+    <input type="Hidden" name="zsouscr_id">
+    <div class="container">
+      <fieldset>
+        <legend>Véhicule</legend>
+        <div id="ligne_oImmatriculation" class="ligne">
+          <label id="libelle_oImmatriculation" for="oImmatriculation">Immatriculation :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oImmatriculation">&nbsp;</div>
+          <div id="objet_oImmatriculation" class="objet"><input class="text" type="text" name="oImmatriculation" id="oImmatriculation" maxlength="10"> <input type="Checkbox" name="bImmatInconnue" id="bImmatInconnue"> Je ne la connais pas</div>
+          <div id="blocValidation_oImmatriculation" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oMarque" class="ligne">
+          <label id="libelle_oMarque" for="oMarque">Marque :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oMarque">&nbsp;</div>
+          <div id="objet_oMarque" class="objet"><select name="oMarque" id="oMarque" class="liste"><option value="">Choisissez</option><option value="ALF">ALFA ROMEO</option><option value="AUD">AUDI</option><option value="BMW">BMW</option><option value="CIT">CITROEN</option><option value="CUP">CUPRA</option><option value="DAC">DACIA</option><option value="DS">DS</option><option value="FIA">FIAT</option><option value="FOR">FORD</option><option value="HON">HONDA</option><option value="HYU">HYUNDAI</option><option value="JEE">JEEP</option><option value="KIA">KIA</option><option value="LAN">LAND ROVER</option><option value="MAZ">MAZDA</option><option value="MER">MERCEDES</option><option value="MIN">MINI</option><option value="MIT">MITSUBISHI</option><option value="NIS">NISSAN</option><option value="OPE">OPEL</option><option value="PEU">PEUGEOT</option><option value="REN">RENAULT</option><option value="SEA">SEAT</option><option value="SKO">SKODA</option><option value="SMA">SMART</option><option value="SUZ">SUZUKI</option><option value="TES">TESLA</option><option value="TOY">TOYOTA</option><option value="VOL">VOLKSWAGEN</option><option value="VLV">VOLVO</option></select></div>
+          <div id="blocValidation_oMarque" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oModele" class="ligne">
+          <label id="libelle_oModele" for="oModele">Modèle :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oModele">&nbsp;</div>
+          <div id="objet_oModele" class="objet"><input name="oModele" type="text" id="oModele" class="texte" maxlength="50"></div>
+          <div id="blocValidation_oModele" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oDateMEC" class="ligne">
+          <label id="libelle_oDateMEC" for="oDateMEC">Date de 1ère mise en circulation :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oDateMEC">&nbsp;</div>
+          <div id="objet_oDateMEC" class="objet"><input name="oDateMEC_jour" type="text" id="oDateMEC_jour" class="texte" maxlength="2"> <input name="oDateMEC_mois" type="text" id="oDateMEC_mois" class="texte" maxlength="2"> <input name="oDateMEC_annee" type="text" id="oDateMEC_annee" class="texte" maxlength="4"></div>
+          <div id="blocValidation_oDateMEC" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oEnergie" class="ligne">
+          <label id="libelle_oEnergie" for="oEnergie">Energie :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oEnergie">&nbsp;</div>
+          <div id="objet_oEnergie" class="objet"><select name="oEnergie" id="oEnergie" class="liste"><option value="">Choisissez</option><option value="ES">Essence</option><option value="GO">Gazole</option><option value="EH">Hybride</option><option value="EE">Hybride rechargeable</option><option value="EL">Electrique</option><option value="GP">GPL</option></select></div>
+          <div id="blocValidation_oEnergie" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Utilisation du véhicule</legend>
+        <div id="ligne_oUsage" class="ligne">
+          <label id="libelle_oUsage" for="oUsage">Usage du véhicule :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oUsage">&nbsp;</div>
+          <div id="objet_oUsage" class="objet"><select name="oUsage" id="oUsage" class="liste"><option value="">Choisissez</option><option value="1">Privé uniquement (loisirs)</option><option value="2">Privé et trajet domicile-travail</option><option value="3">Professionnel (tournées)</option></select></div>
+          <div id="blocValidation_oUsage" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oModeGarage" class="ligne">
+          <label id="libelle_oModeGarage">Lieu de stationnement la nuit <img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oModeGarage">&nbsp;</div>
+          <div id="objet_oModeGarage" class="objet"><input name="oModeGarage" type="radio" class="choix" value="G">Garage individuel fermé <input name="oModeGarage" type="radio" class="choix" value="P">Parking privé clos <input name="oModeGarage" type="radio" class="choix" value="V">Voie publique</div>
+          <div id="blocValidation_oModeGarage" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oCPGarage" class="ligne">
+          <label id="libelle_oCPGarage" for="oCPGarage">Code postal du lieu de stationnement :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oCPGarage">&nbsp;</div>
+          <div id="objet_oCPGarage" class="objet"><input class="text" type="text" name="oCPGarage" id="oCPGarage" maxlength="5"></div>
+          <div id="blocValidation_oCPGarage" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+      </fieldset>
+    </div>
+  </form>
+  <div class="boutons"><a role="button" class="btn" href="conducteur.html">Retour</a> <a role="button" class="btn next" href="tarif.html">&gt; Continuer Devis</a></div>
+  </main>
+  <footer class="oy">Démo type Oyat (locale) – extranet fictif pour la démonstration de Courtier Intelligent.</footer>
+  <script src="app.js"></script>
+</body>
+</html>

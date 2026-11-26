@@ -9,7 +9,7 @@ import { asCanonicalPath, ExtraQuestion, isCompatible, Mapping, mapExtraPaths, m
 import { toDiscoveredFields, toRequiredPaths, toSightedFields } from './memory';
 import { FillPlan, planFill, valueOf } from './plan';
 import { adapterFor, type ExtranetAdapter } from './extranets';
-import { advanceButton, AdvanceGuard, leftTextPage, refusalMessage, stepKey } from './flow/advance';
+import { advanceButton, AdvanceGuard, leftTextPage, refusalMessage, replacedByBlankStep, stepKey } from './flow/advance';
 import { completeWithAi, fillableCount, needsAiCompletion } from './flow/capture-page';
 import { ClaimRows } from './flow/claim-rows';
 import { blockedStepSnapshot, failureCode } from './flow/step-report';
@@ -543,6 +543,7 @@ export class FormRunner {
     console.info('[Courtier Intelligent] avancer :', JSON.stringify({ bouton: found?.button.textContent?.trim() ?? null, premierEssai: firstTry }));
     if (!found || !firstTry) return;
     const before = this.lastStep;
+    const filledBefore = this.filledElements();
     // Le dernier champ saisi garde le focus : l'extranet ne valide ses valeurs qu'à la sortie du champ.
     (this.ports.doc.activeElement as HTMLElement | null)?.blur?.();
     found.button.click();
@@ -564,7 +565,10 @@ export class FormRunner {
     const refused = this.analyze();
     const after = { keys: refused.fields.map(f => f.key), hint: detectStepHint(this.ports.doc) };
     // Nouvelle étape : remplie tout de suite (la surveillance de la page n'est pas encore active au démarrage).
-    if (isNewStep(before, after) || (before.keys.length === 0 && leftTextPage(key, this.ports.doc))) return this.runStep(true);
+    // Deux étapes identiques qui se suivent (Zephir : antécédents des deux conducteurs) : page remplacée, champs vides.
+    if (isNewStep(before, after) || (before.keys.length === 0 && leftTextPage(key, this.ports.doc)) || replacedByBlankStep(filledBefore, refused)) {
+      return this.runStep(true);
+    }
     // Refus : l'extranet marque maintenant ses champs obligatoires (Zephir ne le fait qu'après « Suivant »). Ceux qui
     // n'ont pas d'équivalent sont signalés : ils deviennent des questions du dossier, et le prochain passage les remplira.
     const discovered = toDiscoveredFields(refused.fields, mapFields(refused.fields), this.productPaths, this.job.quoteData);

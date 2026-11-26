@@ -32,8 +32,12 @@ describe('adapterFor', () => {
  */
 describe('registre des extranets', () => {
   const root = dirname(fileURLToPath(import.meta.url));
+  /** Extranets de démonstration locaux (`assureur-<x>-local`) : ils reprennent l'adaptateur d'un vrai extranet, sans domaine. */
+  const isLocalDemo = (insurerId: string) => insurerId.endsWith('-local');
+  const real = EXTRANETS.filter(extranet => !isLocalDemo(extranet.insurerId));
+  const demos = EXTRANETS.filter(extranet => isLocalDemo(extranet.insurerId));
 
-  it.each(EXTRANETS.map(extranet => [extranet.insurerId]))('%s : adaptateur, fixture et test de parcours', insurerId => {
+  it.each(real.map(extranet => [extranet.insurerId]))('%s : adaptateur, fixture et test de parcours', insurerId => {
     for (const file of ['adapter.ts', 'fixture.ts', 'journey.test.ts']) {
       expect(existsSync(join(root, insurerId, file)), `${insurerId}/${file} manquant`).toBe(true);
     }
@@ -42,7 +46,14 @@ describe('registre des extranets', () => {
   it('un assureur n’est enregistré qu’une fois, avec au moins un domaine', () => {
     const ids = EXTRANETS.map(extranet => extranet.insurerId);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const extranet of EXTRANETS) expect(extranet.hosts.length).toBeGreaterThan(0);
+    for (const extranet of real) expect(extranet.hosts.length).toBeGreaterThan(0);
+  });
+
+  it('une démo locale reprend l’adaptateur d’un vrai extranet, sans domaine', () => {
+    for (const demo of demos) {
+      expect(demo.hosts, demo.insurerId).toEqual([]);
+      expect(real.some(extranet => extranet.adapter === demo.adapter), demo.insurerId).toBe(true);
+    }
   });
 });
 

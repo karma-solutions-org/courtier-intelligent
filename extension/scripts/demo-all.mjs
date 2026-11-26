@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * Sert les trois extranets de démonstration en même temps (aucune dépendance ajoutée : http-server via npx) :
+ * Sert les cinq extranets de démonstration en même temps (aucune dépendance ajoutée : http-server via npx) :
  *   - Assureur Test (démo locale)        → http://localhost:8090/index.html
  *   - Horizon Assurances (démo locale)   → http://localhost:8091/index.html
  *   - Atlas Mutuelle (démo locale)       → http://localhost:8092/index.html
- * Ctrl+C arrête les trois serveurs.
+ *   - Démo type Oyat (locale)            → http://localhost:8093/index.html (structure HTML relevée sur Oyat)
+ *   - Démo type Zephir (locale)          → http://localhost:8094/index.html (structure HTML relevée sur Zephir)
+ * Ctrl+C arrête tous les serveurs.
  */
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
@@ -15,6 +17,8 @@ const DEMOS = [
   { name: 'Assureur Test', dir: 'demo-extranet', port: 8090 },
   { name: 'Horizon Assurances', dir: 'demo-extranet-horizon', port: 8091 },
   { name: 'Atlas Mutuelle', dir: 'demo-extranet-atlas', port: 8092 },
+  { name: 'Démo type Oyat', dir: 'demo-extranet-oyat', port: 8093 },
+  { name: 'Démo type Zephir', dir: 'demo-extranet-zephir', port: 8094 },
 ];
 
 const children = DEMOS.map(demo => {

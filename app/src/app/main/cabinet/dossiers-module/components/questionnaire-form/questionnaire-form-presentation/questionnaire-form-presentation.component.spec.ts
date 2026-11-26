@@ -101,6 +101,14 @@ describe('QuestionnaireFormPresentationComponent', () => {
       await expect.element(tester.root.getByText(/Repris du dossier précédent : à vérifier/)).toBeVisible();
     });
 
+    it("ne compte pas une réponse à vérifier masquée par sa condition", async () => {
+      tester.setInputs({ data: { 'insuranceHistory.currentlyInsured': false, 'insuranceHistory.previousInsurer': 'MAAF' } });
+
+      const note = tester.root.getByRole('note');
+      await expect.element(note).toBeVisible();
+      expect(note.element().textContent).not.toContain('à confirmer');
+    });
+
     it('émet la confirmation de la réponse reprise', async () => {
       const verified: CanonicalPath[] = [];
       tester.fixture.componentInstance.answerVerified.subscribe((path) => verified.push(path));

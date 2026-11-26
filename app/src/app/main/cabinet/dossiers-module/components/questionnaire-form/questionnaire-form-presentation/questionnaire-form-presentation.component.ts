@@ -59,9 +59,18 @@ export class QuestionnaireFormPresentationComponent {
       })),
   );
 
-  /** Réponses à vérifier dans les sections affichées (le bandeau les compte). */
+  /**
+   * Réponses à vérifier visibles dans les sections affichées (le bandeau les compte) : une question masquée par sa
+   * condition (assureur actuel d'un client non assuré, détail d'un sinistre non déclaré) ne se vérifie pas.
+   */
   protected readonly shownToVerify = computed(() => {
-    const paths = new Set(this.sections().flatMap((section) => section.questions.map((question) => question.canonicalPath)));
+    const data = this.data();
+    const paths = new Set(
+      this.sections()
+        .flatMap((section) => section.questions)
+        .filter((question) => isQuestionVisible(question, data))
+        .map((question) => question.canonicalPath),
+    );
     return this.toVerify().filter((path) => paths.has(path));
   });
 

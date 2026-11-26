@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Devis automobile – Démo type Oyat (locale)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ribbon">Démonstration locale – extranet fictif, aucune donnée n'est transmise.</div>
+  <header class="oy">
+    <div class="brand">Démo type Oyat <small>(locale) – espace courtiers</small></div>
+    <nav>Cabinet partenaire – démo</nav>
+  </header>
+  <main class="page">
+  <h1>Devis automobile : Etape 1</h1>
+  <div class="onglets"><a class="onglet actif">&gt; Conducteur 1</a> <a class="onglet">&gt; Véhicule</a></div>
+  <div class="erreurs" id="oy-erreurs" role="alert" hidden></div>
+  <form id="monform_crm" name="monform_crm" data-etape="conducteur">
+    <input type="Hidden" name="ordre_cond" value="1"><input type="Hidden" name="zsouscr_id">
+    <div class="container">
+      <fieldset>
+        <div id="ligne_oNomPrenomSaisieDevis" class="ligne">
+          <label id="libelle_oNomPrenomSaisieDevis" for="oNomPrenomSaisieDevis">Pour une meilleure traçabilité de vos devis,<br>merci d'indiquer vos noms et prénoms</label>
+          <div class="puce_aide" id="puce_aide_oNomPrenomSaisieDevis">&nbsp;</div>
+          <div id="objet_oNomPrenomSaisieDevis" class="objet"><input name="oNomPrenomSaisieDevis" type="text" id="oNomPrenomSaisieDevis" class="texte" maxlength="250"></div>
+          <div id="blocValidation_oNomPrenomSaisieDevis" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oDateReprise" class="ligne">
+          <label id="libelle_oDateReprise" for="oDateReprise">Date d'effet souhaitée :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oDateReprise">&nbsp;</div>
+          <div id="objet_oDateReprise" class="objet"><input name="oDateReprise_jour" type="text" id="oDateReprise_jour" class="texte" maxlength="2"> <input name="oDateReprise_mois" type="text" id="oDateReprise_mois" class="texte" maxlength="2"> <input name="oDateReprise_annee" type="text" id="oDateReprise_annee" class="texte" maxlength="4"></div>
+          <div id="blocValidation_oDateReprise" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Conducteur 1</legend>
+        <div id="ligne_oSexe" class="ligne">
+          <label id="libelle_oSexe">Civilité <img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oSexe">&nbsp;</div>
+          <div id="objet_oSexe" class="objet"><input name="oSexe" type="radio" class="choix" value="H">Homme <input name="oSexe" type="radio" class="choix" value="F">Femme</div>
+          <div id="blocValidation_oSexe" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oNom" class="ligne">
+          <label id="libelle_oNom" for="oNom">Nom :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oNom">&nbsp;</div>
+          <div id="objet_oNom" class="objet"><input name="oNom" type="text" id="oNom" class="texte" maxlength="250"></div>
+          <div id="blocValidation_oNom" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oPrenom" class="ligne">
+          <label id="libelle_oPrenom" for="oPrenom">Prénom :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oPrenom">&nbsp;</div>
+          <div id="objet_oPrenom" class="objet"><input name="oPrenom" type="text" id="oPrenom" class="texte" maxlength="250"></div>
+          <div id="blocValidation_oPrenom" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oDateNaissance" class="ligne">
+          <label id="libelle_oDateNaissance" for="oDateNaissance_jour">Date de naissance :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oDateNaissance">&nbsp;</div>
+          <div id="objet_oDateNaissance" class="objet"><input name="oDateNaissance_jour" type="text" id="oDateNaissance_jour" class="texte" maxlength="2"> <input name="oDateNaissance_mois" type="text" id="oDateNaissance_mois" class="texte" maxlength="2"> <input name="oDateNaissance_annee" type="text" id="oDateNaissance_annee" class="texte" maxlength="4"></div>
+          <div id="blocValidation_oDateNaissance" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oPaysNaiss" class="ligne">
+          <label id="libelle_oPaysNaiss" for="oPaysNaiss">Pays de naissance :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oPaysNaiss">&nbsp;</div>
+          <div id="objet_oPaysNaiss" class="objet"><select name="oPaysNaiss" id="oPaysNaiss" class="liste"><option value="61">France</option><option value="0">-------------------</option><option value="191">Afghanistan</option><option value="192">Afrique du Sud</option><option value="193">Albanie</option><option value="194">Algérie</option><option value="195">Allemagne</option><option value="210">Belgique</option><option value="225">Espagne</option><option value="236">Italie</option><option value="241">Maroc</option><option value="243">Portugal</option><option value="244">Suisse</option><option value="245">Tunisie</option></select></div>
+          <div id="blocValidation_oPaysNaiss" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oVilleNaissSaisieLibre" class="ligne">
+          <label id="libelle_oVilleNaissSaisieLibre" for="oVilleNaissSaisieLibre">Ville de naissance :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oVilleNaissSaisieLibre">&nbsp;</div>
+          <div id="objet_oVilleNaissSaisieLibre" class="objet"><input name="oVilleNaissSaisieLibre" type="text" id="oVilleNaissSaisieLibre" class="texte" maxlength="250"></div>
+          <div id="blocValidation_oVilleNaissSaisieLibre" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oSituationFam" class="ligne">
+          <label id="libelle_oSituationFam" for="oSituationFam">Situation familiale :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oSituationFam">&nbsp;</div>
+          <div id="objet_oSituationFam" class="objet"><select name="oSituationFam" id="oSituationFam" class="liste"><option value="celibataire">Célibataire</option><option value="marie">Marié(e)</option><option value="union_libre">Union libre</option><option value="divorce">Divorcé(e)</option><option value="veuf">Veuf(ve)</option></select></div>
+          <div id="blocValidation_oSituationFam" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oProfession" class="ligne">
+          <label id="libelle_oProfession" for="oProfession">Profession :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oProfession">&nbsp;</div>
+          <div id="objet_oProfession" class="objet"><select name="oProfession" id="oProfession" class="liste"><option value="">Choisissez</option><option value="104">Salarié Sédentaire</option><option value="115">Salarié Non Sédentaire</option><option value="211">Fonctionnaire Sédentaire</option><option value="212">Fonctionnaire Non Sédentaire</option><option value="301">Commerçant</option><option value="302">Artisan</option><option value="401">Profession libérale</option><option value="501">Retraité</option><option value="601">Etudiant</option><option value="701">Sans profession</option></select></div>
+          <div id="blocValidation_oProfession" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oDatePermis" class="ligne">
+          <label id="libelle_oDatePermis" for="oDatePermis_jour">Date de permis (date du permis d'origine) :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oDatePermis">&nbsp;</div>
+          <div id="objet_oDatePermis" class="objet"><input name="oDatePermis_jour" type="text" id="oDatePermis_jour" class="texte" maxlength="2"> <input name="oDatePermis_mois" type="text" id="oDatePermis_mois" class="texte" maxlength="2"> <input name="oDatePermis_annee" type="text" id="oDatePermis_annee" class="texte" maxlength="4"></div>
+          <div id="blocValidation_oDatePermis" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oPays" class="ligne">
+          <label id="libelle_oPays" for="oPays">Pays d'obtention du permis :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oPays">&nbsp;</div>
+          <div id="objet_oPays" class="objet"><select name="oPays" id="oPays" class="liste"><option value="61">France</option><option value="0">-------------------</option><option value="191">Afghanistan</option><option value="192">Afrique du Sud</option><option value="193">Albanie</option><option value="194">Algérie</option><option value="195">Allemagne</option><option value="210">Belgique</option><option value="225">Espagne</option><option value="236">Italie</option><option value="241">Maroc</option><option value="243">Portugal</option><option value="244">Suisse</option><option value="245">Tunisie</option></select></div>
+          <div id="blocValidation_oPays" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oConduite" class="ligne">
+          <label id="libelle_oConduite">Permis obtenu dans le cadre de l'AAC<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oConduite">&nbsp;</div>
+          <div id="objet_oConduite" class="objet"><input name="oConduite" type="radio" class="choix" value="1">Oui <input name="oConduite" type="radio" class="choix" value="0">Non</div>
+          <div id="blocValidation_oConduite" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oCodePostal" class="ligne">
+          <label id="libelle_oCodePostal" for="oCodePostal">Code postal l'adresse :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oCodePostal">&nbsp;</div>
+          <div id="objet_oCodePostal" class="objet"><div id="refContainer"><input class="text" type="text" name="oCodePostal" id="oCodePostal" maxlength="5"><br></div></div>
+          <div id="blocValidation_oCodePostal" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oAdresse1" class="ligne">
+          <label id="libelle_oAdresse1" for="oAdresse1">Adresse :</label>
+          <div class="puce_aide" id="puce_aide_oAdresse1">&nbsp;</div>
+          <div id="objet_oAdresse1" class="objet"><input class="text" type="text" name="oAdresse1" id="oAdresse1"><ul class="suggestions-list"></ul></div>
+          <div id="blocValidation_oAdresse1" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oAdresse2" class="ligne">
+          <label id="libelle_oAdresse2" for="oAdresse2">Adresse<i>(suite)</i> :</label>
+          <div class="puce_aide" id="puce_aide_oAdresse2">&nbsp;</div>
+          <div id="objet_oAdresse2" class="objet"><input class="text" type="text" name="oAdresse2" id="oAdresse2" placeholder="Complément d'adresse"><div></div></div>
+          <div id="blocValidation_oAdresse2" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oVille" class="ligne">
+          <label id="libelle_oVille" for="oVille">Ville :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oVille">&nbsp;</div>
+          <div id="objet_oVille" class="objet"><select name="oVille" id="oVille" class="liste"><option value="">Sélectionner une ville...</option><option value="BORDEAUX">BORDEAUX</option><option value="LILLE">LILLE</option><option value="LYON">LYON</option><option value="MARSEILLE">MARSEILLE</option><option value="NANTES">NANTES</option><option value="NICE">NICE</option><option value="PARIS">PARIS</option><option value="STRASBOURG">STRASBOURG</option><option value="TOULOUSE">TOULOUSE</option></select></div>
+          <div id="blocValidation_oVille" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oNumeroTelephone" class="ligne">
+          <label id="libelle_oNumeroTelephone" for="oNumeroTelephone">Téléphone fixe :</label>
+          <div class="puce_aide" id="puce_aide_oNumeroTelephone">&nbsp;</div>
+          <div id="objet_oNumeroTelephone" class="objet"><input class="text" type="text" name="oNumeroTelephone" id="oNumeroTelephone" maxlength="10"></div>
+          <div id="blocValidation_oNumeroTelephone" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oNumeroTelephonePortable" class="ligne">
+          <label id="libelle_oNumeroTelephonePortable" for="oNumeroTelephonePortable">Téléphone portable :</label>
+          <div class="puce_aide" id="puce_aide_oNumeroTelephonePortable">&nbsp;</div>
+          <div id="objet_oNumeroTelephonePortable" class="objet"><input class="text" type="text" name="oNumeroTelephonePortable" id="oNumeroTelephonePortable" maxlength="10"></div>
+          <div id="blocValidation_oNumeroTelephonePortable" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oEmail" class="ligne">
+          <label id="libelle_oEmail" for="oEmail">Email :</label>
+          <div class="puce_aide" id="puce_aide_oEmail">&nbsp;</div>
+          <div id="objet_oEmail" class="objet"><input class="text" type="text" name="oEmail" id="oEmail" maxlength="250"></div>
+          <div id="blocValidation_oEmail" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Antécédents d'assurance <small>(sur les 36 derniers mois)</small></legend>
+        <div id="ligne_oNbMoisAssuranceV4" class="ligne">
+          <label id="libelle_oNbMoisAssuranceV4">Avez-vous été assuré et/ou désigné sur un contrat automobile ?<img src="asterisque.svg" alt=""><br>(Comptabilisez l'intégralité des antécédents depuis <span class="dateMoins3Ans">Octobre 2023</span>)<br><a>Aide calcul antécédents</a></label>
+          <div class="puce_aide" id="puce_aide_oNbMoisAssuranceV4">&nbsp;</div>
+          <div id="objet_oNbMoisAssuranceV4" class="objet"><input name="oNbMoisAssuranceV4" type="radio" id="oNbMoisAssuranceV4_0" class="choix" value="0"> Non, aucune assurance<br>
+           <input name="oNbMoisAssuranceV4" type="radio" id="oNbMoisAssuranceV4_1" class="choix" value="1"> Oui, moins de 9 mois<br>
+           <input name="oNbMoisAssuranceV4" type="radio" id="oNbMoisAssuranceV4_9" class="choix" value="9"> Oui, de 9 à 23 mois<br>
+           <input name="oNbMoisAssuranceV4" type="radio" id="oNbMoisAssuranceV4_24" class="choix" value="24"> Oui, 24 mois et plus<br></div>
+          <div id="blocValidation_oNbMoisAssuranceV4" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <h4>Résiliation(s) depuis <span class="dateMoins3Ans">Octobre 2023</span></h4>
+        <div id="ligne_oResilAssPrec" class="ligne">
+          <label id="libelle_oResilAssPrec">Avez-vous été résilié par un précédent assureur<br>depuis <span class="dateMoins3Ans">Octobre 2023</span> ?<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oResilAssPrec">&nbsp;</div>
+          <div id="objet_oResilAssPrec" class="objet"><input id="oResilAssPrec_1" name="oResilAssPrec" type="radio" class="choix" value="1">Oui <input id="oResilAssPrec_0" name="oResilAssPrec" type="radio" class="choix" value="0">Non</div>
+          <div id="blocValidation_oResilAssPrec" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oResilNPP" class="ligne">
+          <label id="libelle_oResilNPP">Avez-vous été résilié pour non-paiement (NPP) ?<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oResilNPP">&nbsp;</div>
+          <div id="objet_oResilNPP" class="objet"><input id="oResilNPP_1" name="oResilNPP" type="radio" class="choix" value="1">Oui <input id="oResilNPP_0" name="oResilNPP" type="radio" class="choix" value="0">Non</div>
+          <div id="blocValidation_oResilNPP" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oResilAutreMotif" class="ligne">
+          <label id="libelle_oResilAutreMotif">Avez-vous été résilié par la compagnie pour un autre motif ?<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oResilAutreMotif">&nbsp;</div>
+          <div id="objet_oResilAutreMotif" class="objet"><input id="oResilAutreMotif_1" name="oResilAutreMotif" type="radio" class="choix" value="1">Oui <input id="oResilAutreMotif_0" name="oResilAutreMotif" type="radio" class="choix" value="0">Non</div>
+          <div id="blocValidation_oResilAutreMotif" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <div id="ligne_oNulliteFauseDeclaFraude" class="ligne">
+          <label id="libelle_oNulliteFauseDeclaFraude">Avez-vous fait l’objet d’une nullité pour fausse déclaration ?<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oNulliteFauseDeclaFraude">&nbsp;</div>
+          <div id="objet_oNulliteFauseDeclaFraude" class="objet"><input id="oNulliteFauseDeclaFraude_1" name="oNulliteFauseDeclaFraude" type="radio" class="choix" value="1">Oui <input id="oNulliteFauseDeclaFraude_0" name="oNulliteFauseDeclaFraude" type="radio" class="choix" value="0">Non</div>
+          <div id="blocValidation_oNulliteFauseDeclaFraude" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+        <h4>CRM</h4>
+        <div id="ligne_oCRM" class="ligne">
+          <label id="libelle_oCRM" for="oCRM">Bonus/Malus déclaré à la date d'effet souhaitée<img src="asterisque.svg" alt=""><br>(N'oubliez pas d'impacter les éventuels sinistres)</label>
+          <div class="puce_aide" id="puce_aide_oCRM">&nbsp;</div>
+          <div id="objet_oCRM" class="objet"><input class="text" type="text" name="oCRM" id="oCRM" maxlength="4"><i>(ex : 0.50)</i></div>
+          <div id="blocValidation_oCRM" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Infraction(s) relative(s) à la conduite d'un véhicule (Depuis <span class="dateMoins5Ans">Octobre 2021</span>)</legend>
+        <div id="ligne_oBoolSanctionPenaleAdmin" class="ligne">
+          <label id="libelle_oBoolSanctionPenaleAdmin"><strong>Sanction(s)</strong> au cours des 5 dernières années ?<br><span id="id5LastYear2">(Depuis <span class="dateMoins5Ans">Octobre 2021</span>)</span></label>
+          <div class="puce_aide" id="puce_aide_oBoolSanctionPenaleAdmin">&nbsp;</div>
+          <div id="objet_oBoolSanctionPenaleAdmin" class="objet"><div><input type="Checkbox" name="bZeroSanction" id="bZeroSanction"> Aucune sanction (ni alcoolémie, ni stupéfiant, ni autre)</div><br>
+           <div><input type="Checkbox" name="bSanctionAlco"> Sanction(s) pour <strong>alcoolémie</strong></div>
+           <div><input type="Checkbox" name="oUsageStupefiant"> Sanction(s) pour <strong>stupéfiant</strong></div>
+           <div><input type="Checkbox" name="oBoolAutresSanction"><strong>Autre(s) sanction(s)</strong> pénale(s) ou administrative(s)</div></div>
+          <div id="blocValidation_oBoolSanctionPenaleAdmin" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Autre information</legend>
+        <div id="ligne_oInfirmite" class="ligne">
+          <label id="libelle_oInfirmite">Troubles neuromoteurs et/ou neuropsychiques<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oInfirmite">&nbsp;</div>
+          <div id="objet_oInfirmite" class="objet"><input name="oInfirmite" type="radio" class="choix" value="1">Oui <input name="oInfirmite" type="radio" class="choix" value="0">Non</div>
+          <div id="blocValidation_oInfirmite" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Sinistres</legend>
+        <div id="ligne_oNbSinistre36Mois" class="ligne">
+          <label id="libelle_oNbSinistre36Mois" for="oNbSinistre36Mois">Nombres de sinistres survenus sur les 36 derniers mois :<img src="asterisque.svg" alt=""></label>
+          <div class="puce_aide" id="puce_aide_oNbSinistre36Mois">&nbsp;</div>
+          <div id="objet_oNbSinistre36Mois" class="objet"><input class="text" type="text" name="oNbSinistre36Mois" id="oNbSinistre36Mois" maxlength="1"><i>(6 maximum)</i></div>
+          <div id="blocValidation_oNbSinistre36Mois" class="validation"><img src="coche_cancel.svg" style="display:none" alt=""></div>
+        </div>
+      </fieldset>
+    </div>
+  </form>
+  <div class="boutons"><a role="button" class="btn" id="oy-ajout-conducteur">Ajouter un Conducteur</a> <a role="button" class="btn next" href="vehicule.html">&gt; Continuer Devis</a></div>
+  </main>
+  <footer class="oy">Démo type Oyat (locale) – extranet fictif pour la démonstration de Courtier Intelligent.</footer>
+  <script src="app.js"></script>
+</body>
+</html>
